@@ -5,7 +5,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, ReactNode } from 'react';
-import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon } from 'lucide-react'; // Renamed Settings to SettingsIcon
+import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Search, Aperture } from 'lucide-react';
 import { Logo } from '@/components/common/Logo';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { Button } from '@/components/ui/button';
@@ -20,8 +20,10 @@ import {
   SidebarMenuItem, 
   SidebarMenuButton,
   SidebarInset, 
-  SidebarFooter 
-} from '@/components/ui/sidebar'; // Assuming sidebar components are in ui
+  SidebarFooter
+} from '@/components/ui/sidebar';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, loading, logout, role } = useAuth();
@@ -47,7 +49,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   const isAdmin = role === 'Admin';
 
-  const adminNavItems = [
+  // Navigation items for Admin
+  const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/users', label: 'Users', icon: Users },
     { href: '/admin/products', label: 'Products', icon: Package },
@@ -57,30 +60,76 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     { href: '/admin/deliveries', label: 'Deliveries', icon: Truck },
     { href: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck },
     { href: '/admin/reports', label: 'Reports', icon: FileArchive },
-    { href: '/admin/settings', label: 'Settings', icon: SettingsIcon }, // Used aliased SettingsIcon
+  ];
+
+  const footerAdminNavItems = [
     { href: '/profile', label: 'Profile', icon: UserCircle },
+    { href: '/admin/settings', label: 'Settings', icon: SettingsIcon },
   ];
 
   if (isAdmin) {
     return (
       <SidebarProvider defaultOpen={true}>
         <div className="flex min-h-screen bg-background">
-          <Sidebar side="left" className="border-r hidden md:flex bg-card text-card-foreground">
-            <SidebarHeader className="p-4 border-b">
-              <Logo textSize="text-xl" />
+          <Sidebar 
+            side="left" 
+            className="border-r hidden md:flex bg-card text-card-foreground"
+            collapsible="icon" // Enables icon-only collapsed state
+          >
+            <SidebarHeader className="p-4 border-b flex justify-between items-center h-16">
+              {/* Show full logo when expanded, icon only when collapsed */}
+              <div className="group-data-[state=expanded]:block hidden">
+                <Logo textSize="text-xl" />
+              </div>
+              <div className="group-data-[state=collapsed]:block hidden text-center w-full">
+                <Aperture className="text-primary mx-auto" size={28} />
+              </div>
+              {/* Desktop Sidebar Toggle - visible in header when sidebar is expanded */}
+              <div className="group-data-[state=expanded]:block hidden">
+                <SidebarTrigger />
+              </div>
             </SidebarHeader>
-            <SidebarContent>
-              <SidebarMenu>
-                {adminNavItems.map((item) => (
+            <SidebarContent className="flex flex-col"> {/* Ensures content can grow and push footer */}
+              <div className="p-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input placeholder="Search..." className="pl-8 h-9 w-full" />
+                </div>
+              </div>
+              <ScrollArea className="flex-grow">
+                <SidebarMenu className="p-2">
+                  {mainAdminNavItems.map((item) => (
+                    <SidebarMenuItem key={item.label}>
+                      <Link href={item.href} passHref legacyBehavior>
+                        <SidebarMenuButton
+                          asChild
+                          tooltip={item.label} // Tooltip for collapsed state
+                          className="w-full justify-start"
+                          variant="ghost"
+                        >
+                          <a> 
+                            <item.icon className="mr-2" />
+                            <span>{item.label}</span>
+                          </a>
+                        </SidebarMenuButton>
+                      </Link>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </ScrollArea>
+            </SidebarContent>
+            <SidebarFooter className="p-2 border-t mt-auto"> {/* mt-auto pushes to bottom */}
+              <SidebarMenu className="p-0"> {/* Remove padding if items have their own */}
+                {footerAdminNavItems.map((item) => (
                   <SidebarMenuItem key={item.label}>
-                    <Link href={item.href} passHref legacyBehavior>
-                      <SidebarMenuButton 
-                        asChild 
-                        tooltip={item.label} 
+                     <Link href={item.href} passHref legacyBehavior>
+                      <SidebarMenuButton
+                        asChild
+                        tooltip={item.label}
                         className="w-full justify-start"
-                        variant="ghost" // Use ghost for sidebar items for better UX
+                        variant="ghost"
                       >
-                        <a> 
+                        <a>
                           <item.icon className="mr-2" />
                           <span>{item.label}</span>
                         </a>
@@ -89,24 +138,30 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>
-            </SidebarContent>
-            <SidebarFooter className="p-4 border-t">
-              <Button variant="outline" onClick={logout} className="w-full">
-                <LogOutIcon className="mr-2 h-4 w-4" /> Logout
-              </Button>
+              <div className="mt-2 p-2"> {/* Add margin top for separation and padding for button */}
+                <Button variant="outline" onClick={logout} className="w-full">
+                  <LogOutIcon className="mr-2 h-4 w-4" />
+                  <span className="group-data-[state=expanded]:inline hidden">Logout</span>
+                </Button>
+              </div>
             </SidebarFooter>
           </Sidebar>
 
           <div className="flex flex-col flex-grow">
             <header className="sticky top-0 z-40 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
               <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+                {/* Mobile Sidebar Toggle */}
                 <div className="md:hidden">
                    <SidebarTrigger />
                 </div>
-                {/* Invisible placeholder to keep title centered if trigger is not shown on md+ */}
-                <div className="hidden md:w-8"></div> 
+                {/* Desktop: Show trigger to expand if sidebar is collapsed to icon mode */}
+                <div className="hidden md:block">
+                  <div className="group-data-[state=collapsed]:block hidden">
+                     <SidebarTrigger />
+                  </div>
+                </div>
                 
-                <div className="flex-1 text-center md:text-left">
+                <div className="flex-1 text-center md:text-left pl-0 md:pl-2"> {/* Adjust padding */}
                   <span className="font-headline text-xl font-bold text-foreground">
                     Zellow Enterprises - Admin
                   </span>
@@ -119,7 +174,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                   </Button>
                 </div>
               </div>
-            </header>
+            </Header>
             <SidebarInset>
               <main className="flex-grow p-4 md:p-6 lg:p-8">
                 {children}
