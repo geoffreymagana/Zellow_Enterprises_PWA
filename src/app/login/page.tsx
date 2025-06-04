@@ -29,7 +29,7 @@ export default function LoginPage() {
         <CardHeader>
           <CardTitle className="text-2xl font-headline text-center">Welcome Back</CardTitle>
           <CardDescription className="text-center">
-            Sign in to access your ZellowLive account.
+            Sign in to access your Zellow Enterprises account.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -37,7 +37,7 @@ export default function LoginPage() {
         </CardContent>
       </Card>
        <p className="mt-6 text-center text-sm text-muted-foreground">
-        New to ZellowLive? <a href="#" className="font-medium text-primary hover:underline">Sign up</a>
+        New to Zellow Enterprises? <a href="#" className="font-medium text-primary hover:underline">Sign up</a>
       </p>
     </div>
   );

@@ -44,7 +44,7 @@ export default function DashboardPage() {
       case 'ServiceManager': return "Service Management";
       case 'InventoryManager': return "Inventory Control";
       case 'DispatchManager': return "Dispatch Operations";
-      default: return "Welcome to ZellowLive";
+      default: return "Welcome to Zellow Enterprises";
     }
   };
   

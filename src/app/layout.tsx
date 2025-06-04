@@ -6,8 +6,8 @@ import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 
 export const metadata: Metadata = {
-  title: 'ZellowLive PWA',
-  description: 'ZellowLive PWA for Customers and Staff',
+  title: 'Zellow Enterprises PWA',
+  description: 'Zellow Enterprises PWA for Customers and Staff',
   manifest: '/manifest.json', // Assuming manifest.json will be added for PWA
 };
 

@@ -38,7 +38,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-50 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <div className="container flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
           <Logo className="hidden md:flex" />
-          <span className="md:hidden font-headline text-xl font-bold text-foreground">ZellowLive</span>
+          <span className="md:hidden font-headline text-xl font-bold text-foreground">Zellow Enterprises</span>
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <Button variant="outline" size="sm" onClick={logout}>Logout</Button>
