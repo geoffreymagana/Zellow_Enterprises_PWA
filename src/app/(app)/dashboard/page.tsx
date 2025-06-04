@@ -20,7 +20,7 @@ const DashboardItem = ({ title, value, icon: Icon, link, description }: { title:
       {description && <p className="text-xs text-muted-foreground">{description}</p>}
       {link && (
         <Link href={link} passHref>
-          <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground mt-1">View details</Button>
+          <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground mt-1 hover:text-primary">View details</Button>
         </Link>
       )}
     </CardContent>
@@ -94,7 +94,7 @@ export default function DashboardPage() {
           </>
         );
       default:
-        return <Alert><AlertTitle>No specific items for your role.</AlertTitle><AlertDescription>Explore available sections via navigation or contact support if your role is unassigned.</AlertDescription></Alert>;
+        return <div className="col-span-full"><Alert><AlertTitle>No specific items for your role.</AlertTitle><AlertDescription>Explore available sections via navigation or contact support if your role is unassigned. Your current role is: {role || 'Not Assigned'}</AlertDescription></Alert></div>;
     }
   }
 
@@ -107,7 +107,7 @@ export default function DashboardPage() {
       
       {role !== 'Admin' && role !== 'Customer' && (
         <Alert>
-          <BarChart className="h-4 w-4" />
+          <BarChart className="h-4 w-4 mr-2" />
           <AlertTitle>Real-time Updates</AlertTitle>
           <AlertDescription>
             This dashboard will show real-time data once connected to Firestore. Placeholder values are shown.
@@ -115,17 +115,17 @@ export default function DashboardPage() {
         </Alert>
       )}
        {role === 'Admin' && (
-        <Alert variant="default">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Admin Panel</AlertTitle>
-          <AlertDescription>
+        <Alert variant="default" className="border-primary/50 bg-primary/5 text-primary-foreground-muted">
+          <AlertTriangle className="h-4 w-4 mr-2 text-primary" />
+          <AlertTitle className="text-primary">Admin Panel Active</AlertTitle>
+          <AlertDescription className="text-primary/90">
             You have administrative privileges. Manage system data and operations from here. Data displayed is currently placeholder.
           </AlertDescription>
         </Alert>
       )}
       {role === 'Customer' && (
          <Alert variant="default">
-          <ShoppingCart className="h-4 w-4" />
+          <ShoppingCart className="h-4 w-4 mr-2" />
           <AlertTitle>Welcome to Zellow Enterprises!</AlertTitle>
           <AlertDescription>
             Browse products, manage your orders, and customize items. Placeholder values are currently shown.
@@ -138,29 +138,35 @@ export default function DashboardPage() {
         {getRoleSpecificItems()}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {role === 'Admin' && (
-            <>
-              <Link href="/admin/users"><Button><UserCog className="mr-2 h-4 w-4" /> Manage Users</Button></Link>
-              <Link href="/admin/products"><Button variant="outline"><Package className="mr-2 h-4 w-4" /> Manage Products</Button></Link>
-              <Link href="/admin/orders"><Button><ShoppingCart className="mr-2 h-4 w-4" /> Manage Orders</Button></Link>
-              <Link href="/admin/reports"><Button variant="outline"><FileArchive className="mr-2 h-4 w-4" /> View Reports</Button></Link>
-            </>
-          )}
-          {role === 'Customer' && <Link href="/products"><Button><Package className="mr-2 h-4 w-4" />Browse Products</Button></Link>}
-          {role === 'Customer' && <Link href="/orders"><Button variant="outline"><ShoppingCart className="mr-2 h-4 w-4" />My Orders</Button></Link>}
-          {role === 'Customer' && <Link href="/customizations/gift"><Button variant="outline"><UsersIcon className="mr-2 h-4 w-4" />Customize Gift</Button></Link>}
-          {(role === 'Technician' || role === 'ServiceManager') && <Link href="/tasks"><Button>View Tasks</Button></Link>}
-          {(role === 'Rider' || role === 'DispatchManager') && <Link href="/deliveries"><Button>Manage Deliveries</Button></Link>}
-          {/* Add more role-specific quick actions */}
-        </CardContent>
-      </Card>
+      {role === 'Admin' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Admin Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+                <Link href="/admin/users"><Button><UserCog className="mr-2 h-4 w-4" /> Manage Users</Button></Link>
+                <Link href="/admin/products"><Button variant="outline"><Package className="mr-2 h-4 w-4" /> Manage Products</Button></Link>
+                <Link href="/admin/orders"><Button><ShoppingCart className="mr-2 h-4 w-4" /> Manage Orders</Button></Link>
+                <Link href="/admin/reports"><Button variant="outline"><FileArchive className="mr-2 h-4 w-4" /> View Reports</Button></Link>
+                <Link href="/admin/settings"><Button><Settings className="mr-2 h-4 w-4" /> System Settings</Button></Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {role !== 'Admin' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {role === 'Customer' && <Link href="/products"><Button><Package className="mr-2 h-4 w-4" />Browse Products</Button></Link>}
+            {role === 'Customer' && <Link href="/orders"><Button variant="outline"><ShoppingCart className="mr-2 h-4 w-4" />My Orders</Button></Link>}
+            {role === 'Customer' && <Link href="/customizations/gift"><Button variant="outline"><UsersIcon className="mr-2 h-4 w-4" />Customize Gift</Button></Link>}
+            {(role === 'Technician' || role === 'ServiceManager') && <Link href="/tasks"><Button>View Tasks</Button></Link>}
+            {(role === 'Rider' || role === 'DispatchManager') && <Link href="/deliveries"><Button>Manage Deliveries</Button></Link>}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
-
-    
