@@ -1,8 +1,9 @@
+
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getAuth, Auth } from "firebase/auth";
 import { getFirestore, Firestore } from "firebase/firestore";
 // import { getFunctions, Functions } from "firebase/functions"; // Uncomment if needed
-// import { getStorage, FirebaseStorage } from "firebase/storage"; // Uncomment if using Firebase Storage
+// import { getStorage, FirebaseStorage } from "firebase/storage"; // Uncomment if needed
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -13,31 +14,35 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-let app: FirebaseApp;
-let auth: Auth;
-let db: Firestore;
+let app: FirebaseApp | undefined;
+let auth: Auth | undefined;
+let db: Firestore | undefined;
 // let functions: Functions; // Uncomment if needed
 // let storage: FirebaseStorage; // Uncomment if needed
 
-if (typeof window !== "undefined" && !getApps().length) {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-  // functions = getFunctions(app); // Uncomment if needed
-  // storage = getStorage(app); // Uncomment if needed
-} else if (getApps().length > 0) {
-  app = getApp();
-  auth = getAuth(app);
-  db = getFirestore(app);
-  // functions = getFunctions(app); // Uncomment if needed
-  // storage = getStorage(app); // Uncomment if needed
-} else {
-  // This case is for server-side rendering or environments where Firebase might not be initialized yet.
-  // Handle gracefully or throw an error if Firebase services are accessed before initialization.
-  // For this PWA, client-side initialization is primary.
+// Only attempt to initialize Firebase on the client side
+// and if the necessary configuration (especially API key and Project ID) is present.
+if (typeof window !== "undefined") {
+  if (firebaseConfig.apiKey && firebaseConfig.projectId) { // Ensure critical config is present
+    if (!getApps().length) {
+      app = initializeApp(firebaseConfig);
+    } else {
+      app = getApp();
+    }
+    auth = getAuth(app);
+    db = getFirestore(app);
+    // functions = getFunctions(app); // Uncomment if needed
+    // storage = getStorage(app); // Uncomment if needed
+  } else {
+    // Log an error if Firebase config is missing on the client side.
+    // Firebase services (app, auth, db) will remain undefined.
+    console.error(
+      "Firebase configuration is incomplete (API key or Project ID missing). " +
+      "Firebase will not be initialized. Please check your environment variables (e.g., NEXT_PUBLIC_FIREBASE_API_KEY)."
+    );
+  }
 }
+// On the server side (when typeof window === "undefined"), app, auth, db will also be undefined.
 
-
-// @ts-ignore
 export { app, auth, db };
 // export { app, auth, db, functions, storage }; // Uncomment if needed
