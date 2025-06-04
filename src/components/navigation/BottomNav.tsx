@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -11,11 +12,13 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ElementType;
-  roles: UserRole[]; // Roles that can see this item, or 'all' for any authenticated user
+  roles: UserRole[]; // Roles that can see this item. `null` can be included for "Not Assigned".
 }
 
+const allAppRoles: UserRole[] = ['Customer', 'Technician', 'Rider', 'Supplier', 'SupplyManager', 'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'];
+
 const navItems: NavItem[] = [
-  { href: '/dashboard', label: 'Home', icon: Home, roles: ['Customer', 'Technician', 'Rider', 'Supplier', 'SupplyManager', 'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'] },
+  { href: '/dashboard', label: 'Home', icon: Home, roles: [...allAppRoles, null] }, // Accessible to all authenticated users, including those with null/unassigned role
   { href: '/products', label: 'Products', icon: Package, roles: ['Customer'] },
   { href: '/orders', label: 'Orders', icon: ShoppingCart, roles: ['Customer'] },
   { href: '/tasks', label: 'Tasks', icon: ListChecks, roles: ['Technician', 'ServiceManager'] },
@@ -25,7 +28,7 @@ const navItems: NavItem[] = [
   { href: '/inventory', label: 'Inventory', icon: Warehouse, roles: ['InventoryManager', 'SupplyManager'] },
   { href: '/suppliers', label: 'Suppliers', icon: Users, roles: ['SupplyManager'] },
   { href: '/services', label: 'Services', icon: Layers, roles: ['ServiceManager'] },
-  { href: '/profile', label: 'Profile', icon: UserCircle, roles: ['Customer', 'Technician', 'Rider', 'Supplier', 'SupplyManager', 'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'] },
+  { href: '/profile', label: 'Profile', icon: UserCircle, roles: [...allAppRoles, null] }, // Accessible to all authenticated users, including those with null/unassigned role
 ];
 
 export function BottomNav() {
@@ -34,9 +37,9 @@ export function BottomNav() {
 
   if (!user) return null; // Don't show if not logged in
 
-  const filteredNavItems = navItems.filter(item => 
-    item.roles.includes(role) || item.roles.includes(user.role) // Ensure role from auth context is used
-  );
+  // Filter items: show item if its `roles` array includes the current user's role.
+  // `role` from useAuth() can be a specific role string or `null` if not assigned.
+  const filteredNavItems = navItems.filter(item => item.roles.includes(role));
   
   // Ensure a sensible number of items, e.g., max 5. Prioritize common items or implement scrolling / "more" tab.
   // This is a simplified version; a real app might need more sophisticated logic for tab visibility.
