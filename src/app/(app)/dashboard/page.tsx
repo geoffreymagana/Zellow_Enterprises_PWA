@@ -4,7 +4,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers } from 'lucide-react';
+import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers } from 'lucide-react'; // Renamed Users to UsersIcon to avoid conflict
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
@@ -71,28 +71,28 @@ export default function DashboardPage() {
       case 'Customer':
         return (
           <>
-            <DashboardItem title="Active Orders" value={3} icon={ShoppingCart} link="/orders" />
-            <DashboardItem title="Wishlist Items" value={5} icon={Package} link="/products" />
-            <DashboardItem title="Recent Activity" value="Payment successful" icon={DollarSign} />
+            <DashboardItem title="Active Orders" value={"N/A"} icon={ShoppingCart} link="/orders" />
+            <DashboardItem title="Wishlist Items" value={"N/A"} icon={Package} link="/products" />
+            <DashboardItem title="Browse Services" value={"N/A"} icon={Layers} link="/services" />
+            <DashboardItem title="Gift Customizations" value={"N/A"} icon={UsersIcon} link="/customizations/gift" />
           </>
         );
       case 'Technician':
         return (
           <>
-            <DashboardItem title="Assigned Tasks" value={7} icon={Wrench} link="/tasks" />
-            <DashboardItem title="Pending Approvals" value={2} icon={AlertTriangle} />
-            <DashboardItem title="Completed Today" value={1} icon={Wrench} />
+            <DashboardItem title="Assigned Tasks" value={"N/A"} icon={Wrench} link="/tasks" />
+            <DashboardItem title="Pending Approvals" value={"N/A"} icon={AlertTriangle} />
+            <DashboardItem title="Completed Today" value={"N/A"} icon={Wrench} />
           </>
         );
        case 'Rider':
         return (
           <>
-            <DashboardItem title="Active Deliveries" value={4} icon={Truck} link="/deliveries" />
-            <DashboardItem title="Completed Today" value={8} icon={Truck} />
-            <DashboardItem title="Next Delivery Area" value="Zone B" icon={Truck} />
+            <DashboardItem title="Active Deliveries" value={"N/A"} icon={Truck} link="/deliveries" />
+            <DashboardItem title="Completed Today" value={"N/A"} icon={Truck} />
+            <DashboardItem title="Next Delivery Area" value="N/A" icon={Truck} />
           </>
         );
-      // Add more cases for other roles
       default:
         return <Alert><AlertTitle>No specific items for your role.</AlertTitle><AlertDescription>Explore available sections via navigation or contact support if your role is unassigned.</AlertDescription></Alert>;
     }
@@ -105,12 +105,12 @@ export default function DashboardPage() {
         Hello, {user.displayName || user.email}! Your role is: <span className="font-semibold text-primary">{role || 'Not Assigned'}</span>.
       </p>
       
-      {role !== 'Admin' && (
+      {role !== 'Admin' && role !== 'Customer' && (
         <Alert>
           <BarChart className="h-4 w-4" />
           <AlertTitle>Real-time Updates</AlertTitle>
           <AlertDescription>
-            This dashboard will show real-time data once connected to Firestore.
+            This dashboard will show real-time data once connected to Firestore. Placeholder values are shown.
           </AlertDescription>
         </Alert>
       )}
@@ -120,6 +120,15 @@ export default function DashboardPage() {
           <AlertTitle>Admin Panel</AlertTitle>
           <AlertDescription>
             You have administrative privileges. Manage system data and operations from here. Data displayed is currently placeholder.
+          </AlertDescription>
+        </Alert>
+      )}
+      {role === 'Customer' && (
+         <Alert variant="default">
+          <ShoppingCart className="h-4 w-4" />
+          <AlertTitle>Welcome to Zellow Enterprises!</AlertTitle>
+          <AlertDescription>
+            Browse products, manage your orders, and customize items. Placeholder values are currently shown.
           </AlertDescription>
         </Alert>
       )}
@@ -142,8 +151,9 @@ export default function DashboardPage() {
               <Link href="/admin/reports"><Button variant="outline"><FileArchive className="mr-2 h-4 w-4" /> View Reports</Button></Link>
             </>
           )}
-          {role === 'Customer' && <Link href="/products"><Button>Browse Products</Button></Link>}
-          {role === 'Customer' && <Link href="/orders"><Button variant="outline">My Orders</Button></Link>}
+          {role === 'Customer' && <Link href="/products"><Button><Package className="mr-2 h-4 w-4" />Browse Products</Button></Link>}
+          {role === 'Customer' && <Link href="/orders"><Button variant="outline"><ShoppingCart className="mr-2 h-4 w-4" />My Orders</Button></Link>}
+          {role === 'Customer' && <Link href="/customizations/gift"><Button variant="outline"><UsersIcon className="mr-2 h-4 w-4" />Customize Gift</Button></Link>}
           {(role === 'Technician' || role === 'ServiceManager') && <Link href="/tasks"><Button>View Tasks</Button></Link>}
           {(role === 'Rider' || role === 'DispatchManager') && <Link href="/deliveries"><Button>Manage Deliveries</Button></Link>}
           {/* Add more role-specific quick actions */}
@@ -152,3 +162,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
