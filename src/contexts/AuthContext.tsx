@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         variant: "destructive",
         duration: Infinity, // Keep message until dismissed
       });
-      console.error("AuthContext: Firebase auth or db service is not available.");
+      // console.error("AuthContext: Firebase auth or db service is not available."); // Removed this line
       setLoading(false);
       setUser(null);
       setRole(null);
@@ -134,3 +134,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
+
