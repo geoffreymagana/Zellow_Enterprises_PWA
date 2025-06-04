@@ -34,15 +34,12 @@ if (typeof window !== "undefined") {
     // functions = getFunctions(app); // Uncomment if needed
     // storage = getStorage(app); // Uncomment if needed
   } else {
-    // Log an error if Firebase config is missing on the client side.
-    // Firebase services (app, auth, db) will remain undefined.
-    console.error(
-      "Firebase configuration is incomplete (API key or Project ID missing). " +
-      "Firebase will not be initialized. Please check your environment variables (e.g., NEXT_PUBLIC_FIREBASE_API_KEY)."
-    );
+    // Firebase services (app, auth, db) will remain undefined if config is missing.
+    // AuthContext will handle notifying the user.
   }
 }
 // On the server side (when typeof window === "undefined"), app, auth, db will also be undefined.
 
 export { app, auth, db };
 // export { app, auth, db, functions, storage }; // Uncomment if needed
+
