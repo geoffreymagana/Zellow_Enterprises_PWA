@@ -1,14 +1,15 @@
+
 "use client";
 
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users, Wrench } from 'lucide-react';
+import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 // Helper component for dashboard items
-const DashboardItem = ({ title, value, icon: Icon, link }: { title: string; value: string | number; icon: React.ElementType; link?: string }) => (
+const DashboardItem = ({ title, value, icon: Icon, link, description }: { title: string; value: string | number; icon: React.ElementType; link?: string; description?: string }) => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-sm font-medium">{title}</CardTitle>
@@ -16,9 +17,10 @@ const DashboardItem = ({ title, value, icon: Icon, link }: { title: string; valu
     </CardHeader>
     <CardContent>
       <div className="text-2xl font-bold">{value}</div>
+      {description && <p className="text-xs text-muted-foreground">{description}</p>}
       {link && (
         <Link href={link} passHref>
-          <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground">View details</Button>
+          <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground mt-1">View details</Button>
         </Link>
       )}
     </CardContent>
@@ -35,6 +37,7 @@ export default function DashboardPage() {
 
   const getRoleSpecificGreeting = () => {
     switch (role) {
+      case 'Admin': return "Admin Control Panel";
       case 'Customer': return "Welcome, valued Customer!";
       case 'Technician': return "Technician Dashboard";
       case 'Rider': return "Rider Dashboard";
@@ -51,6 +54,20 @@ export default function DashboardPage() {
   const getRoleSpecificItems = () => {
     // Placeholder data - in a real app, this would come from Firestore
     switch (role) {
+      case 'Admin':
+        return (
+          <>
+            <DashboardItem title="User Management" value="N/A" icon={UserCog} link="/admin/users" description="Add, edit, delete users and roles." />
+            <DashboardItem title="Product Catalog" value="N/A" icon={Package} link="/admin/products" description="Manage all products." />
+            <DashboardItem title="Order Processing" value="N/A" icon={ShoppingCart} link="/admin/orders" description="Oversee all customer orders." />
+            <DashboardItem title="Payment Records" value="N/A" icon={DollarSign} link="/admin/payments" description="View financial transactions." />
+            <DashboardItem title="Delivery Logistics" value="N/A" icon={Truck} link="/admin/deliveries" description="Track and manage deliveries." />
+            <DashboardItem title="Service Approvals" value="N/A" icon={ClipboardCheck} link="/admin/approvals" description="Review pending requests." />
+            <DashboardItem title="System Reports" value="N/A" icon={FileArchive} link="/admin/reports" description="Generate and view reports." />
+            <DashboardItem title="Customization Hub" value="N/A" icon={Layers} link="/admin/customizations" description="Manage customization options." />
+            <DashboardItem title="System Settings" value="N/A" icon={Settings} link="/admin/settings" description="Configure application settings." />
+          </>
+        );
       case 'Customer':
         return (
           <>
@@ -63,7 +80,7 @@ export default function DashboardPage() {
         return (
           <>
             <DashboardItem title="Assigned Tasks" value={7} icon={Wrench} link="/tasks" />
-            <DashboardItem title="Pending Approvals" value={2} icon={Wrench} />
+            <DashboardItem title="Pending Approvals" value={2} icon={AlertTriangle} />
             <DashboardItem title="Completed Today" value={1} icon={Wrench} />
           </>
         );
@@ -77,7 +94,7 @@ export default function DashboardPage() {
         );
       // Add more cases for other roles
       default:
-        return <Alert><AlertTitle>No specific items for your role.</AlertTitle><AlertDescription>Explore available sections via navigation.</AlertDescription></Alert>;
+        return <Alert><AlertTitle>No specific items for your role.</AlertTitle><AlertDescription>Explore available sections via navigation or contact support if your role is unassigned.</AlertDescription></Alert>;
     }
   }
 
@@ -88,13 +105,25 @@ export default function DashboardPage() {
         Hello, {user.displayName || user.email}! Your role is: <span className="font-semibold text-primary">{role || 'Not Assigned'}</span>.
       </p>
       
-      <Alert>
-        <BarChart className="h-4 w-4" />
-        <AlertTitle>Real-time Updates</AlertTitle>
-        <AlertDescription>
-          This dashboard will show real-time data once connected to Firestore.
-        </AlertDescription>
-      </Alert>
+      {role !== 'Admin' && (
+        <Alert>
+          <BarChart className="h-4 w-4" />
+          <AlertTitle>Real-time Updates</AlertTitle>
+          <AlertDescription>
+            This dashboard will show real-time data once connected to Firestore.
+          </AlertDescription>
+        </Alert>
+      )}
+       {role === 'Admin' && (
+        <Alert variant="default">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Admin Panel</AlertTitle>
+          <AlertDescription>
+            You have administrative privileges. Manage system data and operations from here. Data displayed is currently placeholder.
+          </AlertDescription>
+        </Alert>
+      )}
+
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {getRoleSpecificItems()}
@@ -105,6 +134,14 @@ export default function DashboardPage() {
           <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
+          {role === 'Admin' && (
+            <>
+              <Link href="/admin/users"><Button><UserCog className="mr-2 h-4 w-4" /> Manage Users</Button></Link>
+              <Link href="/admin/products"><Button variant="outline"><Package className="mr-2 h-4 w-4" /> Manage Products</Button></Link>
+              <Link href="/admin/orders"><Button><ShoppingCart className="mr-2 h-4 w-4" /> Manage Orders</Button></Link>
+              <Link href="/admin/reports"><Button variant="outline"><FileArchive className="mr-2 h-4 w-4" /> View Reports</Button></Link>
+            </>
+          )}
           {role === 'Customer' && <Link href="/products"><Button>Browse Products</Button></Link>}
           {role === 'Customer' && <Link href="/orders"><Button variant="outline">My Orders</Button></Link>}
           {(role === 'Technician' || role === 'ServiceManager') && <Link href="/tasks"><Button>View Tasks</Button></Link>}
