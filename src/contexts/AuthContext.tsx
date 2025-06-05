@@ -4,9 +4,9 @@
 import type { User, UserRole } from '@/types';
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import type { User as FirebaseUser } from 'firebase/auth';
-import { onAuthStateChanged, signOut as firebaseSignOut, signInWithEmailAndPassword } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase'; // auth and db can now be undefined
-import { doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged, signOut as firebaseSignOut, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { auth, db } from '@/lib/firebase'; 
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
@@ -16,6 +16,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateUserProfile: (newDisplayName: string) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -53,9 +54,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.warn(`User document for ${firebaseUser.uid} not found or role is missing.`);
         }
         
-        // Allow Admin to log in, but other roles might have specific PWA paths.
-        // The previous check for 'Admin' to log them out has been removed.
-
         const appUser: User = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -115,8 +113,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updateUserProfile = async (newDisplayName: string) => {
+    if (!auth || !auth.currentUser || !db) {
+      toast({ title: "Update Failed", description: "User not authenticated or Firebase services unavailable.", variant: "destructive" });
+      throw new Error("User not authenticated or Firebase services unavailable.");
+    }
+    setLoading(true);
+    try {
+      // Update Firebase Auth profile
+      await updateProfile(auth.currentUser, { displayName: newDisplayName });
+
+      // Update Firestore document
+      const userDocRef = doc(db, 'users', auth.currentUser.uid);
+      await updateDoc(userDocRef, { displayName: newDisplayName });
+
+      // Update local state
+      setUser(prevUser => prevUser ? { ...prevUser, displayName: newDisplayName } : null);
+      
+      toast({ title: "Profile Updated", description: "Your display name has been successfully updated." });
+    } catch (error: any) {
+      console.error("Profile update failed:", error);
+      toast({ title: "Update Failed", description: error.message || "Could not update profile.", variant: "destructive" });
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, role, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, role, loading, login, logout, updateUserProfile }}>
       {children}
     </AuthContext.Provider>
   );
