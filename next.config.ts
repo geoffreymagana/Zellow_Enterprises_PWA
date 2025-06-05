@@ -34,6 +34,12 @@ const nextConfig: NextConfig = {
         hostname: 'i.imgur.com', // Often direct image links are on i.imgur.com
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'photos.google.com',
+        port: '',
+        pathname: '/**',
       }
     ],
   },
