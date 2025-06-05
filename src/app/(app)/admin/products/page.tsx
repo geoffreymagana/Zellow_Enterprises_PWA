@@ -21,7 +21,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Badge } from "@/components/ui/badge";
 import Image from 'next/image';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -49,6 +49,8 @@ const productFormSchema = z.object({
 });
 
 type ProductFormValues = z.infer<typeof productFormSchema>;
+
+const ALL_CATEGORIES_SENTINEL = "__ALL_CATEGORIES__";
 
 export default function AdminProductsPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -182,7 +184,6 @@ export default function AdminProductsPage() {
     // This should not be reached if auth checks are done correctly, but as a fallback.
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">Unauthorized or session changed.</div>;
   }
-  // console.log("Rendering AdminProductsPage, user role:", role); // For debugging
 
   return (
     <div className="space-y-6">
@@ -206,12 +207,15 @@ export default function AdminProductsPage() {
                 className="pl-8 w-full"
               />
             </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <Select
+              value={categoryFilter === "" ? ALL_CATEGORIES_SENTINEL : categoryFilter}
+              onValueChange={(value) => setCategoryFilter(value === ALL_CATEGORIES_SENTINEL ? "" : value)}
+            >
               <SelectTrigger className="w-full sm:w-[200px]">
                 <SelectValue placeholder="Filter by category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value={ALL_CATEGORIES_SENTINEL}>All Categories</SelectItem>
                 {predefinedCategories.map(cat => (
                   <SelectItem key={cat} value={cat}>{cat.split(' (')[0]}</SelectItem>
                 ))}
@@ -312,8 +316,8 @@ export default function AdminProductsPage() {
                       <FormDescription>Enter a direct link to the product image (e.g., from Google Drive, Imgur, or your own CDN).</FormDescription>
                       <FormMessage />
                     </FormItem>
-                  )}
-                   {form.watch("imageUrl") && (
+                  )} />
+                  {form.watch("imageUrl") && (
                     <div className="my-2 p-2 border rounded-md flex justify-center items-center bg-muted aspect-video max-h-48 relative">
                       <Image src={form.watch("imageUrl")!} alt="Image Preview" fill className="object-contain"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement?.querySelector('.error-placeholder')?.classList.remove('hidden');}}
@@ -321,7 +325,7 @@ export default function AdminProductsPage() {
                       />
                       <div className="error-placeholder hidden text-muted-foreground text-xs flex flex-col items-center"><ImageOff className="h-8 w-8 mb-1"/><span>Invalid URL or image</span></div>
                     </div>
-                   )}
+                  )}
 
                   <FormField control={form.control} name="sku" render={({ field }) => (<FormItem><FormLabel>SKU (Optional)</FormLabel><FormControl><Input {...field} placeholder="e.g., ZMUG-WHT-11" /></FormControl><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="supplier" render={({ field }) => (<FormItem><FormLabel>Supplier (Optional)</FormLabel><FormControl><Input {...field} placeholder="e.g., Acme Supplies" /></FormControl><FormMessage /></FormItem>)} />
@@ -385,4 +389,4 @@ export default function AdminProductsPage() {
     </div>
   );
 }
-    
+
