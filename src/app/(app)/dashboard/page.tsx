@@ -4,7 +4,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component } from 'lucide-react';
+import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState, useCallback } from 'react';
@@ -66,7 +66,7 @@ export default function DashboardPage() {
         setIsLoadingUserCount(false);
       }
 
-      if (role === 'DispatchManager' || role === 'Admin') { // Admin might also want to see these stats
+      if (role === 'DispatchManager' || role === 'Admin') { // Admin might also want to see these stats for their own dashboard, Dispatch Manager for theirs
         setIsLoadingActiveRiders(true);
         setIsLoadingOrdersAwaiting(true);
         setIsLoadingOngoingDeliveries(true);
@@ -95,8 +95,8 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubAwaiting);
         
-        const qOngoing: OrderStatus[] = ['assigned', 'out_for_delivery'];
-        const qOngoingDeliveries = query(ordersCol, where("status", "in", qOngoing));
+        const qOngoingStatuses: OrderStatus[] = ['assigned', 'out_for_delivery'];
+        const qOngoingDeliveries = query(ordersCol, where("status", "in", qOngoingStatuses));
         const unsubOngoing = onSnapshot(qOngoingDeliveries, (snapshot) => {
             setOngoingDeliveries(snapshot.size);
             setIsLoadingOngoingDeliveries(false);
@@ -138,21 +138,21 @@ export default function DashboardPage() {
   };
   
   const getRoleSpecificItems = () => {
-    // Placeholder data - in a real app, this would come from Firestore
     switch (role) {
       case 'Admin':
         return (
           <>
             <DashboardItem title="Active Users" value={activeUserCount} icon={UserCog} link="/admin/users" description="Manage active users and roles." isLoadingValue={isLoadingUserCount} />
-            <DashboardItem title="Product Catalog" value={87} icon={Package} link="/admin/products" description="Manage all products." />
-            <DashboardItem title="Order Processing" value={256} icon={ShoppingCart} link="/admin/orders" description="Oversee all customer orders." />
-            <DashboardItem title="Payment Records" value={103} icon={DollarSign} link="/admin/payments" description="View financial transactions." />
-            <DashboardItem title="Delivery Logistics" value={42} icon={Truck} link="/admin/deliveries" description="Track and manage deliveries." />
-            <DashboardItem title="Service Approvals" value={12} icon={ClipboardCheck} link="/admin/approvals" description="Review pending requests." />
-            <DashboardItem title="System Reports" value={35} icon={FileArchive} link="/admin/reports" description="Generate and view reports." />
-            <DashboardItem title="Customization Hub" value={8} icon={Layers} link="/admin/customizations" description="Manage customization options." />
-            <DashboardItem title="System Settings" value={"Online"} icon={Settings} link="/admin/settings" description="Configure application settings." />
-            <DashboardItem title="Dispatch Center" value={"View"} icon={Component} link="/admin/dispatch" description="Manage dispatch operations." />
+            <DashboardItem title="Product Catalog" value={"View"} icon={Package} link="/admin/products" description="Manage all products." />
+            <DashboardItem title="Order Processing" value={"View"} icon={ShoppingCart} link="/admin/orders" description="Oversee all customer orders." />
+            <DashboardItem title="Payment Records" value={"View"} icon={DollarSign} link="/admin/payments" description="View financial transactions." />
+            <DashboardItem title="Delivery Logistics" value={"View"} icon={Truck} link="/admin/deliveries" description="Track and manage deliveries." />
+            <DashboardItem title="Service Approvals" value={"View"} icon={ClipboardCheck} link="/admin/approvals" description="Review pending requests." />
+            <DashboardItem title="System Reports" value={"View"} icon={FileArchive} link="/admin/reports" description="Generate and view reports." />
+            <DashboardItem title="Customization Hub" value={"View"} icon={Layers} link="/admin/customizations" description="Manage customization options." />
+             <DashboardItem title="Shipping Config" value={"Manage"} icon={Ship} link="/admin/shipping" description="Configure shipping options." />
+            <DashboardItem title="Notifications" value={"Check"} icon={Bell} link="/admin/notifications" description="View system notifications." />
+            <DashboardItem title="System Settings" value={"Configure"} icon={Settings} link="/admin/settings" description="Configure application settings." />
           </>
         );
       case 'DispatchManager':
@@ -186,7 +186,7 @@ export default function DashboardPage() {
           <>
             <DashboardItem title="Active Deliveries" value={5} icon={Truck} link="/deliveries" />
             <DashboardItem title="Completed Today" value={11} icon={Truck} />
-            <DashboardItem title="View Route Map" value={"Open"} icon={Route} link="/rider/map" />
+            <DashboardItem title="View Route Map" value={"Open"} icon={MapIcon} link="/rider/map" />
           </>
         );
       default:
@@ -262,3 +262,6 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+
+    

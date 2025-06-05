@@ -3,9 +3,9 @@
 
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, ReactNode } from 'react';
-import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Bell, Ship, MapIcon, SlidersHorizontal } from 'lucide-react';
+import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Bell, Ship, MapIcon, SlidersHorizontal, ChevronLeft } from 'lucide-react';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -26,10 +26,12 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useIsMobile } from '@/hooks/use-mobile';
+
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
-  const { searchTerm, setSearchTerm, isMobile, openMobile } = useSidebar()!;
+  const { searchTerm, setSearchTerm, isMobile: sidebarHookIsMobile, openMobile } = useSidebar()!; // Renamed to avoid conflict with useIsMobile hook
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -52,30 +54,29 @@ function AdminLayout({ children }: { children: ReactNode }) {
     { href: '/admin/settings', label: 'Settings', icon: SettingsIcon },
   ];
 
-  const filteredMainAdminNavItems = mainAdminNavItems.map(item => {
-    // For items with subItems, filter subItems first
-    if (item.subItems) {
-      const filteredSubItems = item.subItems.filter(subItem =>
-        subItem.label.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      // If subItems remain after filtering, or if the parent item's label matches, show the parent
-      if (filteredSubItems.length > 0) {
-        return { ...item, subItems: filteredSubItems, isVisible: true };
+  // Filter logic considering items without subItems and items with subItems
+  const filteredMainAdminNavItems = mainAdminNavItems
+    .map(item => {
+      if (!searchTerm) return { ...item, isVisible: true }; // Show all if no search term
+
+      const labelMatches = item.label.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      if (item.subItems && item.subItems.length > 0) {
+        const filteredSubItems = item.subItems.filter(subItem =>
+          subItem.label.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        // Show parent if its label matches OR if any of its subItems match
+        const isVisible = labelMatches || filteredSubItems.length > 0;
+        return { ...item, subItems: isVisible ? (labelMatches ? item.subItems : filteredSubItems) : [], isVisible };
       }
-      // If no subItems match, but parent item label matches, show parent with its (now empty) subItems array
-      if (item.label.toLowerCase().includes(searchTerm.toLowerCase())) {
-        return { ...item, subItems: [], isVisible: true }; // Or keep original subItems if you want to show them
-      }
-      // Otherwise, this parent item (with subItems) is not visible
-      return { ...item, subItems: [], isVisible: false };
-    }
-    // For items without subItems, just check the label
-    return { ...item, isVisible: item.label.toLowerCase().includes(searchTerm.toLowerCase()) };
-  }).filter(item => item.isVisible);
+      // For items without subItems
+      return { ...item, isVisible: labelMatches };
+    })
+    .filter(item => item.isVisible);
 
 
   const filteredFooterAdminNavItems = footerAdminNavItems.filter(item =>
-    item.label.toLowerCase().includes(searchTerm.toLowerCase())
+    !searchTerm || item.label.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -91,7 +92,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <ScrollArea className="h-full">
-             {(isMobile && openMobile || !isMobile && searchTerm) && (
+             {(sidebarHookIsMobile && openMobile && !searchTerm) && ( // Show on mobile when sidebar open & no search
               <div className="p-2">
                 <Input
                   type="search"
@@ -105,7 +106,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
             {filteredMainAdminNavItems.length > 0 ? (
               <SidebarMenu className="p-2">
                 {filteredMainAdminNavItems.map((item) => (
-                  item.subItems && item.subItems.length > 0 ? ( // Check if subItems exist and are not empty
+                  item.subItems && item.subItems.length > 0 ? (
                     <SidebarMenuItem key={item.label}>
                        <SidebarMenuButton
                         isCollapsible={true}
@@ -175,7 +176,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
               ))}
             </SidebarMenu>
           )}
-          <div className="p-2 mt-1 md:hidden">
+          <div className="p-2 mt-1 md:hidden"> {/* Theme toggle only on mobile in sidebar footer */}
             <ThemeToggle />
           </div>
           <div className="mt-2 p-2">
@@ -186,16 +187,16 @@ function AdminLayout({ children }: { children: ReactNode }) {
           </div>
         </SidebarFooter>
       </Sidebar>
-
-      <div className="flex flex-col flex-1 min-w-0">
+      
+      <div className="flex flex-col flex-1 min-w-0"> {/* This div is the "right panel" wrapper */}
         <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="w-full h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2">
-              <SidebarTrigger className="md:hidden" />
+              <SidebarTrigger className="md:hidden" /> {/* Trigger for mobile sidebar */}
                <h1 className="text-xl font-semibold font-headline hidden md:block">Admin Panel</h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
-               <div className="hidden md:block">
+               <div className="hidden md:block"> {/* Search input for desktop top bar */}
                  <Input
                   type="search"
                   placeholder="Search admin sections..."
@@ -204,7 +205,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <div className="hidden md:block">
+              <div className="hidden md:block"> {/* Theme toggle for desktop top bar */}
                 <ThemeToggle />
               </div>
             </div>
@@ -217,23 +218,36 @@ function AdminLayout({ children }: { children: ReactNode }) {
           </div>
         </main>
       </div>
+
     </div>
   );
 }
 
 function NonAdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const isMobile = useIsMobile();
+
   return (
     <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2">
-             <Aperture className="text-primary h-6 w-6 md:h-7 md:w-7" />
-             <span className="font-headline text-xl md:text-2xl font-bold text-foreground">
-                <span className="md:hidden">Zellow</span>
-                <span className="hidden md:inline">Zellow Enterprises</span>
-             </span>
-          </Link>
+          <div className="flex items-center gap-1 sm:gap-2"> {/* Wrapper for logo and potential back button */}
+            {!isMobile && pathname !== '/dashboard' && ( // Show back button on desktop if not on dashboard
+              <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-1 sm:mr-2">
+                <ChevronLeft className="h-5 w-5" />
+                <span className="sr-only">Back</span>
+              </Button>
+            )}
+            <Link href="/dashboard" className="flex items-center gap-2"> {/* Changed to /dashboard for consistent home link */}
+               <Aperture className="text-primary h-6 w-6 md:h-7 md:w-7" />
+               <span className="font-headline text-xl md:text-2xl font-bold text-foreground">
+                  <span className="md:hidden">Zellow</span>
+                  <span className="hidden md:inline">Zellow Enterprises</span>
+               </span>
+            </Link>
+          </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <Button variant="outline" size="sm" onClick={logout}>Logout</Button>
@@ -267,19 +281,21 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
-    return null;
+    return null; // Or a redirect component if preferred while loading user state
   }
 
   const isAdmin = role === 'Admin';
-  const isDispatchManager = role === 'DispatchManager';
 
-  if (isAdmin || isDispatchManager) { // Allow Admin and DispatchManager to see AdminLayout
+  if (isAdmin) { // Only Admin gets AdminLayout
     return (
       <SidebarProvider defaultOpen={true}>
         <AdminLayout>{children}</AdminLayout>
       </SidebarProvider>
     );
   }
-  // All other roles (including Rider if they don't need admin sidebar) get NonAdminLayout
+  // All other roles (including DispatchManager) get NonAdminLayout
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
+
+
+    
