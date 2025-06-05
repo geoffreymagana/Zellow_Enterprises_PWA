@@ -35,6 +35,8 @@ type SidebarContextType = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
 }
 
 const SidebarContext = React.createContext<SidebarContextType | null>(null)
@@ -70,6 +72,7 @@ const SidebarProvider = React.forwardRef<
   ) => {
     const isMobile = useIsMobile()
     const [openMobile, setOpenMobile] = React.useState(false)
+    const [searchTerm, setSearchTerm] = React.useState("");
 
     const [_open, _setOpen] = React.useState(() => {
       if (typeof document !== 'undefined') {
@@ -132,8 +135,10 @@ const SidebarProvider = React.forwardRef<
         openMobile,
         setOpenMobile,
         toggleSidebar,
+        searchTerm,
+        setSearchTerm,
       }),
-      [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+      [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, searchTerm, setSearchTerm]
     )
 
     return (
@@ -197,7 +202,7 @@ const Sidebar = React.forwardRef<
   (
     {
       side = "left",
-      className,
+      className, // User-provided classes from layout.tsx for desktop (e.g., border, width, height, sticky)
       children,
       ...props
     },
@@ -223,7 +228,7 @@ const Sidebar = React.forwardRef<
             }
             side={side}
           >
-            <VisuallyHidden>
+             <VisuallyHidden>
                 <SheetTitle>{props['aria-label'] || 'Mobile Navigation Menu'}</SheetTitle>
             </VisuallyHidden>
             <div className="flex h-full w-full flex-col">{children}</div>
@@ -232,7 +237,7 @@ const Sidebar = React.forwardRef<
       );
     }
 
-    // Desktop sidebar (always expanded)
+    // Desktop sidebar
     return (
       <div
         ref={ref}
@@ -240,10 +245,10 @@ const Sidebar = React.forwardRef<
         data-mobile="false"
         className={cn(
             "group peer hidden md:flex flex-col", // Core visibility & structure for desktop
-            "bg-sidebar text-sidebar-foreground", // Default theme
+            "bg-sidebar text-sidebar-foreground", // Default theme from component
             className // User-provided classes from layout.tsx (e.g., border, width, height, sticky)
         )}
-        data-state={"expanded"}
+        data-state={"expanded"} // Desktop sidebar is always expanded in this design
         data-collapsible={"none"}
         data-variant={"sidebar"}
         data-side={side}
@@ -285,13 +290,15 @@ const SidebarTrigger = React.forwardRef<
     );
   }
 
+  // On desktop, this trigger is typically not used if the sidebar is always visible and expanded.
+  // Kept for potential future use or different desktop sidebar interaction models.
   return (
     <Button
       ref={ref}
       data-sidebar="trigger"
       variant="ghost"
       size="icon"
-      className={cn("h-8 w-8 hidden", className)}
+      className={cn("h-8 w-8 hidden", className)} // Hidden by default on desktop
       onClick={(event) => {
         onClick?.(event);
         toggleSidebar();
@@ -598,18 +605,23 @@ const SidebarMenuButton = React.forwardRef<
       </Comp>
     )
 
-    if (!tooltip || !isMobile) {
+    if (!tooltip || !isMobile) { // Desktop: no tooltip by default, tooltip is for icon-only collapsed state usually
       return buttonContent
     }
+     // Mobile: Tooltips are generally not used for bottom nav style items.
+     // If this button were part of a different mobile pattern (e.g., icon-only toolbar), tooltip might be useful.
+     // For now, if 'tooltip' prop is provided, we show it.
+     if (isMobile && tooltip) {
+        const tooltipContentProps = typeof tooltip === "string" ? { children: tooltip } : tooltip;
+        return (
+            <Tooltip>
+                <TooltipPrimitiveTrigger asChild>{buttonContent}</TooltipPrimitiveTrigger>
+                <TooltipContent side="top" align="center" {...tooltipContentProps} />
+            </Tooltip>
+        );
+    }
 
-    const tooltipContentProps = typeof tooltip === "string" ? { children: tooltip } : tooltip;
-
-    return (
-        <Tooltip>
-            <TooltipPrimitiveTrigger asChild>{buttonContent}</TooltipPrimitiveTrigger>
-            <TooltipContent side="right" align="center" {...tooltipContentProps} />
-        </Tooltip>
-    )
+    return buttonContent
   }
 )
 SidebarMenuButton.displayName = "SidebarMenuButton"
@@ -771,3 +783,4 @@ export {
   SidebarSeparator,
   SidebarTrigger,
 }
+

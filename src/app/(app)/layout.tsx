@@ -19,12 +19,14 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
+  useSidebar, // Import useSidebar
 } from '@/components/ui/sidebar';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
+  const { searchTerm, setSearchTerm } = useSidebar(); // Consume from context
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -43,6 +45,14 @@ function AdminLayout({ children }: { children: ReactNode }) {
     { href: '/admin/settings', label: 'Settings', icon: SettingsIcon },
   ];
 
+  const filteredMainAdminNavItems = mainAdminNavItems.filter(item =>
+    item.label.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredFooterAdminNavItems = footerAdminNavItems.filter(item =>
+    item.label.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar
@@ -56,8 +66,36 @@ function AdminLayout({ children }: { children: ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <ScrollArea className="h-full">
-            <SidebarMenu className="p-2">
-              {mainAdminNavItems.map((item) => (
+            {filteredMainAdminNavItems.length > 0 ? (
+              <SidebarMenu className="p-2">
+                {filteredMainAdminNavItems.map((item) => (
+                  <SidebarMenuItem key={item.label}>
+                    <Link href={item.href} passHref legacyBehavior>
+                      <SidebarMenuButton
+                        asChild
+                        tooltip={item.label}
+                        className="w-full justify-start"
+                        variant="ghost"
+                      >
+                        <a>
+                          <item.icon className="mr-2 h-4 w-4" />
+                          <span>{item.label}</span>
+                        </a>
+                      </SidebarMenuButton>
+                    </Link>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            ) : null}
+             {searchTerm && filteredMainAdminNavItems.length === 0 && filteredFooterAdminNavItems.length === 0 && (
+              <p className="p-4 text-sm text-muted-foreground">No admin sections found matching your search.</p>
+            )}
+          </ScrollArea>
+        </SidebarContent>
+        <SidebarFooter className="p-2 border-t border-sidebar mt-auto">
+          {filteredFooterAdminNavItems.length > 0 && (
+            <SidebarMenu className="p-0">
+              {filteredFooterAdminNavItems.map((item) => (
                 <SidebarMenuItem key={item.label}>
                   <Link href={item.href} passHref legacyBehavior>
                     <SidebarMenuButton
@@ -75,28 +113,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
-          </ScrollArea>
-        </SidebarContent>
-        <SidebarFooter className="p-2 border-t border-sidebar mt-auto">
-          <SidebarMenu className="p-0">
-            {footerAdminNavItems.map((item) => (
-              <SidebarMenuItem key={item.label}>
-                <Link href={item.href} passHref legacyBehavior>
-                  <SidebarMenuButton
-                    asChild
-                    tooltip={item.label}
-                    className="w-full justify-start"
-                    variant="ghost"
-                  >
-                    <a>
-                      <item.icon className="mr-2 h-4 w-4" />
-                      <span>{item.label}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
+          )}
           <div className="p-2 mt-1 md:hidden">
             <ThemeToggle />
           </div>
@@ -125,15 +142,15 @@ function AdminLayout({ children }: { children: ReactNode }) {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="relative hidden md:block">
+            <div className="flex items-center gap-3 flex-grow md:flex-grow-0 justify-end">
+              <div className="relative w-full max-w-xs sm:max-w-sm md:w-auto md:max-w-none">
                 <SearchIcon className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="Search app..." className="pl-8 h-9 w-[200px] lg:w-[250px] bg-background" />
-              </div>
-              <div className="md:hidden">
-                <Button variant="ghost" size="icon" aria-label="Search">
-                  <SearchIcon className="h-5 w-5" />
-                </Button>
+                <Input
+                  placeholder="Search admin sections..."
+                  className="pl-8 h-9 w-full md:w-[200px] lg:w-[250px] bg-background"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
               <div className="hidden md:block">
                 <ThemeToggle />
@@ -213,3 +230,4 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
+
