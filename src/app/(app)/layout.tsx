@@ -5,7 +5,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, ReactNode } from 'react';
-import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Search as SearchIcon, PanelLeft } from 'lucide-react';
+import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Search as SearchIcon, PanelLeft, Aperture } from 'lucide-react';
 import { Logo } from '@/components/common/Logo';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { Button } from '@/components/ui/button';
@@ -46,16 +46,17 @@ function AdminLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Desktop Sidebar - Always Expanded and Sticky */}
       <Sidebar
         side="left"
         className="border-r hidden md:flex flex-col bg-card text-card-foreground w-[var(--sidebar-width)] h-screen sticky top-0"
       >
         <SidebarHeader className="p-4 border-b flex justify-start items-center h-16">
-          <Logo textSize="text-xl" iconSize={24} />
+          <Link href="/" aria-label="Zellow Enterprises Home">
+            <Aperture className="text-primary" size={24} />
+          </Link>
         </SidebarHeader>
-        <SidebarContent> {/* Base component is flex-col, flex-1, overflow-auto */}
-          <ScrollArea className="h-full"> {/* h-full makes ScrollArea fill SidebarContent */}
+        <SidebarContent>
+          <ScrollArea className="h-full">
             <SidebarMenu className="p-2">
               {mainAdminNavItems.map((item) => (
                 <SidebarMenuItem key={item.label}>
@@ -77,7 +78,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
             </SidebarMenu>
           </ScrollArea>
         </SidebarContent>
-        <SidebarFooter className="p-2 border-t mt-auto"> {/* mt-auto pushes footer to bottom */}
+        <SidebarFooter className="p-2 border-t mt-auto">
           <SidebarMenu className="p-0">
             {footerAdminNavItems.map((item) => (
               <SidebarMenuItem key={item.label}>
@@ -97,7 +98,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
-          <div className="p-2 mt-1 md:hidden"> {/* ThemeToggle for mobile sidebar (sheet) */}
+          <div className="p-2 mt-1 md:hidden">
             <ThemeToggle />
           </div>
           <div className="mt-2 p-2">
@@ -109,12 +110,10 @@ function AdminLayout({ children }: { children: ReactNode }) {
         </SidebarFooter>
       </Sidebar>
 
-      {/* This div wraps the main header and main content area, taking remaining width */}
-      <div className="flex flex-col flex-grow min-w-0"> {/* Added min-w-0 here */}
+      <div className="flex flex-col flex-grow min-w-0">
         <header className="sticky top-0 z-40 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
           <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2">
-              {/* Mobile Sidebar Toggle - only for mobile */}
               <div className="md:hidden">
                 <SidebarTrigger>
                   <PanelLeft />
@@ -122,30 +121,27 @@ function AdminLayout({ children }: { children: ReactNode }) {
               </div>
               <div className="text-left">
                 <span className="font-headline text-xl font-bold text-foreground">
-                  Zellow Enterprises - Admin
+                  Admin Panel
                 </span>
               </div>
             </div>
             
             <div className="flex items-center gap-3">
-              {/* Desktop Search Input for Admin */}
               <div className="relative hidden md:block">
                 <SearchIcon className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input placeholder="Search app..." className="pl-8 h-9 w-[200px] lg:w-[250px] bg-background" />
               </div>
-              {/* Mobile Search Icon Button for Admin */}
               <div className="md:hidden">
                 <Button variant="ghost" size="icon" aria-label="Search">
                   <SearchIcon className="h-5 w-5" />
                 </Button>
               </div>
-              <div className="hidden md:block"> {/* ThemeToggle for desktop header */}
+              <div className="hidden md:block">
                 <ThemeToggle />
               </div>
             </div>
           </div>
         </header>
-        {/* Main content area, ensuring it scrolls independently */}
         <main className="flex flex-col flex-grow p-4 md:p-6 lg:px-8 lg:py-6 overflow-y-auto">
           <div className="w-full"> 
             {children}
@@ -161,7 +157,7 @@ function NonAdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-50 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-        <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8"> {/* Removed 'container' class */}
+        <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
           <Logo className="hidden md:flex" />
           <span className="md:hidden font-headline text-xl font-bold text-foreground">Zellow Enterprises</span>
           <div className="flex items-center gap-2">
@@ -170,7 +166,7 @@ function NonAdminLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="flex-grow container mx-auto px-4 py-8 pb-20 md:pb-8">
+      <main className="flex-grow w-full mx-auto px-4 py-8 pb-20 md:pb-8">
         {children}
       </main>
       <BottomNav />
