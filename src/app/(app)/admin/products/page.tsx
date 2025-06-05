@@ -179,7 +179,6 @@ export default function AdminProductsPage() {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">Unauthorized or session changed.</div>;
   }
   
-  // console.log("Preparing to render AdminProductsPage main content."); // Debug log
 
   return (
     <div className="space-y-6">
