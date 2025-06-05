@@ -181,7 +181,6 @@ export default function AdminProductsPage() {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   if (role !== 'Admin') {
-    // This should not be reached if auth checks are done correctly, but as a fallback.
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">Unauthorized or session changed.</div>;
   }
 
@@ -390,3 +389,4 @@ export default function AdminProductsPage() {
   );
 }
 
+    
