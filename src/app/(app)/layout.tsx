@@ -174,7 +174,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                   </Button>
                 </div>
               </div>
-            </Header>
+            </header>
             <SidebarInset>
               <main className="flex-grow p-4 md:p-6 lg:p-8">
                 {children}
@@ -209,3 +209,5 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+    
