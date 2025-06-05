@@ -23,6 +23,18 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**', // Or be more specific if needed, e.g., '/uc/**' or '/file/d/**'
       },
+      {
+        protocol: 'https',
+        hostname: 'imgur.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i.imgur.com', // Often direct image links are on i.imgur.com
+        port: '',
+        pathname: '/**',
+      }
     ],
   },
 };
