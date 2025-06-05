@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ShoppingCart, ListChecks, UserCircle, Package, Truck, FileText, DollarSign, Settings, Warehouse, Users, Layers, MapPin, SlidersHorizontal, Gift } from 'lucide-react'; // Added Gift
+import { Home, ShoppingCart, ListChecks, UserCircle, Package, Truck, FileText, DollarSign, Settings, Warehouse, Users, Layers, MapPin, SlidersHorizontal, Gift } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import type { UserRole } from '@/types';
 import { cn } from '@/lib/utils';
@@ -19,8 +19,9 @@ const allAppRoles: UserRole[] = ['Customer', 'Technician', 'Rider', 'Supplier', 
 
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Home', icon: Home, roles: [...allAppRoles, 'Admin', null] }, 
-  { href: '/products', label: 'Gift Boxes', icon: Gift, roles: ['Customer'] }, // Changed label and icon
-  { href: '/orders', label: 'Orders', icon: ShoppingCart, roles: ['Customer'] },
+  { href: '/products', label: 'Products', icon: Package, roles: ['Customer'] },
+  { href: '/gift-boxes', label: 'Gift Boxes', icon: Gift, roles: ['Customer'] },
+  { href: '/orders', label: 'My Orders', icon: ShoppingCart, roles: ['Customer'] }, // Changed label for clarity
   { href: '/tasks', label: 'Tasks', icon: ListChecks, roles: ['Technician', 'ServiceManager'] },
   { href: '/deliveries', label: 'My Deliveries', icon: Truck, roles: ['Rider'] }, 
   { href: '/admin/dispatch', label: 'Dispatch', icon: SlidersHorizontal, roles: ['DispatchManager', 'Admin'] }, 
@@ -28,8 +29,8 @@ const navItems: NavItem[] = [
   { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['Supplier', 'FinanceManager'] },
   { href: '/payments', label: 'Payments', icon: DollarSign, roles: ['FinanceManager'] },
   { href: '/inventory', label: 'Inventory', icon: Warehouse, roles: ['InventoryManager', 'SupplyManager'] },
-  { href: '/suppliers', label: 'Suppliers', icon: Users, roles: ['SupplyManager'] },
-  { href: '/services', label: 'Services', icon: Layers, roles: ['ServiceManager'] },
+  // { href: '/suppliers', label: 'Suppliers', icon: Users, roles: ['SupplyManager'] }, // Consider if needed or part of Admin
+  // { href: '/services', label: 'Services', icon: Layers, roles: ['ServiceManager'] }, // Consider if needed or part of Admin
   { href: '/profile', label: 'Profile', icon: UserCircle, roles: [...allAppRoles, 'Admin', null] }, 
 ];
 
@@ -42,17 +43,30 @@ export function BottomNav() {
   const filteredNavItems = navItems.filter(item => item.roles.includes(role));
   
   let displayItems = filteredNavItems;
+  // Prioritize specific items if the list is too long for the bottom bar (max 5)
   if (displayItems.length > 5) {
     const homeItem = displayItems.find(item => item.href === '/dashboard');
+    const productsItem = displayItems.find(item => item.label === 'Products');
+    const giftBoxesItem = displayItems.find(item => item.label === 'Gift Boxes');
+    const ordersItem = displayItems.find(item => item.label === 'My Orders');
     const profileItem = displayItems.find(item => item.href === '/profile');
-    const otherItems = displayItems.filter(item => item.href !== '/dashboard' && item.href !== '/profile');
     
-    const prioritizedItems = [];
-    if (homeItem) prioritizedItems.push(homeItem);
-    prioritizedItems.push(...otherItems.slice(0, profileItem ? 3 : 4));
-    if (profileItem && prioritizedItems.length < 5) prioritizedItems.push(profileItem);
-    
-    displayItems = prioritizedItems.slice(0, 5);
+    const priorityOrder: NavItem[] = [];
+    if (homeItem) priorityOrder.push(homeItem);
+    if (productsItem) priorityOrder.push(productsItem);
+    if (giftBoxesItem) priorityOrder.push(giftBoxesItem);
+    if (ordersItem) priorityOrder.push(ordersItem);
+    if (profileItem) priorityOrder.push(profileItem);
+
+    // Fill remaining spots if any of the prioritized items were not found or if more space
+    const remainingSpots = 5 - priorityOrder.length;
+    if (remainingSpots > 0) {
+        const otherItems = displayItems.filter(
+            item => !priorityOrder.some(pItem => pItem.href === item.href)
+        );
+        priorityOrder.push(...otherItems.slice(0, remainingSpots));
+    }
+    displayItems = priorityOrder.slice(0, 5);
   }
 
 

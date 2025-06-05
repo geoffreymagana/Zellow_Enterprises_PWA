@@ -32,7 +32,7 @@ const predefinedCategories = [
   "Drinkware (Mugs, Tumblers, Flasks)", "Apparel (T-shirts, Hoodies, Caps)", "Stationery (Pens, Notebooks, Journals)",
   "Keepsakes (Keychains, Photo Frames, Ornaments)", "Home & Office Decor (Plaques, Coasters, Desk Accessories)",
   "Jewelry & Accessories (Bracelets, Necklaces, Bags, Wallets)", "Tech Gadgets (Power Banks, Earbuds, Phone Stands)",
-  "Gourmet & Edibles (Gift Baskets, Chocolates)", "Experiences (Voucher base items)",
+  "Gourmet & Edibles (Gift Baskets, Chocolates)", "Experiences (Voucher base items)", "Gift Boxes",
   "Seasonal & Holiday Specials", "For Him", "For Her", "For Kids", "For Pets", "Corporate Gifts", "Eco-Friendly"
 ];
 
@@ -143,7 +143,7 @@ export default function AdminProductsPage() {
       });
     } else {
       form.reset({
-        name: "", description: "", price: 0, stock: 0, categories: [], imageUrl: "", supplier: "", customizationOptions: []
+        name: "", description: "", price: undefined, stock: undefined, categories: [], imageUrl: "", supplier: "", customizationOptions: []
       });
     }
     setIsDialogOpen(true);
@@ -153,7 +153,7 @@ export default function AdminProductsPage() {
     if (!db) return;
     setIsSubmitting(true);
     
-    const dataToSave: Omit<ProductFormValues, 'customizationOptions'> & { customizationOptions?: ProductCustomizationOption[], updatedAt: any, createdAt?: any } = {
+    const dataToSave = {
       name: values.name,
       description: values.description,
       price: values.price,
@@ -165,15 +165,13 @@ export default function AdminProductsPage() {
         ...opt,
         choices: opt.type === 'select' ? opt.choices?.map(choice => ({...choice, priceAdjustment: choice.priceAdjustment || 0})) : undefined,
         maxLength: opt.type === 'text' ? opt.maxLength : undefined,
-        placeholder: opt.type === 'text' ? opt.placeholder : undefined,
-        defaultValue: opt.type === 'checkbox' ? (opt.defaultValue === true || opt.defaultValue === 'true') : (opt.type === 'text' ? opt.defaultValue : undefined),
+        placeholder: opt.type === 'text' || opt.type === 'checkbox' ? opt.placeholder : undefined, // Checkbox can have placeholder for label
+        defaultValue: opt.type === 'checkbox' ? (opt.defaultValue === true || String(opt.defaultValue).toLowerCase() === 'true') : (opt.type === 'text' ? opt.defaultValue : undefined),
       })) || [],
       updatedAt: serverTimestamp(),
+      ...(editingProduct ? {} : { createdAt: serverTimestamp() }),
     };
-    if (!editingProduct) {
-        dataToSave.createdAt = serverTimestamp();
-    }
-
+    
     try {
       if (editingProduct) {
         const productRef = doc(db, 'products', editingProduct.id);
@@ -311,7 +309,7 @@ export default function AdminProductsPage() {
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader><AlertDialogTitle>Delete Product?</AlertDialogTitle><AlertDialogDescription>Are you sure you want to delete "{productToDelete?.name}"? This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                          <AlertDialogFooter><AlertDialogCancel onClick={() => setProductToDelete(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteConfirm} disabled={isSubmitting}>Delete</AlertDialogAction></AlertDialogFooter>
+                          <AlertDialogFooter><AlertDialogCancel onClick={() => setProductToDelete(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteConfirm} disabled={isSubmitting} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
                     </TableCell>
@@ -398,18 +396,21 @@ export default function AdminProductsPage() {
                             </div>
                           )}
                            {form.watch(`customizationOptions.${index}.type`) === 'checkbox' && (
-                             <FormField control={form.control} name={`customizationOptions.${index}.defaultValue`} render={({ field }) => (
-                                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 mt-3">
-                                    <FormControl>
-                                    <Checkbox
-                                        checked={typeof field.value === 'boolean' ? field.value : String(field.value).toLowerCase() === 'true'}
-                                        onCheckedChange={(checked) => field.onChange(checked)}
-                                    />
-                                    </FormControl>
-                                    <FormLabel className="font-normal">Default Checked State</FormLabel>
-                                </FormItem>
-                                )}
-                            />
+                             <div className="grid grid-cols-1 gap-4 mt-3">
+                               <FormField control={form.control} name={`customizationOptions.${index}.placeholder`} render={({ field }) => (<FormItem><FormLabel>Checkbox Label Text</FormLabel><FormControl><Input {...field} placeholder="e.g., Include gift wrapping?"/></FormControl><FormDescription className="text-xs">This text appears next to the checkbox.</FormDescription><FormMessage/></FormItem>)} />
+                               <FormField control={form.control} name={`customizationOptions.${index}.defaultValue`} render={({ field }) => (
+                                  <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3">
+                                      <FormControl>
+                                      <Checkbox
+                                          checked={typeof field.value === 'boolean' ? field.value : String(field.value).toLowerCase() === 'true'}
+                                          onCheckedChange={(checked) => field.onChange(checked)}
+                                      />
+                                      </FormControl>
+                                      <FormLabel className="font-normal">Default Checked State</FormLabel>
+                                  </FormItem>
+                                  )}
+                              />
+                             </div>
                            )}
                            <FormField control={form.control} name={`customizationOptions.${index}.required`} render={({ field }) => (
                                 <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 mt-3">
@@ -455,14 +456,13 @@ function RenderSelectChoices({ control, nestIndex }: { control: any, nestIndex: 
       </div>
       {fields.length === 0 && <p className="text-xs text-muted-foreground">No choices added yet.</p>}
       {fields.map((choiceField, choiceIndex) => (
-        <div key={choiceField.id} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end p-2 border rounded bg-muted/20">
+        <div key={choiceField.id} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end p-2 border rounded bg-muted/20">
           <FormField control={control} name={`customizationOptions.${nestIndex}.choices.${choiceIndex}.label`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Display Label</FormLabel><FormControl><Input {...field} placeholder="e.g., Red, Small"/></FormControl><FormMessage className="text-xs"/></FormItem>)} />
           <FormField control={control} name={`customizationOptions.${nestIndex}.choices.${choiceIndex}.value`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Value (Unique)</FormLabel><FormControl><Input {...field} placeholder="e.g., red, sm"/></FormControl><FormMessage className="text-xs"/></FormItem>)} />
           <FormField control={control} name={`customizationOptions.${nestIndex}.choices.${choiceIndex}.priceAdjustment`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Price Adj. (Ksh)</FormLabel><FormControl><Input type="number" step="0.01" {...field} placeholder="0.00"/></FormControl><FormMessage className="text-xs"/></FormItem>)} />
-          <Button type="button" variant="ghost" size="sm" className="col-span-full sm:col-span-1 sm:ml-auto mt-1 h-8" onClick={() => remove(choiceIndex)}>Remove Choice</Button>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => remove(choiceIndex)} aria-label="Remove choice"><MinusCircle className="h-4 w-4 text-destructive"/></Button>
         </div>
       ))}
     </div>
   );
 }
-

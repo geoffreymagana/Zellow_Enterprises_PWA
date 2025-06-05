@@ -41,7 +41,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
     { href: '/admin/customizations', label: 'Customizations', icon: Layers },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign },
     { href: '/admin/deliveries', label: 'Deliveries', icon: Truck },
-    { href: '/admin/dispatch', label: 'Dispatch Center', icon: Aperture }, // Changed icon for variety
+    { href: '/admin/dispatch', label: 'Dispatch Center', icon: Aperture },
     { href: '/admin/shipping', label: 'Shipping', icon: Ship },
     { href: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck },
     { href: '/admin/notifications', label: 'Notifications', icon: Bell },
@@ -60,8 +60,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
 
       const labelMatches = item.label.toLowerCase().includes(searchTerm.toLowerCase());
       
-      // If item has subItems, check them too
-      const subItems = (item as any).subItems; // Type assertion if subItems is not always present
+      const subItems = (item as any).subItems; 
       if (subItems && subItems.length > 0) {
         const filteredSubItems = subItems.filter((subItem: any) =>
           subItem.label.toLowerCase().includes(searchTerm.toLowerCase())
@@ -94,7 +93,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
             {filteredMainAdminNavItems.length > 0 ? (
               <SidebarMenu className="p-2">
                 {filteredMainAdminNavItems.map((item) => {
-                  const typedItem = item as any; // Use any for simplicity with subItems
+                  const typedItem = item as any; 
                   return typedItem.subItems && typedItem.subItems.length > 0 ? (
                     <SidebarMenuItem key={typedItem.label}>
                        <SidebarMenuButton
@@ -180,12 +179,15 @@ function AdminLayout({ children }: { children: ReactNode }) {
       <div className="flex flex-col flex-1 min-w-0"> 
         <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="w-full h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-2"> {/* Left side of header */}
+            <div className="flex items-center gap-2">
               <SidebarTrigger className="md:hidden" /> 
-              <h1 className="text-xl font-semibold font-headline hidden md:block">Admin Panel</h1>
+              <Link href="/dashboard" className="hidden md:flex items-center gap-2" aria-label="Admin Dashboard Home">
+                 <Aperture className="text-primary h-6 w-6" />
+                 <h1 className="text-xl font-semibold font-headline">Admin Panel</h1>
+              </Link>
             </div>
-            <div className="flex flex-1 md:flex-none items-center gap-2 sm:gap-4 justify-end md:justify-normal"> {/* Right side of header */}
-              <div className="flex-grow max-w-xs sm:max-w-sm md:w-64 lg:w-96"> {/* Search input takes available space on mobile */}
+            <div className="flex flex-1 md:flex-none items-center gap-2 sm:gap-4 justify-end">
+              <div className="flex-grow max-w-xs sm:max-w-sm md:w-64 lg:w-96">
                 <Input
                   type="search"
                   placeholder="Search sections..."
@@ -194,7 +196,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <div className="hidden md:block"> {/* Theme toggle hidden on mobile */}
+              <div className="hidden md:block">
                 <ThemeToggle />
               </div>
             </div>
@@ -223,7 +225,7 @@ function NonAdminLayout({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-1 sm:gap-2"> 
-            {!isMobile && pathname !== '/dashboard' && ( 
+            {!isMobile && pathname !== '/dashboard' && !pathname.startsWith('/products') && !pathname.startsWith('/gift-boxes') && ( 
               <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-1 sm:mr-2">
                 <ChevronLeft className="h-5 w-5" />
                 <span className="sr-only">Back</span>

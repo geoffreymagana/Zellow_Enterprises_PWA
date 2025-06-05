@@ -10,7 +10,7 @@ import type { Product } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Loader2, AlertTriangle, ShoppingCart, PlusCircle, ArrowLeft, Settings } from 'lucide-react';
+import { Loader2, AlertTriangle, ShoppingCart, ArrowLeft, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
@@ -45,7 +45,7 @@ export default function ProductDetailsPage() {
       if (productDoc.exists()) {
         setProduct({ id: productDoc.id, ...productDoc.data() } as Product);
       } else {
-        setError("Item not found."); // Changed from Product to Item
+        setError("Item not found.");
         toast({ title: "Not Found", description: "The item you're looking for doesn't exist.", variant: "destructive" });
       }
     } catch (e: any) {
@@ -99,8 +99,8 @@ export default function ProductDetailsPage() {
         <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
         <h2 className="text-xl font-semibold mb-2">Item Not Found</h2>
         <p className="text-muted-foreground mb-4">The item you are looking for could not be found.</p>
-        <Button onClick={() => router.push('/products')} variant="outline"> {/* Path remains /products */}
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Gift Boxes 
+        <Button onClick={() => router.push('/products')} variant="outline">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Products
         </Button>
       </div>
     );
@@ -110,8 +110,8 @@ export default function ProductDetailsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <Button onClick={() => router.push('/products')} variant="outline" size="sm" className="mb-6"> {/* Path remains /products */}
-        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Gift Boxes
+      <Button onClick={() => router.push('/products')} variant="outline" size="sm" className="mb-6">
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Products
       </Button>
       <Card className="overflow-hidden">
         <div className="md:flex">
@@ -147,7 +147,7 @@ export default function ProductDetailsPage() {
             </CardContent>
             <CardFooter className="p-0 mt-6 pt-6 border-t flex flex-col sm:flex-row gap-3">
               {hasCustomizations ? (
-                <Link href={`/products/${product.id}/customize`} passHref className="w-full sm:w-auto"> {/* Path remains /products/.../customize */}
+                <Link href={`/products/${product.id}/customize`} passHref className="w-full sm:w-auto">
                   <Button size="lg" variant="outline" className="w-full" disabled={product.stock === 0}>
                     <Settings className="mr-2 h-5 w-5" /> Customize Item
                   </Button>

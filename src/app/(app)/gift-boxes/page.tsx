@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import type { Product } from "@/types";
-import { ShoppingCart, Loader2, AlertTriangle } from "lucide-react";
+import { ShoppingCart, Loader2, AlertTriangle, Gift } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 
@@ -18,38 +18,45 @@ const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
 };
 
-export default function ProductsPage() { 
+const GIFT_BOX_CATEGORY_KEY = "Gift Boxes"; // Ensure this matches the category string used by admins
+
+export default function GiftBoxesPage() { 
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [giftBoxes, setGiftBoxes] = useState<Product[]>([]);
+  const [isLoadingGiftBoxes, setIsLoadingGiftBoxes] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const fetchProducts = useCallback(async () => {
+  const fetchGiftBoxes = useCallback(async () => {
     if (!db) {
       toast({ title: "Error", description: "Database service is not available.", variant: "destructive" });
-      setIsLoadingProducts(false);
+      setIsLoadingGiftBoxes(false);
       setFetchError("Database service unavailable.");
       return;
     }
-    setIsLoadingProducts(true);
+    setIsLoadingGiftBoxes(true);
     setFetchError(null);
     try {
-      const productsQuery = query(collection(db, "products"), orderBy("createdAt", "desc"));
+      // Query for products that include "Gift Boxes" in their categories array
+      const productsQuery = query(
+        collection(db, "products"), 
+        where("categories", "array-contains", GIFT_BOX_CATEGORY_KEY),
+        orderBy("createdAt", "desc")
+      );
       const querySnapshot = await getDocs(productsQuery);
-      const fetchedProducts: Product[] = [];
+      const fetchedGiftBoxes: Product[] = [];
       querySnapshot.forEach((doc) => {
-        fetchedProducts.push({ id: doc.id, ...doc.data() } as Product);
+        fetchedGiftBoxes.push({ id: doc.id, ...doc.data() } as Product);
       });
-      setProducts(fetchedProducts);
+      setGiftBoxes(fetchedGiftBoxes);
     } catch (error: any) {
-      console.error("Error fetching products:", error);
-      toast({ title: "Error Fetching Products", description: error.message || "Could not load items.", variant: "destructive" });
-      setFetchError("Could not load products. Please try again later.");
+      console.error("Error fetching gift boxes:", error);
+      toast({ title: "Error Fetching Gift Boxes", description: error.message || "Could not load gift boxes.", variant: "destructive" });
+      setFetchError("Could not load gift boxes. Please try again later.");
     } finally {
-      setIsLoadingProducts(false);
+      setIsLoadingGiftBoxes(false);
     }
   }, [toast]);
 
@@ -60,14 +67,14 @@ export default function ProductsPage() {
       router.replace('/login');
       return;
     }
-    fetchProducts();
-  }, [authLoading, user, router, fetchProducts]);
+    fetchGiftBoxes();
+  }, [authLoading, user, router, fetchGiftBoxes]);
 
-  if (authLoading || isLoadingProducts) {
+  if (authLoading || isLoadingGiftBoxes) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))] space-y-2">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="text-muted-foreground">Loading products...</p>
+        <p className="text-muted-foreground">Loading gift boxes...</p>
       </div>
     );
   }
@@ -76,9 +83,9 @@ export default function ProductsPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">
         <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
-        <p className="text-lg font-semibold">Failed to Load Products</p>
+        <p className="text-lg font-semibold">Failed to Load Gift Boxes</p>
         <p className="text-muted-foreground mb-4">{fetchError}</p>
-        <Button onClick={fetchProducts}>Try Again</Button>
+        <Button onClick={fetchGiftBoxes}>Try Again</Button>
       </div>
     );
   }
@@ -86,7 +93,7 @@ export default function ProductsPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-headline font-semibold">Discover Our Products</h1>
+        <h1 className="text-3xl font-headline font-semibold">Our Special Gift Boxes</h1>
         {role === 'Customer' && (
           <Link href="/orders/cart" passHref className="hidden sm:inline-flex">
             <Button variant="outline">
@@ -96,19 +103,19 @@ export default function ProductsPage() {
         )}
       </div>
       
-      <p className="text-muted-foreground">Browse our selection of customizable items.</p>
+      <p className="text-muted-foreground">Beautifully curated gift boxes for every occasion.</p>
 
-      {products.length === 0 ? (
+      {giftBoxes.length === 0 ? (
         <Card>
           <CardContent className="pt-10 pb-10 text-center">
-            <ShoppingCart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <p className="text-xl font-semibold mb-2">No Products Available Yet</p>
-            <p className="text-muted-foreground">Check back soon for new arrivals!</p>
+            <Gift className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+            <p className="text-xl font-semibold mb-2">No Gift Boxes Available Yet</p>
+            <p className="text-muted-foreground">Our special gift box collections will appear here soon. Check back later!</p>
           </CardContent>
         </Card>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
-          {products.map((product) => (
+          {giftBoxes.map((product) => (
             <Link key={product.id} href={`/products/${product.id}`} passHref>
               <Card className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group h-full">
                 <CardHeader className="p-0">
@@ -119,7 +126,7 @@ export default function ProductsPage() {
                         fill
                         sizes="(max-width: 640px) 50vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
-                        data-ai-hint={product.categories?.[0]?.toLowerCase().split(" ")[0] || product.name.split(" ")[0]?.toLowerCase() || "product item"}
+                        data-ai-hint={product.categories?.includes(GIFT_BOX_CATEGORY_KEY) ? "gift box" : (product.categories?.[0]?.toLowerCase().split(" ")[0] || product.name.split(" ")[0]?.toLowerCase() || "gift item")}
                       />
                     </div>
                 </CardHeader>
