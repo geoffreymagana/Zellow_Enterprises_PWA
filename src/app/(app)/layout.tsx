@@ -3,9 +3,10 @@
 
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
-import { useRouter, usePathname } from 'next/navigation';
-import { useEffect, ReactNode } from 'react';
-import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Bell, Ship, MapIcon, ChevronLeft, Search as SearchIcon } from 'lucide-react';
+import { useRouter, usePathname, useSearchParams } // Added useSearchParams
+from 'next/navigation';
+import React, { useEffect, ReactNode, useState } from 'react'; // Added useState
+import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Bell, Ship, MapIcon, ChevronLeft, Search as SearchIcon, Menu } from 'lucide-react';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -27,7 +28,7 @@ import {
 } from '@/components/ui/sidebar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useIsMobile } from '@/hooks/use-mobile';
-
+import { useCart } from '@/contexts/CartContext'; // Import useCart
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
@@ -57,9 +58,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
   const filteredMainAdminNavItems = mainAdminNavItems
     .map(item => {
       if (!searchTerm) return { ...item, isVisible: true }; 
-
       const labelMatches = item.label.toLowerCase().includes(searchTerm.toLowerCase());
-      
       const subItems = (item as any).subItems; 
       if (subItems && subItems.length > 0) {
         const filteredSubItems = subItems.filter((subItem: any) =>
@@ -71,7 +70,6 @@ function AdminLayout({ children }: { children: ReactNode }) {
       return { ...item, isVisible: labelMatches };
     })
     .filter(item => item.isVisible);
-
 
   const filteredFooterAdminNavItems = footerAdminNavItems.filter(item =>
     !searchTerm || item.label.toLowerCase().includes(searchTerm.toLowerCase())
@@ -180,7 +178,9 @@ function AdminLayout({ children }: { children: ReactNode }) {
         <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="w-full h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2">
-              <SidebarTrigger className="md:hidden" /> 
+              <SidebarTrigger className="md:hidden">
+                <Menu className="h-5 w-5" /> {/* Replaced PanelLeft with Menu icon */}
+              </SidebarTrigger> 
               <Link href="/dashboard" className="hidden md:flex items-center gap-2" aria-label="Admin Dashboard Home">
                  <Aperture className="text-primary h-6 w-6" />
                  <h1 className="text-xl font-semibold font-headline">Admin Panel</h1>
@@ -215,36 +215,90 @@ function AdminLayout({ children }: { children: ReactNode }) {
 }
 
 function NonAdminLayout({ children }: { children: ReactNode }) {
-  const { logout } = useAuth(); // Logout might be used by profile or bottom nav in future
   const router = useRouter();
   const pathname = usePathname();
-  const isMobile = useIsMobile();
+  const searchParams = useSearchParams(); // For reading initial search term
+  const { cartTotalItems } = useCart();
+
+  // State for the search input value
+  const [localSearchTerm, setLocalSearchTerm] = useState(searchParams.get('q') || '');
+
+  // Sync URL with input and vice-versa
+  useEffect(() => {
+    // If URL changes, update input (e.g., back button)
+    setLocalSearchTerm(searchParams.get('q') || '');
+  }, [searchParams]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newSearchTerm = e.target.value;
+    setLocalSearchTerm(newSearchTerm);
+    // Update URL query parameter as user types (debouncing might be good for performance)
+    const currentParams = new URLSearchParams(Array.from(searchParams.entries()));
+    if (newSearchTerm) {
+      currentParams.set('q', newSearchTerm);
+    } else {
+      currentParams.delete('q');
+    }
+    // Only push to router if it's the products page or gift boxes page for active filtering.
+    // Other pages might not use the 'q' param.
+    if (pathname === '/products' || pathname === '/gift-boxes') {
+         router.push(`${pathname}?${currentParams.toString()}`, { scroll: false });
+    } else if (!newSearchTerm) { // Clear 'q' if search term is empty on other pages
+        router.push(`${pathname}?${currentParams.toString()}`, { scroll: false });
+    }
+  };
+  
+  const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      const currentParams = new URLSearchParams(Array.from(searchParams.entries()));
+      if (localSearchTerm) {
+        currentParams.set('q', localSearchTerm);
+      } else {
+        currentParams.delete('q');
+      }
+      // Always navigate to products page on explicit submit from header search
+      router.push(`/products?${currentParams.toString()}`);
+  };
+
+
+  // Show back button if not on a main tab link and not on checkout
+  const mainTabRoutes = ['/dashboard', '/products', '/gift-boxes', '/orders', '/profile'];
+  const showBackButton = !mainTabRoutes.includes(pathname) && !pathname.startsWith('/checkout');
 
   return (
     <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <div className="w-full flex h-16 items-center px-4 sm:px-6 lg:px-8 gap-2">
-          {/* Conditional Back Button */}
-          {(!isMobile && pathname !== '/dashboard' && !pathname.startsWith('/products') && !pathname.startsWith('/gift-boxes')) && (
+          {showBackButton && (
             <Button variant="ghost" size="icon" onClick={() => router.back()} className="shrink-0 mr-1 sm:mr-2">
               <ChevronLeft className="h-5 w-5" />
               <span className="sr-only">Back</span>
             </Button>
           )}
-          {/* Search Bar Area */}
-          <div className="flex-grow relative">
+          <form onSubmit={handleSearchSubmit} className="flex-grow relative">
             <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
               type="search"
-              placeholder="Search..." // Generic placeholder
+              placeholder="Search products..."
               className="w-full h-10 pl-9 pr-3 rounded-md border-input bg-background focus:ring-primary"
-              // Add value and onChange handlers for search functionality in a future step
+              value={localSearchTerm}
+              onChange={handleSearchChange}
             />
-          </div>
-          {/* ThemeToggle and Logout button are removed from here for non-admin top bar */}
+          </form>
+          <Link href="/orders/cart" passHref>
+            <Button variant="ghost" size="icon" className="relative">
+              <ShoppingCart className="h-5 w-5" />
+              {cartTotalItems > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                  {cartTotalItems}
+                </span>
+              )}
+              <span className="sr-only">View Cart</span>
+            </Button>
+          </Link>
         </div>
       </header>
-      <main className="flex-grow w-full mx-auto px-4 py-8 pb-20 md:pb-8">
+      <main className="flex-grow w-full mx-auto px-4 py-8 pb-24 md:pb-8"> {/* Increased pb for bottom nav */}
         {children}
       </main>
       <BottomNav />

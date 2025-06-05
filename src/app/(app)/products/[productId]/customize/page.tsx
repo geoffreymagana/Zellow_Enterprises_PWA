@@ -6,21 +6,20 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Product } from '@/types'; // ProductCustomizationOption, CustomizationChoiceOption are within Product
+import type { Product } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
+import { useCart } from '@/contexts/CartContext'; // Import useCart
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label'; // Keep if used outside Form, though FormLabel is preferred inside
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { useForm, SubmitHandler } from 'react-hook-form'; // Removed Controller as FormField handles it
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from "zod";
 import { Loader2, AlertTriangle, ArrowLeft, ShoppingCart, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-// Removed Link as it's not used for submitting
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -30,6 +29,7 @@ export default function CustomizeProductPage() {
   const params = useParams();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { addToCart } = useCart(); // Get addToCart from context
   const { toast } = useToast();
   
   const productId = typeof params.productId === 'string' ? params.productId : null;
@@ -62,13 +62,12 @@ export default function CustomizeProductPage() {
           calculatedPrice += choice.priceAdjustment;
         }
       }
-      if (opt.type === 'checkbox' && selectedValue === true && opt.choices?.[0]?.priceAdjustment) { // Checkbox usually has one "choice" for its price adjustment
+      if (opt.type === 'checkbox' && selectedValue === true && opt.choices?.[0]?.priceAdjustment) {
         calculatedPrice += opt.choices[0].priceAdjustment;
       }
     });
     setCurrentPrice(calculatedPrice);
   }, [product, form]);
-
 
   const fetchProductAndBuildSchema = useCallback(async () => {
     if (!productId || !db) {
@@ -85,7 +84,7 @@ export default function CustomizeProductPage() {
       if (productDoc.exists()) {
         const fetchedProduct = { id: productDoc.id, ...productDoc.data() } as Product;
         setProduct(fetchedProduct);
-        setCurrentPrice(fetchedProduct.price);
+        setCurrentPrice(fetchedProduct.price); // Initialize with base price
 
         if (fetchedProduct.customizationOptions && fetchedProduct.customizationOptions.length > 0) {
           const shape: Record<string, z.ZodTypeAny> = {};
@@ -97,14 +96,14 @@ export default function CustomizeProductPage() {
               case 'select':
                 fieldSchema = z.string();
                 if (opt.required) fieldSchema = fieldSchema.min(1, `${opt.label} is required.`);
-                else fieldSchema = fieldSchema.optional().nullable(); // Allow empty if not required
+                else fieldSchema = fieldSchema.optional().nullable();
                 defaultValues[opt.id] = opt.defaultValue || opt.choices?.[0]?.value || "";
                 break;
               case 'text':
                 fieldSchema = z.string();
                 if (opt.required) fieldSchema = fieldSchema.min(1, `${opt.label} is required.`);
-                if (opt.maxLength) fieldSchema = fieldSchema.max(opt.maxLength, `${opt.label} cannot exceed ${opt.maxLength} characters.`);
                 else fieldSchema = fieldSchema.optional().nullable(); // Allow empty if not required
+                if (opt.maxLength) fieldSchema = fieldSchema.max(opt.maxLength, `${opt.label} cannot exceed ${opt.maxLength} characters.`);
                 defaultValues[opt.id] = opt.defaultValue || "";
                 break;
               case 'checkbox':
@@ -116,10 +115,16 @@ export default function CustomizeProductPage() {
             }
             shape[opt.id] = fieldSchema;
           });
-          setCustomizationSchema(z.object(shape));
+          
+          const newSchema = z.object(shape);
+          setCustomizationSchema(newSchema);
           form.reset(defaultValues); // Reset form with defaults after schema is set
+          // Initial price calculation after form and product are set
+          // Need to defer this slightly if form.getValues() isn't immediately ready
+          setTimeout(() => calculatePrice(), 0);
+
         } else {
-          setCustomizationSchema(z.object({})); // Empty schema if no options
+          setCustomizationSchema(z.object({}));
         }
       } else {
         setError("Item not found.");
@@ -132,7 +137,7 @@ export default function CustomizeProductPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [productId, toast, form]);
+  }, [productId, toast, form, calculatePrice]); // Added calculatePrice to dependencies
 
   useEffect(() => {
     if (authLoading) return;
@@ -149,7 +154,7 @@ export default function CustomizeProductPage() {
   }, [authLoading, user, productId, router, fetchProductAndBuildSchema]);
 
   useEffect(() => {
-    if (product) {
+    if (product && form) { // Ensure product and form are initialized
         const subscription = form.watch((value, { name, type }) => {
             calculatePrice();
         });
@@ -159,21 +164,19 @@ export default function CustomizeProductPage() {
 
 
   const onSubmit: SubmitHandler<Record<string, any>> = async (data) => {
+    if (!product) return;
     setIsSubmitting(true);
-    console.log("Customizations submitted:", data);
-    console.log("Final Price:", currentPrice);
-    toast({
-      title: "Customizations Noted (Dev)",
-      description: `Selected options: ${JSON.stringify(data)}. Final Price: ${formatPrice(currentPrice)}. Cart functionality to be implemented.`,
-      duration: 5000,
-    });
-    // Here you would typically add the product with customizations to the cart
-    // e.g., addToCart({ productId: product.id, name: product.name, price: currentPrice, quantity: 1, customizations: data });
+    
+    addToCart(product, 1, data, currentPrice);
+    
+    // Navigate to cart or show success
+    // toast({ title: "Added to Cart", description: `${product.name} with your customizations has been added.` });
+    router.push('/orders/cart'); // Redirect to cart page
+
     setIsSubmitting(false);
   };
 
-  // Updated loading check
-  if (isLoading || authLoading || (product && product.customizationOptions && product.customizationOptions.length > 0 && !customizationSchema)) {
+  if (isLoading || authLoading || (product && product.customizationOptions && product.customizationOptions.length > 0 && !customizationSchema && !error)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -196,20 +199,19 @@ export default function CustomizeProductPage() {
   }
 
   if (!product) {
-    // This case should ideally be covered by error state, but as a fallback:
     return ( <div className="text-center p-4">Item data could not be loaded.</div> );
   }
   
   if (!product.customizationOptions || product.customizationOptions.length === 0) {
     return (
-      <div className="container mx-auto px-4 py-8 text-center">
+      <div className="container mx-auto px-0 sm:px-4 py-8 text-center">
         <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4 mx-auto" />
         <h2 className="text-xl font-semibold mb-2">No Customizations Available</h2>
         <p className="text-muted-foreground mb-4">This item does not have any customization options.</p>
         <Button onClick={() => router.push(`/products/${productId}`)} variant="outline" className="mr-2">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Item Details
         </Button>
-        <Button size="lg" disabled={product.stock === 0}> {/* Add to cart directly if no customization */}
+        <Button size="lg" disabled={product.stock === 0} onClick={() => { addToCart(product, 1); router.push('/orders/cart'); }}>
             <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
         </Button>
       </div>
@@ -217,12 +219,12 @@ export default function CustomizeProductPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-0 sm:px-4 py-8">
       <Button onClick={() => router.push(`/products/${productId}`)} variant="outline" size="sm" className="mb-6">
         <ArrowLeft className="mr-2 h-4 w-4" /> Back to Item Details
       </Button>
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden shadow-none sm:shadow-lg rounded-none sm:rounded-lg">
         <div className="md:grid md:grid-cols-12 gap-0">
           <div className="md:col-span-5 lg:col-span-4">
             <div className="aspect-[4/3] relative w-full bg-muted">
@@ -241,13 +243,13 @@ export default function CustomizeProductPage() {
             </div>
           </div>
 
-          <div className="md:col-span-7 lg:col-span-8 p-6 md:p-8">
+          <div className="md:col-span-7 lg:col-span-8 p-4 sm:p-6 md:p-8">
             <CardHeader className="p-0 mb-6">
               <CardTitle className="text-2xl lg:text-3xl font-headline font-bold">Customize Your Item</CardTitle>
               <CardDescription>Make it uniquely yours by selecting the options below.</CardDescription>
             </CardHeader>
             
-            {customizationSchema && ( // Ensure schema is loaded before rendering form
+            {customizationSchema && (
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <CardContent className="p-0 space-y-5">
@@ -275,7 +277,7 @@ export default function CustomizeProductPage() {
                           {option.type === 'text' && (
                             <Input 
                               {...field} 
-                              value={String(field.value ?? "")} // Ensure value is string
+                              value={String(field.value ?? "")}
                               placeholder={option.placeholder || `Enter ${option.label.toLowerCase()}`} 
                               maxLength={option.maxLength} 
                             />
@@ -284,12 +286,12 @@ export default function CustomizeProductPage() {
                             <div className="flex items-center space-x-2 p-3 border rounded-md hover:border-primary transition-colors">
                                <Checkbox
                                 id={option.id}
-                                checked={field.value === true} // Explicit boolean check
+                                checked={field.value === true}
                                 onCheckedChange={field.onChange}
                                />
                                <label htmlFor={option.id} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-grow cursor-pointer">
-                                 {option.placeholder || 'Yes, include this option'}
-                                 {option.choices?.[0]?.priceAdjustment ? ` (+${formatPrice(option.choices[0].priceAdjustment)})` : ''}
+                                 {option.placeholder || option.label}
+                                 {option.choices?.[0]?.priceAdjustment ? ` (${option.choices[0].priceAdjustment > 0 ? '+' : ''}${formatPrice(option.choices[0].priceAdjustment)})` : ''}
                                </label>
                             </div>
                           )}
@@ -310,9 +312,6 @@ export default function CustomizeProductPage() {
                   <Button type="submit" size="lg" className="w-full" disabled={isSubmitting || product.stock === 0}>
                     {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ShoppingCart className="mr-2 h-5 w-5" /> }
                     Add to Cart
-                  </Button>
-                  <Button type="button" variant="outline" size="lg" className="w-full" onClick={() => console.log("Save for later clicked", form.getValues())} disabled={product.stock === 0}>
-                    <Save className="mr-2 h-5 w-5" /> Save For Later
                   </Button>
                 </CardFooter>
               </form>

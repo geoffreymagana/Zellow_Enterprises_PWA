@@ -8,6 +8,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Product } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
+import { useCart } from '@/contexts/CartContext'; // Import useCart
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Loader2, AlertTriangle, ShoppingCart, ArrowLeft, Settings } from 'lucide-react';
@@ -22,6 +23,7 @@ export default function ProductDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { addToCart } = useCart(); // Get addToCart from context
   const { toast } = useToast();
   
   const productId = typeof params.productId === 'string' ? params.productId : null;
@@ -29,6 +31,7 @@ export default function ProductDetailsPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   const fetchProduct = useCallback(async () => {
     if (!productId || !db) {
@@ -71,6 +74,16 @@ export default function ProductDetailsPage() {
     }
   }, [authLoading, user, productId, router, fetchProduct]);
 
+  const handleAddToCart = () => {
+    if (!product) return;
+    setIsAddingToCart(true);
+    // For non-customizable products, add directly with quantity 1
+    addToCart(product, 1); 
+    // Consider adding a small delay or confirmation before resetting isAddingToCart
+    setTimeout(() => setIsAddingToCart(false), 1000); 
+  };
+
+
   if (isLoading || authLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">
@@ -109,11 +122,11 @@ export default function ProductDetailsPage() {
   const hasCustomizations = product.customizationOptions && product.customizationOptions.length > 0;
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-0 sm:px-4 py-8">
       <Button onClick={() => router.push('/products')} variant="outline" size="sm" className="mb-6">
         <ArrowLeft className="mr-2 h-4 w-4" /> Back to Products
       </Button>
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden shadow-none sm:shadow-lg rounded-none sm:rounded-lg">
         <div className="md:flex">
           <div className="md:w-1/2">
             <div className="aspect-[4/3] relative w-full bg-muted">
@@ -127,39 +140,40 @@ export default function ProductDetailsPage() {
               />
             </div>
           </div>
-          <div className="md:w-1/2 p-6 md:p-8 flex flex-col">
+          <div className="md:w-1/2 p-4 sm:p-6 md:p-8 flex flex-col">
             <CardHeader className="p-0 mb-4">
-              <CardTitle className="text-3xl lg:text-4xl font-headline font-bold">{product.name}</CardTitle>
+              <CardTitle className="text-2xl lg:text-3xl font-headline font-bold">{product.name}</CardTitle>
             </CardHeader>
             <CardContent className="p-0 flex-grow space-y-4">
-              <p className="text-2xl lg:text-3xl font-bold text-primary">{formatPrice(product.price)}</p>
+              <p className="text-xl lg:text-2xl font-bold text-primary">{formatPrice(product.price)}</p>
               <CardDescription className="text-base text-foreground/80 leading-relaxed whitespace-pre-line">
                 {product.description}
               </CardDescription>
               
               {product.stock > 0 && product.stock < 10 && (
-                <p className="text-sm text-orange-500 mt-1">{product.stock} left in stock!</p>
+                <p className="text-sm text-orange-500 font-medium mt-1">{product.stock} left in stock!</p>
               )}
               {product.stock === 0 && (
                 <p className="text-sm text-destructive mt-1 font-semibold">Out of stock</p>
               )}
 
             </CardContent>
-            <CardFooter className="p-0 mt-6 pt-6 border-t flex flex-col sm:flex-row gap-3">
+            <CardFooter className="p-0 mt-6 pt-6 border-t flex flex-col sm:flex-row gap-3 items-stretch">
               {hasCustomizations ? (
-                <Link href={`/products/${product.id}/customize`} passHref className="w-full sm:w-auto">
+                <Link href={`/products/${product.id}/customize`} passHref className="flex-1">
                   <Button size="lg" variant="outline" className="w-full" disabled={product.stock === 0}>
                     <Settings className="mr-2 h-5 w-5" /> Customize Item
                   </Button>
                 </Link>
               ) : (
-                <Button size="lg" variant="outline" className="w-full" disabled={true} title="No customization options available for this product">
-                    <Settings className="mr-2 h-5 w-5" /> No Customizations
-                </Button>
+                 <Button size="lg" variant="default" className="flex-1" onClick={handleAddToCart} disabled={product.stock === 0 || isAddingToCart}>
+                    {isAddingToCart ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ShoppingCart className="mr-2 h-5 w-5" />}
+                     Add to Cart
+                 </Button>
               )}
-              <Button size="lg" className="w-full sm:w-auto" disabled={product.stock === 0}>
-                <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
-              </Button>
+              {!hasCustomizations && ( // Show Add to Cart button if no customizations
+                 <span className="sm:hidden"></span> // Placeholder for spacing on small screens or remove if not needed
+              )}
             </CardFooter>
           </div>
         </div>

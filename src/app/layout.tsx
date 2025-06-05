@@ -2,13 +2,14 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { CartProvider } from '@/contexts/CartContext'; // Import CartProvider
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 
 export const metadata: Metadata = {
   title: 'Zellow Enterprises PWA',
   description: 'Zellow Enterprises PWA for Customers and Staff',
-  manifest: '/manifest.json', // Assuming manifest.json will be added for PWA
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
@@ -32,8 +33,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            {children}
-            <Toaster />
+            <CartProvider> {/* Wrap with CartProvider */}
+              {children}
+              <Toaster />
+            </CartProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

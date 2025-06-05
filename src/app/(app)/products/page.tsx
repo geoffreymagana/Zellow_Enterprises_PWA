@@ -8,11 +8,12 @@ import type { Product } from "@/types";
 import { ShoppingCart, Loader2, AlertTriangle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation"; // Added useSearchParams
+import { useEffect, useState, useCallback, useMemo } from "react"; // Added useMemo
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
+import { useCart } from "@/contexts/CartContext"; // Import useCart
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -21,11 +22,14 @@ const formatPrice = (price: number): string => {
 export default function ProductsPage() { 
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams(); // For local search
   const { toast } = useToast();
+  const { cartTotalItems } = useCart(); // Get cart count
 
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const searchTerm = searchParams.get('q') || "";
 
   const fetchProducts = useCallback(async () => {
     if (!db) {
@@ -55,13 +59,23 @@ export default function ProductsPage() {
 
   useEffect(() => {
     if (authLoading) return;
-
     if (!user) {
       router.replace('/login');
       return;
     }
+    if (role === 'Customer' && pathname === '/dashboard') { // Assuming pathname is available or use a different trigger
+      router.replace('/products'); // Redirect customers from dashboard to products
+    }
     fetchProducts();
-  }, [authLoading, user, router, fetchProducts]);
+  }, [authLoading, user, role, router, fetchProducts]);
+
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm) return products;
+    return products.filter(product =>
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.categories?.some(cat => cat.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  }, [products, searchTerm]);
 
   if (authLoading || isLoadingProducts) {
     return (
@@ -90,7 +104,8 @@ export default function ProductsPage() {
         {role === 'Customer' && (
           <Link href="/orders/cart" passHref className="hidden sm:inline-flex">
             <Button variant="outline">
-              <ShoppingCart className="mr-2 h-4 w-4" /> View Cart (0) {/* TODO: Implement cart count */}
+              <ShoppingCart className="mr-2 h-4 w-4" /> 
+              View Cart {cartTotalItems > 0 && `(${cartTotalItems})`}
             </Button>
           </Link>
         )}
@@ -98,17 +113,21 @@ export default function ProductsPage() {
       
       <p className="text-muted-foreground">Browse our selection of customizable items.</p>
 
-      {products.length === 0 ? (
+      {filteredProducts.length === 0 ? (
         <Card>
           <CardContent className="pt-10 pb-10 text-center">
             <ShoppingCart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <p className="text-xl font-semibold mb-2">No Products Available Yet</p>
-            <p className="text-muted-foreground">Check back soon for new arrivals!</p>
+            <p className="text-xl font-semibold mb-2">
+              {searchTerm ? "No Products Match Your Search" : "No Products Available Yet"}
+            </p>
+            <p className="text-muted-foreground">
+              {searchTerm ? "Try a different search term." : "Check back soon for new arrivals!"}
+            </p>
           </CardContent>
         </Card>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
-          {products.map((product) => (
+          {filteredProducts.map((product) => (
             <Link key={product.id} href={`/products/${product.id}`} passHref>
               <Card className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group h-full">
                 <CardHeader className="p-0">
@@ -130,10 +149,10 @@ export default function ProductsPage() {
                   <p className="text-lg md:text-xl font-bold text-primary mt-1">{formatPrice(product.price)}</p>
                 </CardContent>
                  {product.stock > 0 && product.stock < 10 && (
-                  <div className="px-3 pb-2 text-xs text-orange-500">{product.stock} left in stock!</div>
+                  <div className="px-3 pb-2 text-xs text-orange-500 font-medium">{product.stock} left in stock!</div>
                 )}
                 {product.stock === 0 && (
-                  <div className="px-3 pb-2 text-xs text-destructive">Out of stock</div>
+                  <div className="px-3 pb-2 text-xs text-destructive font-semibold">Out of stock</div>
                 )}
               </Card>
             </Link>
