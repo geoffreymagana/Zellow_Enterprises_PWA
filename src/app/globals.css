@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -85,5 +86,20 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: theme('fontFamily.body');
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: theme('fontFamily.headline');
   }
 }
+
+/* Custom header height variable */
+:root {
+  --header-height: 4rem; /* Default header height */
+}
+/* Adjust based on breakpoints if necessary */
+/* @media (min-width: 768px) {
+  :root {
+    --header-height: 4.5rem; 
+  }
+} */
