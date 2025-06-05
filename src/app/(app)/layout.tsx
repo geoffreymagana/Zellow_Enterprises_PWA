@@ -5,7 +5,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, ReactNode } from 'react';
-import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture } from 'lucide-react';
+import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Bell } from 'lucide-react';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -26,7 +26,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
-  const { searchTerm, setSearchTerm, isMobile } = useSidebar()!; 
+  const { searchTerm, setSearchTerm, isMobile, openMobile } = useSidebar()!; 
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -37,6 +37,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
     { href: '/admin/payments', label: 'Payments', icon: DollarSign },
     { href: '/admin/deliveries', label: 'Deliveries', icon: Truck },
     { href: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck },
+    { href: '/admin/notifications', label: 'Notifications', icon: Bell },
     { href: '/admin/reports', label: 'Reports', icon: FileArchive },
   ];
 
@@ -54,7 +55,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="flex min-h-screen bg-background"> {/* Outer flex container */}
+    <div className="flex min-h-screen bg-background">
       <Sidebar
         side="left"
         className="border-r border-sidebar w-[var(--sidebar-width)] h-screen sticky top-0"
@@ -66,8 +67,8 @@ function AdminLayout({ children }: { children: ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <ScrollArea className="h-full">
-            {(!isMobile || (isMobile && !searchTerm)) && ( // On mobile, only show search input if there's no search term yet
-              <div className="p-2 md:hidden">
+            {(isMobile && openMobile) && ( 
+              <div className="p-2">
                 <Input
                   type="search"
                   placeholder="Search sections..."
@@ -125,7 +126,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
               ))}
             </SidebarMenu>
           )}
-          <div className="p-2 mt-1">
+          <div className="p-2 mt-1 md:hidden"> {/* Hide on desktop, show on mobile */}
             <ThemeToggle />
           </div>
           <div className="mt-2 p-2">
@@ -137,16 +138,14 @@ function AdminLayout({ children }: { children: ReactNode }) {
         </SidebarFooter>
       </Sidebar>
 
-      {/* This div is the "Right Panel" taking up space next to the Sidebar */}
       <div className="flex flex-col flex-1 min-w-0"> 
         <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="w-full h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2">
-              <SidebarTrigger className="md:hidden" /> {/* Only show trigger on mobile */}
+              <SidebarTrigger className="md:hidden" />
               <h1 className="text-xl font-semibold font-headline hidden md:block">Admin Panel</h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
-              {/* Search input for desktop and larger tablets */}
               <div className="hidden md:block">
                 <Input
                   type="search"
@@ -156,14 +155,13 @@ function AdminLayout({ children }: { children: ReactNode }) {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <div className="hidden md:block"> {/* Theme toggle for desktop */}
+              <div className="hidden md:block">
                 <ThemeToggle />
               </div>
             </div>
           </div>
         </header>
         
-        {/* This main element will take the remaining vertical space and scroll */}
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:px-8 lg:py-6">
           <div className="w-full">
             {children}
@@ -235,5 +233,3 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
-
-    
