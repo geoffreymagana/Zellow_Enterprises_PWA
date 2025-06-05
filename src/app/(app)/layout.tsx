@@ -5,28 +5,26 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, ReactNode } from 'react';
-import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Search as SearchIcon, PanelLeft, Aperture } from 'lucide-react';
+import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture } from 'lucide-react';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
   SidebarProvider,
   Sidebar,
-  SidebarTrigger,
   SidebarHeader,
   SidebarContent,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
-  useSidebar, // Import useSidebar
+  useSidebar, 
 } from '@/components/ui/sidebar';
-import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
-  const { searchTerm, setSearchTerm } = useSidebar(); // Consume from context
+  const { searchTerm } = useSidebar()!; 
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -127,37 +125,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
       </Sidebar>
 
       <div className="flex flex-col flex-grow min-w-0">
-        <header className="sticky top-0 z-40 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-          <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-2">
-              <div className="md:hidden">
-                <SidebarTrigger>
-                  <PanelLeft />
-                </SidebarTrigger>
-              </div>
-              <div className="text-left">
-                <span className="font-headline text-xl font-bold text-foreground">
-                  Admin Panel
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 flex-grow md:flex-grow-0 justify-end">
-              <div className="relative w-full max-w-xs sm:max-w-sm md:w-auto md:max-w-none">
-                <SearchIcon className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search admin sections..."
-                  className="pl-8 h-9 w-full md:w-[200px] lg:w-[250px] bg-background"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <div className="hidden md:block">
-                <ThemeToggle />
-              </div>
-            </div>
-          </div>
-        </header>
+        {/* Header has been removed from here */}
         <main className="flex flex-col flex-grow p-4 md:p-6 lg:px-8 lg:py-6 overflow-y-auto">
           <div className="w-full">
             {children}
