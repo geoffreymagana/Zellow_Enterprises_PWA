@@ -20,7 +20,6 @@ import {
   SidebarMenuItem, 
   SidebarMenuButton,
   SidebarFooter,
-  // useSidebar // No longer using useSidebar directly in AdminLayout top level
 } from '@/components/ui/sidebar';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -111,7 +110,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
       </Sidebar>
 
       {/* This div wraps the main header and main content area, taking remaining width */}
-      <div className="flex flex-col flex-grow">
+      <div className="flex flex-col flex-grow min-w-0"> {/* Added min-w-0 here */}
         <header className="sticky top-0 z-40 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
           <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2">
@@ -147,7 +146,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
         {/* Main content area, ensuring it scrolls independently */}
-        <main className="flex flex-col flex-grow p-4 md:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex flex-col flex-grow p-4 md:p-6 lg:px-8 lg:py-6 overflow-y-auto">
           <div className="w-full"> 
             {children}
           </div>
