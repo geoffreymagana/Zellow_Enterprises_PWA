@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -11,10 +12,10 @@ import { useRouter } from "next/navigation"; // Import useRouter
 import { useEffect } from "react";
 
 const sampleProducts: Product[] = [
-  { id: '1', name: 'Custom Mug', description: 'Personalize with your text and images.', price: 15.99, imageUrl: 'https://placehold.co/600x400.png', stock: 100, dataAiHint: "custom mug" },
-  { id: '2', name: 'Engraved Pen', description: 'Elegant pen with custom engraving.', price: 25.50, imageUrl: 'https://placehold.co/600x400.png', stock: 50, dataAiHint: "engraved pen" },
-  { id: '3', name: 'Printed T-Shirt', description: 'High-quality custom printed t-shirt.', price: 20.00, imageUrl: 'https://placehold.co/600x400.png', stock: 200, dataAiHint: "printed t-shirt" },
-  { id: '4', name: 'Custom Keychain', description: 'A unique keychain with your design.', price: 9.99, imageUrl: 'https://placehold.co/600x400.png', stock: 150, dataAiHint: "custom keychain" },
+  { id: '1', name: 'Custom Mug', description: 'Personalize with your text and images.', price: 1599.00, imageUrl: 'https://placehold.co/600x400.png', stock: 100, dataAiHint: "custom mug" },
+  { id: '2', name: 'Engraved Pen', description: 'Elegant pen with custom engraving.', price: 2550.00, imageUrl: 'https://placehold.co/600x400.png', stock: 50, dataAiHint: "engraved pen" },
+  { id: '3', name: 'Printed T-Shirt', description: 'High-quality custom printed t-shirt.', price: 2000.00, imageUrl: 'https://placehold.co/600x400.png', stock: 200, dataAiHint: "printed t-shirt" },
+  { id: '4', name: 'Custom Keychain', description: 'A unique keychain with your design.', price: 999.00, imageUrl: 'https://placehold.co/600x400.png', stock: 150, dataAiHint: "custom keychain" },
 ];
 
 export default function ProductsPage() {
@@ -65,7 +66,7 @@ export default function ProductsPage() {
             <CardContent className="pt-4 flex-grow">
               <CardTitle className="text-lg font-semibold mb-1 font-headline">{product.name}</CardTitle>
               <CardDescription className="text-sm text-muted-foreground mb-2">{product.description}</CardDescription>
-              <p className="text-xl font-bold text-primary">${product.price.toFixed(2)}</p>
+              <p className="text-xl font-bold text-primary">Ksh {product.price.toFixed(2)}</p>
             </CardContent>
             <CardFooter className="flex justify-between items-center p-4">
               <Button size="sm" variant="outline">

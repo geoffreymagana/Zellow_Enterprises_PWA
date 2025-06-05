@@ -146,10 +146,10 @@ export default function AdminShippingMethodsPage() {
 
 
   if (authLoading || (!user && !authLoading)) {
-    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
    if (role !== 'Admin') {
-    return <div className="flex items-center justify-center min-h-screen">Unauthorized access.</div>;
+    return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">Unauthorized access.</div>;
   }
 
   return (
@@ -186,7 +186,7 @@ export default function AdminShippingMethodsPage() {
                     <TableCell className="font-medium">{method.name}</TableCell>
                     <TableCell className="max-w-xs truncate">{method.description}</TableCell>
                     <TableCell>{method.duration}</TableCell>
-                    <TableCell>${method.basePrice.toFixed(2)}</TableCell>
+                    <TableCell>Ksh {method.basePrice.toFixed(2)}</TableCell>
                     <TableCell>
                       <Badge variant={method.active ? "default" : "secondary"}>
                         {method.active ? "Active" : "Inactive"}
@@ -285,8 +285,8 @@ export default function AdminShippingMethodsPage() {
                 name="basePrice"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Base Price ($)</FormLabel>
-                    <FormControl><Input type="number" step="0.01" placeholder="e.g., 5.00" {...field} /></FormControl>
+                    <FormLabel>Base Price (Ksh)</FormLabel>
+                    <FormControl><Input type="number" step="0.01" placeholder="e.g., 500.00" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

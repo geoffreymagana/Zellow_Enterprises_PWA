@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -13,10 +14,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 const sampleInventory: Product[] = [
-  { id: 'P001', name: 'Standard Mug Blank', description: 'White ceramic mug for customization.', price: 3.50, stock: 250, imageUrl: 'https://placehold.co/100x100.png', dataAiHint: "blank mug" },
-  { id: 'P002', name: 'Premium Ballpoint Pen', description: 'Metal pen for engraving.', price: 7.20, stock: 85, imageUrl: 'https://placehold.co/100x100.png', dataAiHint: "blank pen" },
-  { id: 'P003', name: 'Cotton T-Shirt (M, White)', description: 'Medium size, white cotton t-shirt.', price: 5.00, stock: 15, imageUrl: 'https://placehold.co/100x100.png', dataAiHint: "blank t-shirt" },
-  { id: 'P004', name: 'Acrylic Keychain Blank', description: 'Clear acrylic blank for keychains.', price: 1.10, stock: 500, imageUrl: 'https://placehold.co/100x100.png', dataAiHint: "blank keychain" },
+  { id: 'P001', name: 'Standard Mug Blank', description: 'White ceramic mug for customization.', price: 350.00, stock: 250, imageUrl: 'https://placehold.co/100x100.png', dataAiHint: "blank mug" },
+  { id: 'P002', name: 'Premium Ballpoint Pen', description: 'Metal pen for engraving.', price: 720.00, stock: 85, imageUrl: 'https://placehold.co/100x100.png', dataAiHint: "blank pen" },
+  { id: 'P003', name: 'Cotton T-Shirt (M, White)', description: 'Medium size, white cotton t-shirt.', price: 500.00, stock: 15, imageUrl: 'https://placehold.co/100x100.png', dataAiHint: "blank t-shirt" },
+  { id: 'P004', name: 'Acrylic Keychain Blank', description: 'Clear acrylic blank for keychains.', price: 110.00, stock: 500, imageUrl: 'https://placehold.co/100x100.png', dataAiHint: "blank keychain" },
 ];
 
 export default function InventoryPage() {
@@ -64,10 +65,10 @@ export default function InventoryPage() {
           </Link>
         )}
       </div>
-      <CardDescription>
+      <p className="text-muted-foreground">
         View and manage product stock levels.
         {role === 'SupplyManager' && " You can also approve incoming stock from suppliers."}
-      </CardDescription>
+      </p>
 
       <Card>
         <CardHeader>
@@ -98,7 +99,7 @@ export default function InventoryPage() {
                   <TableCell className="font-medium">{item.id}</TableCell>
                   <TableCell>{item.name}</TableCell>
                   <TableCell><StockBadge stock={item.stock} /></TableCell>
-                  <TableCell>${item.price.toFixed(2)}</TableCell>
+                  <TableCell>Ksh {item.price.toFixed(2)}</TableCell>
                   <TableCell className="text-right">
                     {role === 'InventoryManager' && (
                       <Link href={`/inventory/edit/${item.id}`} passHref>

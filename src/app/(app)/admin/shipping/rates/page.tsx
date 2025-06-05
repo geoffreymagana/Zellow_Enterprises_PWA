@@ -168,10 +168,10 @@ export default function AdminShippingRatesPage() {
   );
 
   if (authLoading || (!user && !authLoading)) {
-    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
    if (role !== 'Admin') {
-    return <div className="flex items-center justify-center min-h-screen">Unauthorized access.</div>;
+    return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">Unauthorized access.</div>;
   }
 
   return (
@@ -244,7 +244,7 @@ export default function AdminShippingRatesPage() {
                   <TableRow key={rate.id}>
                     <TableCell className="font-medium">{getRegionName(rate.regionId)}</TableCell>
                     <TableCell>{getMethodName(rate.methodId)}</TableCell>
-                    <TableCell>${rate.customPrice.toFixed(2)}</TableCell>
+                    <TableCell>Ksh {rate.customPrice.toFixed(2)}</TableCell>
                     <TableCell className="max-w-xs truncate">{rate.notes || '-'}</TableCell>
                     <TableCell>
                       <Badge variant={rate.active ? "default" : "secondary"}>
@@ -347,7 +347,7 @@ export default function AdminShippingRatesPage() {
                 name="customPrice"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Custom Price ($)</FormLabel>
+                    <FormLabel>Custom Price (Ksh)</FormLabel>
                     <FormControl><Input type="number" step="0.01" placeholder="Overrides method base price" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -390,4 +390,3 @@ export default function AdminShippingRatesPage() {
     </div>
   );
 }
-

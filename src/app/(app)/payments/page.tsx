@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -24,10 +25,10 @@ interface PaymentTransaction {
 }
 
 const samplePayments: PaymentTransaction[] = [
-  { id: 'PAY001', date: new Date('2023-11-01'), description: 'Payment for Order ORD001', amount: 31.98, type: 'incoming', status: 'completed', method: 'Stripe', referenceId: 'ORD001' },
-  { id: 'PAY002', date: new Date('2023-11-02'), description: 'Invoice INV001 to Supplier S001', amount: 500.00, type: 'outgoing', status: 'pending', method: 'Bank Transfer', referenceId: 'INV001' },
-  { id: 'PAY003', date: new Date('2023-11-03'), description: 'Payment for Order ORD002', amount: 25.50, type: 'incoming', status: 'failed', method: 'Stripe', referenceId: 'ORD002' },
-  { id: 'PAY004', date: new Date('2023-11-04'), description: 'Refund for Order ORD000', amount: 10.00, type: 'outgoing', status: 'requires_approval', method: 'Stripe', referenceId: 'ORD000' },
+  { id: 'PAY001', date: new Date('2023-11-01'), description: 'Payment for Order ORD001', amount: 3198.00, type: 'incoming', status: 'completed', method: 'Stripe', referenceId: 'ORD001' },
+  { id: 'PAY002', date: new Date('2023-11-02'), description: 'Invoice INV001 to Supplier S001', amount: 50000.00, type: 'outgoing', status: 'pending', method: 'Bank Transfer', referenceId: 'INV001' },
+  { id: 'PAY003', date: new Date('2023-11-03'), description: 'Payment for Order ORD002', amount: 2550.00, type: 'incoming', status: 'failed', method: 'Stripe', referenceId: 'ORD002' },
+  { id: 'PAY004', date: new Date('2023-11-04'), description: 'Refund for Order ORD000', amount: 1000.00, type: 'outgoing', status: 'requires_approval', method: 'Stripe', referenceId: 'ORD000' },
 ];
 
 export default function PaymentsPage() {
@@ -72,18 +73,18 @@ export default function PaymentsPage() {
           <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" /> New Transaction</Button>
         </div>
       </div>
-      <CardDescription>
+      <p className="text-muted-foreground">
         Manage incoming and outgoing payments, approve transactions, and generate reports.
-      </CardDescription>
+      </p>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader><CardTitle>Total Revenue (Month)</CardTitle></CardHeader>
-          <CardContent><p className="text-2xl font-bold">$10,580.50</p></CardContent>
+          <CardContent><p className="text-2xl font-bold">Ksh 1,058,050.00</p></CardContent>
         </Card>
          <Card>
           <CardHeader><CardTitle>Total Expenses (Month)</CardTitle></CardHeader>
-          <CardContent><p className="text-2xl font-bold">$3,200.00</p></CardContent>
+          <CardContent><p className="text-2xl font-bold">Ksh 320,000.00</p></CardContent>
         </Card>
          <Card>
           <CardHeader><CardTitle>Pending Approvals</CardTitle></CardHeader>
@@ -140,7 +141,7 @@ export default function PaymentsPage() {
                   <TableCell>{p.date.toLocaleDateString()}</TableCell>
                   <TableCell>{p.description}</TableCell>
                   <TableCell className={p.type === 'incoming' ? 'text-green-600' : 'text-red-600'}>
-                    {p.type === 'incoming' ? '+' : '-'}${p.amount.toFixed(2)}
+                    {p.type === 'incoming' ? '+' : '-'}Ksh {p.amount.toFixed(2)}
                   </TableCell>
                   <TableCell><Badge variant={p.type === 'incoming' ? "default" : "secondary"} className="capitalize">{p.type}</Badge></TableCell>
                   <TableCell><Badge variant={getStatusBadgeVariant(p.status)} className="capitalize">{p.status.replace('_', ' ')}</Badge></TableCell>

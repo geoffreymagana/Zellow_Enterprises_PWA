@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Badge } from "@/components/ui/badge";
@@ -12,10 +13,10 @@ import { useRouter } from "next/navigation"; // Import useRouter
 import { useEffect, useState } from "react";
 
 const sampleOrders: Order[] = [
-  { id: 'ORD001', customerId: 'cust123', items: [{productId: '1', quantity: 2}], totalAmount: 31.98, status: 'shipped', createdAt: new Date('2023-10-26') },
-  { id: 'ORD002', customerId: 'cust123', items: [{productId: '2', quantity: 1}], totalAmount: 25.50, status: 'processing', createdAt: new Date('2023-10-28') },
-  { id: 'ORD003', customerId: 'cust123', items: [{productId: '3', quantity: 1}], totalAmount: 20.00, status: 'pending', createdAt: new Date('2023-11-01') },
-  { id: 'ORD004', customerId: 'cust123', items: [{productId: '1', quantity: 1}, {productId: '4', quantity: 3}], totalAmount: 45.96, status: 'delivered', createdAt: new Date('2023-09-15') },
+  { id: 'ORD001', customerId: 'cust123', items: [{productId: '1', quantity: 2}], totalAmount: 3198.00, status: 'shipped', createdAt: new Date('2023-10-26') },
+  { id: 'ORD002', customerId: 'cust123', items: [{productId: '2', quantity: 1}], totalAmount: 2550.00, status: 'processing', createdAt: new Date('2023-10-28') },
+  { id: 'ORD003', customerId: 'cust123', items: [{productId: '3', quantity: 1}], totalAmount: 2000.00, status: 'pending', createdAt: new Date('2023-11-01') },
+  { id: 'ORD004', customerId: 'cust123', items: [{productId: '1', quantity: 1}, {productId: '4', quantity: 3}], totalAmount: 4596.00, status: 'delivered', createdAt: new Date('2023-09-15') },
 ];
 
 export default function OrdersPage() {
@@ -89,7 +90,7 @@ export default function OrdersPage() {
                     <TableCell>
                       <Badge variant={getStatusBadgeVariant(order.status)}>{order.status}</Badge>
                     </TableCell>
-                    <TableCell>${order.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell>Ksh {order.totalAmount.toFixed(2)}</TableCell>
                     <TableCell className="text-right">
                       <Link href={`/orders/${order.id}`} passHref>
                         <Button variant="ghost" size="icon" aria-label="View Order">

@@ -5,7 +5,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, ReactNode } from 'react';
-import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Bell, MapPin, Ship, Combine } from 'lucide-react';
+import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Bell, MapPin, Ship, Combine, Map } from 'lucide-react';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -51,6 +51,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
       ],
     },
     { href: '/admin/reports', label: 'Reports', icon: FileArchive },
+    { href: '/rider/map', label: 'Rider Map', icon: Map }, // New Rider Map link for Admin
   ];
 
   const footerAdminNavItems = [
@@ -66,7 +67,6 @@ function AdminLayout({ children }: { children: ReactNode }) {
       if (filteredSubItems.length > 0) {
         return { ...item, subItems: filteredSubItems, isVisible: true };
       }
-      // If parent itself matches search term, show all its subitems
       if (item.label.toLowerCase().includes(searchTerm.toLowerCase())) {
         return { ...item, isVisible: true };
       }
@@ -97,7 +97,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
               <div className="p-2">
                 <Input
                   type="search"
-                  placeholder="Search sections..."
+                  placeholder="Search admin sections..."
                   className="h-9 w-full"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -200,7 +200,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
               <div className="hidden md:block">
                  <Input
                   type="search"
-                  placeholder="Search sections..."
+                  placeholder="Search admin sections..."
                   className="h-9 w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}

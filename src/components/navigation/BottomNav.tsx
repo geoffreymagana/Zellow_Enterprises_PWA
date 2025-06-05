@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ShoppingCart, ListChecks, UserCircle, Package, Truck, FileText, DollarSign, Settings, Warehouse, Users, Layers } from 'lucide-react';
+import { Home, ShoppingCart, ListChecks, UserCircle, Package, Truck, FileText, DollarSign, Settings, Warehouse, Users, Layers, MapPin } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import type { UserRole } from '@/types';
 import { cn } from '@/lib/utils';
@@ -23,6 +23,7 @@ const navItems: NavItem[] = [
   { href: '/orders', label: 'Orders', icon: ShoppingCart, roles: ['Customer'] },
   { href: '/tasks', label: 'Tasks', icon: ListChecks, roles: ['Technician', 'ServiceManager'] },
   { href: '/deliveries', label: 'Deliveries', icon: Truck, roles: ['Rider', 'DispatchManager'] },
+  { href: '/rider/map', label: 'Route Map', icon: MapPin, roles: ['Rider'] },
   { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['Supplier', 'FinanceManager'] },
   { href: '/payments', label: 'Payments', icon: DollarSign, roles: ['FinanceManager'] },
   { href: '/inventory', label: 'Inventory', icon: Warehouse, roles: ['InventoryManager', 'SupplyManager'] },
@@ -43,14 +44,27 @@ export function BottomNav() {
   
   // Ensure a sensible number of items, e.g., max 5. Prioritize common items or implement scrolling / "more" tab.
   // This is a simplified version; a real app might need more sophisticated logic for tab visibility.
-  const displayItems = filteredNavItems.slice(0, 5);
+  let displayItems = filteredNavItems;
+  if (displayItems.length > 5) {
+    // Basic prioritization: Home, Profile, and then the first 3 role-specific items
+    const homeItem = displayItems.find(item => item.href === '/dashboard');
+    const profileItem = displayItems.find(item => item.href === '/profile');
+    const otherItems = displayItems.filter(item => item.href !== '/dashboard' && item.href !== '/profile');
+    
+    const prioritizedItems = [];
+    if (homeItem) prioritizedItems.push(homeItem);
+    prioritizedItems.push(...otherItems.slice(0, profileItem ? 3 : 4)); // Take 3 others if profile exists, else 4
+    if (profileItem && prioritizedItems.length < 5) prioritizedItems.push(profileItem);
+    
+    displayItems = prioritizedItems.slice(0, 5); // Ensure max 5
+  }
 
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-lg md:hidden">
       <div className="flex justify-around max-w-md mx-auto">
         {displayItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href) && item.href !== '/');
           return (
             <Link key={item.label} href={item.href} legacyBehavior>
               <a className={cn(
