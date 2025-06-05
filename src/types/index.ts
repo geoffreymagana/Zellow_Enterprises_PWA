@@ -1,5 +1,6 @@
+
 export type UserRole = 
-  | 'Admin' // Should not use PWA, but defined for completeness
+  | 'Admin'
   | 'Customer'
   | 'Technician'
   | 'Rider'
@@ -9,24 +10,26 @@ export type UserRole =
   | 'ServiceManager'
   | 'InventoryManager'
   | 'DispatchManager'
-  | null; // For unauthenticated or role not set
+  | null; 
 
 export interface User {
   uid: string;
   email: string | null;
   displayName?: string | null;
+  firstName?: string | null; // Added for more structured name data
+  lastName?: string | null;  // Added for more structured name data
   photoURL?: string | null;
   role: UserRole;
 }
 
-// Add other types as needed, for example:
 export interface Product {
   id: string;
   name: string;
   description: string;
   price: number;
-  imageUrl?: string; // URL from Google Drive
+  imageUrl?: string; 
   stock: number;
+  dataAiHint?: string;
 }
 
 export interface Order {
@@ -41,8 +44,8 @@ export interface Order {
 
 export interface Task {
   id: string;
-  assigneeId: string; // Technician or Rider ID
-  type: 'engraving' | 'printing' | 'delivery';
+  assigneeId: string; 
+  type: 'engraving' | 'printing' | 'delivery' | string; // string for flexibility
   description: string;
   orderId?: string;
   status: 'pending' | 'in-progress' | 'completed' | 'needs_approval';
