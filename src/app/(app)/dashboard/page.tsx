@@ -4,19 +4,23 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers } from 'lucide-react'; // Renamed Users to UsersIcon to avoid conflict
+import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { useEffect, useState, useCallback } from 'react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { User } from '@/types';
 
 // Helper component for dashboard items
-const DashboardItem = ({ title, value, icon: Icon, link, description }: { title: string; value: string | number; icon: React.ElementType; link?: string; description?: string }) => (
+const DashboardItem = ({ title, value, icon: Icon, link, description, isLoadingValue }: { title: string; value: string | number; icon: React.ElementType; link?: string; description?: string, isLoadingValue?: boolean }) => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-sm font-medium">{title}</CardTitle>
       <Icon className="h-5 w-5 text-muted-foreground" />
     </CardHeader>
     <CardContent>
-      <div className="text-2xl font-bold">{value}</div>
+      {isLoadingValue ? <Loader2 className="h-6 w-6 animate-spin text-primary" /> : <div className="text-2xl font-bold">{value}</div>}
       {description && <p className="text-xs text-muted-foreground">{description}</p>}
       {link && (
         <Link href={link} passHref>
@@ -29,10 +33,46 @@ const DashboardItem = ({ title, value, icon: Icon, link, description }: { title:
 
 
 export default function DashboardPage() {
-  const { user, role } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
+  const [activeUserCount, setActiveUserCount] = useState<number | string>("...");
+  const [isLoadingUserCount, setIsLoadingUserCount] = useState(true);
 
-  if (!user) {
-    return <div>Loading user data...</div>;
+  const fetchActiveUserCount = useCallback(async () => {
+    if (!db || role !== 'Admin') {
+      setIsLoadingUserCount(false);
+      if (role === 'Admin') setActiveUserCount(0); // Default to 0 if db error for admin
+      return;
+    }
+    setIsLoadingUserCount(true);
+    try {
+      const usersCollection = collection(db, 'users');
+      // Query for users that are NOT disabled. This includes users where 'disabled' is false or the field doesn't exist.
+      // Firestore doesn't directly support "is not true" or "exists and is false".
+      // So, we fetch all and filter, or fetch where disabled is false, and count those where disabled is not explicitly true.
+      // Simpler for now: fetch where disabled == false. This assumes 'disabled' field is consistently present.
+      // A more robust query would be to fetch all non-admin users and filter client-side, or use a Cloud Function.
+      // For this prototype, we'll count users where `disabled` is explicitly `false`.
+      const q = query(usersCollection, where("disabled", "==", false));
+      const usersSnapshot = await getDocs(q);
+      setActiveUserCount(usersSnapshot.size);
+    } catch (error) {
+      console.error("Failed to fetch active user count:", error);
+      setActiveUserCount("Error");
+    } finally {
+      setIsLoadingUserCount(false);
+    }
+  }, [role]);
+
+  useEffect(() => {
+    if (!authLoading && role === 'Admin') {
+      fetchActiveUserCount();
+    } else if (!authLoading && role !== 'Admin') {
+      setIsLoadingUserCount(false); // Not an admin, no need to load this count
+    }
+  }, [authLoading, role, fetchActiveUserCount]);
+
+  if (authLoading || !user) {
+    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
   const getRoleSpecificGreeting = () => {
@@ -57,7 +97,7 @@ export default function DashboardPage() {
       case 'Admin':
         return (
           <>
-            <DashboardItem title="User Management" value={124} icon={UserCog} link="/admin/users" description="Add, edit, delete users and roles." />
+            <DashboardItem title="Active Users" value={activeUserCount} icon={UserCog} link="/admin/users" description="Manage active users and roles." isLoadingValue={isLoadingUserCount} />
             <DashboardItem title="Product Catalog" value={87} icon={Package} link="/admin/products" description="Manage all products." />
             <DashboardItem title="Order Processing" value={256} icon={ShoppingCart} link="/admin/orders" description="Oversee all customer orders." />
             <DashboardItem title="Payment Records" value={103} icon={DollarSign} link="/admin/payments" description="View financial transactions." />
@@ -119,7 +159,7 @@ export default function DashboardPage() {
           <AlertTriangle className="h-4 w-4 mr-2 text-primary" />
           <AlertTitle className="text-primary">Admin Panel Active</AlertTitle>
           <AlertDescription className="text-primary/90">
-            You have administrative privileges. Manage system data and operations from here. Data displayed is currently placeholder.
+            You have administrative privileges. Manage system data and operations from here. Some data displayed is currently placeholder.
           </AlertDescription>
         </Alert>
       )}
@@ -138,7 +178,6 @@ export default function DashboardPage() {
         {getRoleSpecificItems()}
       </div>
 
-      {/* Admin Quick Actions Card removed */}
 
       {role !== 'Admin' && (
         <Card>
@@ -157,4 +196,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
