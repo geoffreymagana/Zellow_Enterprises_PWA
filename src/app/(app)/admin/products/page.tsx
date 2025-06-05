@@ -82,8 +82,8 @@ export default function AdminProductsPage() {
       const q = query(collection(db, 'products'), orderBy("createdAt", "desc"));
       const querySnapshot = await getDocs(q);
       const fetchedProducts: ProductType[] = [];
-      querySnapshot.forEach((docSnap) => { // Changed doc to docSnap to avoid conflict
-        fetchedProducts.push({ id: docSnap.id, ...docSnap.data() } as ProductType);
+      querySnapshot.forEach((docSnapshot) => { // Using docSnapshot
+        fetchedProducts.push({ id: docSnapshot.id, ...docSnapshot.data() } as ProductType);
       });
       setProducts(fetchedProducts);
     } catch (error) {
@@ -138,7 +138,7 @@ export default function AdminProductsPage() {
       }
       setIsDialogOpen(false);
       setEditingProduct(null);
-      fetchProducts(); // Refetch products after save
+      fetchProducts();
     } catch (error: any) {
       console.error("Failed to save product:", error);
       toast({ title: "Save Failed", description: error.message || "Could not save product.", variant: "destructive" });
@@ -154,7 +154,7 @@ export default function AdminProductsPage() {
       await deleteDoc(doc(db, 'products', productToDelete.id));
       toast({ title: "Product Deleted", description: `"${productToDelete.name}" has been deleted.` });
       setProductToDelete(null);
-      fetchProducts(); // Refetch products
+      fetchProducts();
     } catch (error: any) {
       console.error("Failed to delete product:", error);
       toast({ title: "Deletion Failed", description: error.message || "Could not delete product.", variant: "destructive" });
@@ -178,6 +178,8 @@ export default function AdminProductsPage() {
   if (role !== 'Admin') {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">Unauthorized or session changed.</div>;
   }
+  
+  // console.log("Preparing to render AdminProductsPage main content."); // Debug log
 
   return (
     <div className="space-y-6">
