@@ -6,18 +6,17 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, ReactNode } from 'react';
 import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Search as SearchIcon, PanelLeft, Aperture } from 'lucide-react';
-import { Logo } from '@/components/common/Logo';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { 
-  SidebarProvider, 
-  Sidebar, 
+import {
+  SidebarProvider,
+  Sidebar,
   SidebarTrigger,
-  SidebarHeader, 
-  SidebarContent, 
-  SidebarMenu, 
-  SidebarMenuItem, 
+  SidebarHeader,
+  SidebarContent,
+  SidebarMenu,
+  SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
 } from '@/components/ui/sidebar';
@@ -48,9 +47,9 @@ function AdminLayout({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen bg-background">
       <Sidebar
         side="left"
-        className="border-r hidden md:flex flex-col bg-card text-card-foreground w-[var(--sidebar-width)] h-screen sticky top-0"
+        className="border-r border-sidebar w-[var(--sidebar-width)] h-screen sticky top-0"
       >
-        <SidebarHeader className="p-4 border-b flex justify-start items-center h-16">
+        <SidebarHeader className="p-4 border-b border-sidebar flex justify-start items-center h-16">
           <Link href="/" aria-label="Zellow Enterprises Home">
             <Aperture className="text-primary" size={24} />
           </Link>
@@ -78,7 +77,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
             </SidebarMenu>
           </ScrollArea>
         </SidebarContent>
-        <SidebarFooter className="p-2 border-t mt-auto">
+        <SidebarFooter className="p-2 border-t border-sidebar mt-auto">
           <SidebarMenu className="p-0">
             {footerAdminNavItems.map((item) => (
               <SidebarMenuItem key={item.label}>
@@ -111,7 +110,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
       </Sidebar>
 
       <div className="flex flex-col flex-grow min-w-0">
-        <header className="sticky top-0 z-40 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+        <header className="sticky top-0 z-40 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
           <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2">
               <div className="md:hidden">
@@ -125,7 +124,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
                 </span>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
               <div className="relative hidden md:block">
                 <SearchIcon className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -143,7 +142,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
         <main className="flex flex-col flex-grow p-4 md:p-6 lg:px-8 lg:py-6 overflow-y-auto">
-          <div className="w-full"> 
+          <div className="w-full">
             {children}
           </div>
         </main>
@@ -156,10 +155,16 @@ function NonAdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
   return (
     <div className="flex flex-col min-h-screen">
-      <header className="sticky top-0 z-50 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+      <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Logo className="hidden md:flex" />
-          <span className="md:hidden font-headline text-xl font-bold text-foreground">Zellow Enterprises</span>
+          <Link href="/" className="flex items-center gap-2 md:hidden">
+             <Aperture className="text-primary h-6 w-6" />
+             <span className="font-headline text-xl font-bold text-foreground">Zellow</span>
+          </Link>
+           <Link href="/" className="hidden md:flex items-center gap-2">
+             <Aperture className="text-primary h-7 w-7" />
+             <h1 className="font-headline text-2xl font-bold text-foreground">Zellow Enterprises</h1>
+          </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <Button variant="outline" size="sm" onClick={logout}>Logout</Button>
@@ -193,14 +198,14 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
-    return null; 
+    return null;
   }
 
   const isAdmin = role === 'Admin';
 
   if (isAdmin) {
     return (
-      <SidebarProvider defaultOpen={true}> 
+      <SidebarProvider defaultOpen={true}>
         <AdminLayout>{children}</AdminLayout>
       </SidebarProvider>
     );
@@ -208,4 +213,3 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
-    
