@@ -67,7 +67,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
                       variant="ghost"
                     >
                       <a>
-                        <item.icon className="mr-2" />
+                        <item.icon className="mr-2 h-4 w-4" />
                         <span>{item.label}</span>
                       </a>
                     </SidebarMenuButton>
@@ -89,7 +89,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
                     variant="ghost"
                   >
                     <a>
-                      <item.icon className="mr-2" />
+                      <item.icon className="mr-2 h-4 w-4" />
                       <span>{item.label}</span>
                     </a>
                   </SidebarMenuButton>
@@ -161,7 +161,7 @@ function NonAdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-50 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-        <div className="container flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8"> {/* Removed 'container' class */}
           <Logo className="hidden md:flex" />
           <span className="md:hidden font-headline text-xl font-bold text-foreground">Zellow Enterprises</span>
           <div className="flex items-center gap-2">
