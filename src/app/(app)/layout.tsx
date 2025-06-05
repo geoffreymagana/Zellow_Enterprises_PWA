@@ -5,7 +5,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, ReactNode } from 'react';
-import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Bell, MapPin, Ship, Combine, Map } from 'lucide-react';
+import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Bell, Ship } from 'lucide-react';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -39,19 +39,11 @@ function AdminLayout({ children }: { children: ReactNode }) {
     { href: '/admin/customizations', label: 'Customizations', icon: Layers },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign },
     { href: '/admin/deliveries', label: 'Deliveries', icon: Truck },
+    { href: '/admin/shipping', label: 'Shipping', icon: Ship }, // Changed: Single link
     { href: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck },
     { href: '/admin/notifications', label: 'Notifications', icon: Bell },
-    {
-      label: 'Shipping',
-      icon: Ship,
-      subItems: [
-        { href: '/admin/shipping/regions', label: 'Regions', icon: MapPin },
-        { href: '/admin/shipping/methods', label: 'Methods', icon: Truck },
-        { href: '/admin/shipping/rates', label: 'Rates', icon: Combine },
-      ],
-    },
     { href: '/admin/reports', label: 'Reports', icon: FileArchive },
-    { href: '/rider/map', label: 'Rider Map', icon: Map }, // New Rider Map link for Admin
+    { href: '/rider/map', label: 'Rider Map', icon: LayoutDashboard }, 
   ];
 
   const footerAdminNavItems = [
@@ -60,7 +52,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
   ];
 
   const filteredMainAdminNavItems = mainAdminNavItems.map(item => {
-    if (item.subItems) {
+    if (item.subItems) { // This logic can remain for other potential submenus
       const filteredSubItems = item.subItems.filter(subItem =>
         subItem.label.toLowerCase().includes(searchTerm.toLowerCase())
       );
@@ -194,10 +186,10 @@ function AdminLayout({ children }: { children: ReactNode }) {
           <div className="w-full h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="md:hidden" />
-              <h1 className="text-xl font-semibold font-headline hidden md:block">Admin Panel</h1>
+               <h1 className="text-xl font-semibold font-headline hidden md:block">Admin Panel</h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
-              <div className="hidden md:block">
+               <div className="hidden md:block">
                  <Input
                   type="search"
                   placeholder="Search admin sections..."
