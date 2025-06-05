@@ -20,14 +20,13 @@ import {
   SidebarMenuItem, 
   SidebarMenuButton,
   SidebarFooter,
-  useSidebar 
+  // useSidebar // No longer using useSidebar directly in AdminLayout top level
 } from '@/components/ui/sidebar';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
-  const sidebar = useSidebar(); // Get sidebar context for mobile/desktop specific rendering
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -147,8 +146,8 @@ function AdminLayout({ children }: { children: ReactNode }) {
             </div>
           </div>
         </header>
-        {/* Main content area, ensuring it scrolls independently and is centered */}
-        <main className="flex flex-col flex-grow items-center p-4 md:p-6 lg:p-8 overflow-y-auto">
+        {/* Main content area, ensuring it scrolls independently */}
+        <main className="flex flex-col flex-grow p-4 md:p-6 lg:p-8 overflow-y-auto">
           <div className="w-full"> 
             {children}
           </div>
