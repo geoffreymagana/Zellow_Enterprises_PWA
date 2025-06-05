@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { 
   SidebarProvider, 
   Sidebar, 
-  SidebarTrigger, // This will be used for mobile
+  SidebarTrigger,
   SidebarHeader, 
   SidebarContent, 
   SidebarMenu, 
@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
-  const sidebar = useSidebar(); // Get sidebar context for mobile sheet trigger
+  const sidebar = useSidebar(); // Get sidebar context
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -53,12 +53,10 @@ function AdminLayout({ children }: { children: ReactNode }) {
       {/* Desktop Sidebar - Always Expanded */}
       <Sidebar 
         side="left" 
-        className="border-r hidden md:flex bg-card text-card-foreground w-[var(--sidebar-width)]" // Fixed width for desktop
-        // collapsible="none" // Effectively non-collapsible by not providing triggers or width changes
+        className="border-r hidden md:flex bg-card text-card-foreground w-[var(--sidebar-width)]"
       >
         <SidebarHeader className="p-4 border-b flex justify-start items-center h-16">
           <Logo textSize="text-xl" />
-          {/* No desktop collapse trigger here */}
         </SidebarHeader>
         <SidebarContent className="flex flex-col">
           <ScrollArea className="flex-grow">
@@ -68,7 +66,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
                   <Link href={item.href} passHref legacyBehavior>
                     <SidebarMenuButton
                       asChild
-                      tooltip={item.label} // Tooltip useful if text might get truncated or for consistency
+                      tooltip={item.label}
                       className="w-full justify-start"
                       variant="ghost"
                     >
@@ -124,11 +122,10 @@ function AdminLayout({ children }: { children: ReactNode }) {
             <div className="flex items-center gap-2">
               {/* Mobile Sidebar Toggle - only for mobile */}
               <div className="md:hidden">
-                <SidebarTrigger>
+                <SidebarTrigger> {/* This trigger is for mobile to open the Sheet */}
                   <PanelLeft />
                 </SidebarTrigger>
               </div>
-              {/* No desktop expand trigger here as sidebar is always open */}
               <div className="text-left">
                 <span className="font-headline text-xl font-bold text-foreground">
                   Zellow Enterprises - Admin
@@ -148,7 +145,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
                   <SearchIcon className="h-5 w-5" />
                 </Button>
               )}
-              {/* ThemeToggle: visible on desktop admin */}
+              {/* ThemeToggle: visible on desktop admin header */}
               <div className="hidden md:block">
                 <ThemeToggle />
               </div>
@@ -214,8 +211,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const isAdmin = role === 'Admin';
 
   if (isAdmin) {
-    // For Admin, ensure defaultOpen is true for the provider.
-    // The AdminLayout itself will manage how the sidebar is displayed (always open on desktop).
     return (
       <SidebarProvider defaultOpen={true}> 
         <AdminLayout>{children}</AdminLayout>
