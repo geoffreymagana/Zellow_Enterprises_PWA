@@ -14,9 +14,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PlusCircle, Edit, Trash2, Search, FilterIcon, ExternalLink, ImageOff, UploadCloud } from 'lucide-react';
-import type { Product as ProductType } from '@/types';
-import { useForm, Controller, SubmitHandler } from "react-hook-form";
+import { Loader2, PlusCircle, Edit, Trash2, Search, FilterIcon, ExternalLink, ImageOff, UploadCloud, Settings2, GripVertical, MinusCircle } from 'lucide-react';
+import type { Product as ProductType, ProductCustomizationOption, CustomizationChoiceOption } from '@/types';
+import { useForm, Controller, SubmitHandler, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,23 @@ const predefinedCategories = [
   "Seasonal & Holiday Specials", "For Him", "For Her", "For Kids", "For Pets", "Corporate Gifts", "Eco-Friendly"
 ];
 
+const choiceOptionSchema = z.object({
+  value: z.string().min(1, "Choice value is required"),
+  label: z.string().min(1, "Choice label is required"),
+  priceAdjustment: z.coerce.number().optional(),
+});
+
+const customizationOptionSchema = z.object({
+  id: z.string().min(1, "Option ID is required (e.g., color_option)"),
+  label: z.string().min(1, "Option label is required"),
+  type: z.enum(['select', 'text', 'checkbox']),
+  required: z.boolean().optional().default(false),
+  choices: z.array(choiceOptionSchema).optional(),
+  maxLength: z.coerce.number().optional(),
+  placeholder: z.string().optional(),
+  defaultValue: z.union([z.string(), z.boolean()]).optional(),
+});
+
 const productFormSchema = z.object({
   name: z.string().min(1, "Product name is required"),
   description: z.string().min(1, "Description is required"),
@@ -44,6 +61,7 @@ const productFormSchema = z.object({
   categories: z.array(z.string()).min(1, "Select at least one category"),
   imageUrl: z.string().url({ message: "Please enter a valid URL" }).optional().or(z.literal('')),
   supplier: z.string().optional(),
+  customizationOptions: z.array(customizationOptionSchema).optional(),
 });
 
 type ProductFormValues = z.infer<typeof productFormSchema>;
@@ -69,8 +87,13 @@ export default function AdminProductsPage() {
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
-      name: "", description: "", price: 0, stock: 0, categories: [], imageUrl: "", supplier: ""
+      name: "", description: "", price: 0, stock: 0, categories: [], imageUrl: "", supplier: "", customizationOptions: []
     },
+  });
+
+  const { fields: customizationFields, append: appendCustomizationOption, remove: removeCustomizationOption } = useFieldArray({
+    control: form.control,
+    name: "customizationOptions",
   });
 
   const fetchProducts = useCallback(async () => {
@@ -116,10 +139,11 @@ export default function AdminProductsPage() {
         categories: product.categories || [],
         imageUrl: product.imageUrl || "",
         supplier: product.supplier || "",
+        customizationOptions: product.customizationOptions || [],
       });
     } else {
       form.reset({
-        name: "", description: "", price: 0, stock: 0, categories: [], imageUrl: "", supplier: ""
+        name: "", description: "", price: 0, stock: 0, categories: [], imageUrl: "", supplier: "", customizationOptions: []
       });
     }
     setIsDialogOpen(true);
@@ -128,7 +152,8 @@ export default function AdminProductsPage() {
   const onSubmit: SubmitHandler<ProductFormValues> = async (values) => {
     if (!db) return;
     setIsSubmitting(true);
-    const dataToSave: any = {
+    
+    const dataToSave: Omit<ProductFormValues, 'customizationOptions'> & { customizationOptions?: ProductCustomizationOption[], updatedAt: any, createdAt?: any } = {
       name: values.name,
       description: values.description,
       price: values.price,
@@ -136,6 +161,13 @@ export default function AdminProductsPage() {
       categories: values.categories,
       imageUrl: values.imageUrl,
       supplier: values.supplier,
+      customizationOptions: values.customizationOptions?.map(opt => ({
+        ...opt,
+        choices: opt.type === 'select' ? opt.choices?.map(choice => ({...choice, priceAdjustment: choice.priceAdjustment || 0})) : undefined,
+        maxLength: opt.type === 'text' ? opt.maxLength : undefined,
+        placeholder: opt.type === 'text' ? opt.placeholder : undefined,
+        defaultValue: opt.type === 'checkbox' ? (opt.defaultValue === true || opt.defaultValue === 'true') : (opt.type === 'text' ? opt.defaultValue : undefined),
+      })) || [],
       updatedAt: serverTimestamp(),
     };
     if (!editingProduct) {
@@ -181,7 +213,6 @@ export default function AdminProductsPage() {
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const nameMatch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-      // SKU match removed as SKU field is removed
       const categoryMatch = categoryFilter !== ALL_CATEGORIES_SENTINEL ? product.categories?.includes(categoryFilter) : true;
       return nameMatch && categoryMatch;
     });
@@ -217,8 +248,8 @@ export default function AdminProductsPage() {
               />
             </div>
             <Select
-              value={categoryFilter}
-              onValueChange={(value) => setCategoryFilter(value)}
+              value={categoryFilter === "" ? ALL_CATEGORIES_SENTINEL : categoryFilter}
+              onValueChange={(value) => setCategoryFilter(value === ALL_CATEGORIES_SENTINEL ? "" : value)}
             >
               <SelectTrigger className="w-full sm:w-[200px]">
                 <SelectValue placeholder="Filter by category" />
@@ -230,7 +261,7 @@ export default function AdminProductsPage() {
                 ))}
               </SelectContent>
             </Select>
-            {(searchTerm || categoryFilter !== ALL_CATEGORIES_SENTINEL) && (
+            {(searchTerm || categoryFilter !== ALL_CATEGORIES_SENTINEL && categoryFilter !== "") && (
                 <Button variant="outline" size="sm" onClick={() => {setSearchTerm(""); setCategoryFilter(ALL_CATEGORIES_SENTINEL);}}>Clear Filters</Button>
             )}
           </div>
@@ -294,106 +325,102 @@ export default function AdminProductsPage() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) {setEditingProduct(null); form.reset();} }}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
           <DialogHeader>
             <DialogTitle>{editingProduct ? "Edit Product" : "Create New Product"}</DialogTitle>
-            <DialogDescription>Fill in the details for the product.</DialogDescription>
+            <DialogDescription>Fill in the details for the product and manage customization options.</DialogDescription>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
-              <ScrollArea className="h-[calc(100vh-20rem)] md:h-[calc(80vh-10rem)] pr-6">
-                <div className="space-y-4">
-                  <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Product Name</FormLabel><FormControl><Input {...field} placeholder="e.g., Ceramic Mug 11oz" /></FormControl><FormMessage /></FormItem>)} />
-                  <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field} placeholder="Detailed description of the product..." /></FormControl><FormMessage /></FormItem>)} />
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="price" render={({ field }) => (<FormItem><FormLabel>Price (Ksh)</FormLabel><FormControl><Input type="number" step="0.01" {...field} placeholder="0.00" /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name="stock" render={({ field }) => (<FormItem><FormLabel>Stock Quantity</FormLabel><FormControl><Input type="number" {...field} placeholder="0" /></FormControl><FormMessage /></FormItem>)} />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => window.open(CLOUDINARY_COLLECTION_URL, '_blank')}
-                    >
-                      <UploadCloud className="mr-2 h-4 w-4" /> Browse Cloudinary Collection
-                    </Button>
-                    <FormDescription>Open the Cloudinary collection, copy the desired image URL, and paste it below.</FormDescription>
-                  </div>
-
-                  <FormField control={form.control} name="imageUrl" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Image URL (Paste from Cloudinary)</FormLabel>
-                       <div className="flex items-center gap-2">
-                        <FormControl><Input {...field} placeholder="https://res.cloudinary.com/..." /></FormControl>
-                        {field.value && (
-                          <a href={field.value} target="_blank" rel="noopener noreferrer" title="Open image in new tab">
-                            <Button type="button" variant="outline" size="icon"><ExternalLink className="h-4 w-4"/></Button>
-                          </a>
-                        )}
+              <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(80vh-12rem)] pr-6">
+                <div className="space-y-6">
+                  {/* Basic Product Info */}
+                  <Card>
+                    <CardHeader><CardTitle className="text-lg">Basic Information</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                      <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Product Name</FormLabel><FormControl><Input {...field} placeholder="e.g., Ceramic Mug 11oz" /></FormControl><FormMessage /></FormItem>)} />
+                      <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field} placeholder="Detailed description of the product..." /></FormControl><FormMessage /></FormItem>)} />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <FormField control={form.control} name="price" render={({ field }) => (<FormItem><FormLabel>Price (Ksh)</FormLabel><FormControl><Input type="number" step="0.01" {...field} placeholder="0.00" /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="stock" render={({ field }) => (<FormItem><FormLabel>Stock Quantity</FormLabel><FormControl><Input type="number" {...field} placeholder="0" /></FormControl><FormMessage /></FormItem>)} />
                       </div>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  {form.watch("imageUrl") && (
-                    <div className="my-2 p-2 border rounded-md flex justify-center items-center bg-muted aspect-video max-h-48 relative">
-                      <Image src={form.watch("imageUrl")!} alt="Image Preview" fill className="object-contain"
-                        onError={(e) => { 
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none'; 
-                          const errorPlaceholder = target.parentElement?.querySelector('.error-placeholder');
-                          if (errorPlaceholder) errorPlaceholder.classList.remove('hidden');
-                        }}
-                        data-ai-hint={"product image"}
-                      />
-                      <div className="error-placeholder hidden text-muted-foreground text-xs flex flex-col items-center"><ImageOff className="h-8 w-8 mb-1"/><span>Invalid URL or image</span></div>
-                    </div>
-                  )}
+                      <div className="space-y-2">
+                        <Button type="button" variant="outline" onClick={() => window.open(CLOUDINARY_COLLECTION_URL, '_blank')}><UploadCloud className="mr-2 h-4 w-4" /> Browse Cloudinary Collection</Button>
+                        <FormDescription>Open the Cloudinary collection, copy the desired image URL, and paste it below.</FormDescription>
+                      </div>
+                      <FormField control={form.control} name="imageUrl" render={({ field }) => (<FormItem><FormLabel>Image URL (Paste from Cloudinary)</FormLabel><div className="flex items-center gap-2"><FormControl><Input {...field} placeholder="https://res.cloudinary.com/..." /></FormControl>{field.value && (<a href={field.value} target="_blank" rel="noopener noreferrer" title="Open image in new tab"><Button type="button" variant="outline" size="icon"><ExternalLink className="h-4 w-4"/></Button></a>)}</div><FormMessage /></FormItem>)} />
+                      {form.watch("imageUrl") && (<div className="my-2 p-2 border rounded-md flex justify-center items-center bg-muted aspect-video max-h-48 relative"><Image src={form.watch("imageUrl")!} alt="Image Preview" fill className="object-contain" onError={(e) => { const target = e.target as HTMLImageElement; target.style.display = 'none'; const errorPlaceholder = target.parentElement?.querySelector('.error-placeholder'); if (errorPlaceholder) errorPlaceholder.classList.remove('hidden');}} data-ai-hint={"product image"}/><div className="error-placeholder hidden text-muted-foreground text-xs flex flex-col items-center"><ImageOff className="h-8 w-8 mb-1"/><span>Invalid URL or image</span></div></div>)}
+                      <FormField control={form.control} name="supplier" render={({ field }) => (<FormItem><FormLabel>Supplier (Optional)</FormLabel><FormControl><Input {...field} placeholder="e.g., Acme Supplies" /></FormControl><FormMessage /></FormItem>)} />
+                      <FormField control={form.control} name="categories" render={() => (<FormItem><FormLabel>Categories</FormLabel><ScrollArea className="h-40 rounded-md border p-2">{predefinedCategories.map((category) => (<FormField key={category} control={form.control} name="categories" render={({ field }) => (<FormItem key={category} className="flex flex-row items-start space-x-3 space-y-0 py-1.5"><FormControl><Checkbox checked={field.value?.includes(category)} onCheckedChange={(checked) => { return checked ? field.onChange([...(field.value || []), category]) : field.onChange((field.value || []).filter((value) => value !== category));}}/></FormControl><FormLabel className="font-normal text-sm">{category}</FormLabel></FormItem>)} />))}</ScrollArea><FormMessage /></FormItem>)}/>
+                    </CardContent>
+                  </Card>
 
-                  <FormField control={form.control} name="supplier" render={({ field }) => (<FormItem><FormLabel>Supplier (Optional)</FormLabel><FormControl><Input {...field} placeholder="e.g., Acme Supplies" /></FormControl><FormMessage /></FormItem>)} />
-                  
-                  <FormField
-                    control={form.control}
-                    name="categories"
-                    render={() => (
-                      <FormItem>
-                        <FormLabel>Categories</FormLabel>
-                        <ScrollArea className="h-40 rounded-md border p-2">
-                          {predefinedCategories.map((category) => (
-                            <FormField
-                              key={category}
-                              control={form.control}
-                              name="categories"
-                              render={({ field }) => {
-                                return (
-                                  <FormItem key={category} className="flex flex-row items-start space-x-3 space-y-0 py-1.5">
+                  {/* Customization Options */}
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle className="text-lg">Customization Options</CardTitle>
+                      <Button type="button" variant="outline" size="sm" onClick={() => appendCustomizationOption({ id: `opt_${Date.now()}`, label: '', type: 'text', required: false, choices: [], maxLength: undefined, placeholder: '', defaultValue: '' })}>
+                        <PlusCircle className="mr-2 h-4 w-4"/> Add Option
+                      </Button>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {customizationFields.length === 0 && <p className="text-sm text-muted-foreground">No customization options added yet.</p>}
+                      {customizationFields.map((field, index) => (
+                        <Card key={field.id} className="p-4 border bg-muted/50">
+                          <div className="flex justify-between items-center mb-3">
+                            <h4 className="font-medium flex items-center"><GripVertical className="mr-1 h-4 w-4 cursor-grab text-muted-foreground"/> Option {index + 1}</h4>
+                            <Button type="button" variant="ghost" size="icon" onClick={() => removeCustomizationOption(index)}><MinusCircle className="h-4 w-4 text-destructive"/></Button>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField control={form.control} name={`customizationOptions.${index}.label`} render={({ field }) => (<FormItem><FormLabel>Option Label</FormLabel><FormControl><Input {...field} placeholder="e.g., Color, Engraving Text"/></FormControl><FormMessage/></FormItem>)} />
+                            <FormField control={form.control} name={`customizationOptions.${index}.id`} render={({ field }) => (<FormItem><FormLabel>Option ID</FormLabel><FormControl><Input {...field} placeholder="e.g., color_choice (unique)"/></FormControl><FormDescription className="text-xs">Unique identifier for this option.</FormDescription><FormMessage/></FormItem>)} />
+                          </div>
+                          <FormField control={form.control} name={`customizationOptions.${index}.type`} render={({ field: typeField }) => (
+                            <FormItem className="mt-4"><FormLabel>Option Type</FormLabel>
+                              <Select onValueChange={typeField.onChange} value={typeField.value}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Select option type" /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                  <SelectItem value="select">Select List (Dropdown)</SelectItem>
+                                  <SelectItem value="text">Text Input</SelectItem>
+                                  <SelectItem value="checkbox">Checkbox (Yes/No)</SelectItem>
+                                </SelectContent>
+                              </Select><FormMessage/>
+                            </FormItem>
+                          )} />
+                          
+                          {form.watch(`customizationOptions.${index}.type`) === 'select' && (
+                            <RenderSelectChoices control={form.control} nestIndex={index} />
+                          )}
+                          {form.watch(`customizationOptions.${index}.type`) === 'text' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                              <FormField control={form.control} name={`customizationOptions.${index}.placeholder`} render={({ field }) => (<FormItem><FormLabel>Placeholder</FormLabel><FormControl><Input {...field} placeholder="e.g., Enter your text here"/></FormControl><FormMessage/></FormItem>)} />
+                              <FormField control={form.control} name={`customizationOptions.${index}.maxLength`} render={({ field }) => (<FormItem><FormLabel>Max Length</FormLabel><FormControl><Input type="number" {...field} placeholder="e.g., 50"/></FormControl><FormMessage/></FormItem>)} />
+                            </div>
+                          )}
+                           {form.watch(`customizationOptions.${index}.type`) === 'checkbox' && (
+                             <FormField control={form.control} name={`customizationOptions.${index}.defaultValue`} render={({ field }) => (
+                                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 mt-3">
                                     <FormControl>
-                                      <Checkbox
-                                        checked={field.value?.includes(category)}
-                                        onCheckedChange={(checked) => {
-                                          return checked
-                                            ? field.onChange([...(field.value || []), category])
-                                            : field.onChange(
-                                                (field.value || []).filter(
-                                                  (value) => value !== category
-                                                )
-                                              );
-                                        }}
-                                      />
+                                    <Checkbox
+                                        checked={typeof field.value === 'boolean' ? field.value : String(field.value).toLowerCase() === 'true'}
+                                        onCheckedChange={(checked) => field.onChange(checked)}
+                                    />
                                     </FormControl>
-                                    <FormLabel className="font-normal text-sm">
-                                      {category}
-                                    </FormLabel>
-                                  </FormItem>
-                                );
-                              }}
+                                    <FormLabel className="font-normal">Default Checked State</FormLabel>
+                                </FormItem>
+                                )}
                             />
-                          ))}
-                        </ScrollArea>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                           )}
+                           <FormField control={form.control} name={`customizationOptions.${index}.required`} render={({ field }) => (
+                                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 mt-3">
+                                    <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                                    <FormLabel className="font-normal">Required Option</FormLabel>
+                                </FormItem>
+                            )} />
+                        </Card>
+                      ))}
+                    </CardContent>
+                  </Card>
                 </div>
               </ScrollArea>
               <DialogFooter className="pt-4">
@@ -410,3 +437,32 @@ export default function AdminProductsPage() {
     </div>
   );
 }
+
+// Helper component for rendering choices for 'select' type customization options
+function RenderSelectChoices({ control, nestIndex }: { control: any, nestIndex: number }) {
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: `customizationOptions.${nestIndex}.choices`
+  });
+
+  return (
+    <div className="mt-3 space-y-3 p-3 border rounded-md bg-background">
+      <div className="flex justify-between items-center">
+        <h5 className="text-sm font-medium">Choices for Select List</h5>
+        <Button type="button" size="sm" variant="outline" onClick={() => append({ value: '', label: '', priceAdjustment: 0 })}>
+          <PlusCircle className="mr-1 h-3 w-3"/> Add Choice
+        </Button>
+      </div>
+      {fields.length === 0 && <p className="text-xs text-muted-foreground">No choices added yet.</p>}
+      {fields.map((choiceField, choiceIndex) => (
+        <div key={choiceField.id} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end p-2 border rounded bg-muted/20">
+          <FormField control={control} name={`customizationOptions.${nestIndex}.choices.${choiceIndex}.label`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Display Label</FormLabel><FormControl><Input {...field} placeholder="e.g., Red, Small"/></FormControl><FormMessage className="text-xs"/></FormItem>)} />
+          <FormField control={control} name={`customizationOptions.${nestIndex}.choices.${choiceIndex}.value`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Value (Unique)</FormLabel><FormControl><Input {...field} placeholder="e.g., red, sm"/></FormControl><FormMessage className="text-xs"/></FormItem>)} />
+          <FormField control={control} name={`customizationOptions.${nestIndex}.choices.${choiceIndex}.priceAdjustment`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Price Adj. (Ksh)</FormLabel><FormControl><Input type="number" step="0.01" {...field} placeholder="0.00"/></FormControl><FormMessage className="text-xs"/></FormItem>)} />
+          <Button type="button" variant="ghost" size="sm" className="col-span-full sm:col-span-1 sm:ml-auto mt-1 h-8" onClick={() => remove(choiceIndex)}>Remove Choice</Button>
+        </div>
+      ))}
+    </div>
+  );
+}
+

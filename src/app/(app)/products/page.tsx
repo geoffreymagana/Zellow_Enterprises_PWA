@@ -60,11 +60,6 @@ export default function ProductsPage() {
       router.replace('/login');
       return;
     }
-    // This page is now primarily for customers, but Admins might want to see it too.
-    // Other roles might be redirected from their dashboard if it points here.
-    if (role && !['Customer', 'Admin'].includes(role)) {
-        // Allow if navigated to directly, but dashboard for other roles won't point here by default.
-    }
     fetchProducts();
   }, [authLoading, user, role, router, fetchProducts]);
 
@@ -134,9 +129,8 @@ export default function ProductsPage() {
                   </div>
                   <p className="text-lg md:text-xl font-bold text-primary mt-1">{formatPrice(product.price)}</p>
                 </CardContent>
-                 {/* Stock information can be added here if desired, e.g., for low stock warnings */}
-                 {product.stock < 10 && product.stock > 0 && (
-                  <div className="px-3 pb-2 text-xs text-orange-500">Low stock!</div>
+                 {product.stock > 0 && product.stock < 10 && (
+                  <div className="px-3 pb-2 text-xs text-orange-500">{product.stock} left in stock!</div>
                 )}
                 {product.stock === 0 && (
                   <div className="px-3 pb-2 text-xs text-destructive">Out of stock</div>

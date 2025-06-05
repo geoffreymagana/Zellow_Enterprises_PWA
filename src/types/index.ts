@@ -27,6 +27,23 @@ export interface User {
   assignedOrdersCount?: number; // Denormalized count for quick display
 }
 
+export interface CustomizationChoiceOption {
+  value: string;
+  label: string;
+  priceAdjustment?: number; // Optional price change for this choice
+}
+
+export interface ProductCustomizationOption {
+  id: string; // Unique ID for this option (e.g., 'color', 'engraving_text')
+  label: string; // User-friendly label (e.g., "Choose Color", "Engraving Text")
+  type: 'select' | 'text' | 'checkbox'; // Type of customization
+  required?: boolean;
+  choices?: CustomizationChoiceOption[]; // For 'select' type
+  maxLength?: number; // For 'text' type
+  placeholder?: string; // For 'text' type
+  defaultValue?: string | boolean; // For 'text' or 'checkbox'
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -34,7 +51,12 @@ export interface Product {
   price: number;
   imageUrl?: string;
   stock: number;
-  dataAiHint?: string;
+  categories?: string[];
+  supplier?: string;
+  createdAt?: any;
+  updatedAt?: any;
+  customizationOptions?: ProductCustomizationOption[];
+  // dataAiHint has been removed as per user request
 }
 
 export type OrderStatus =
@@ -62,7 +84,13 @@ export interface Order {
   customerId: string;
   customerName?: string; // Denormalize for easier display
   customerPhone?: string; // Denormalize
-  items: Array<{ productId: string; quantity: number; customization?: any; name?: string; price?: number }>;
+  items: Array<{
+    productId: string;
+    quantity: number;
+    customization?: Record<string, any>; // Stores selected customization values
+    name?: string;
+    price?: number; // Price per item, potentially including customization adjustments
+  }>;
   totalAmount: number;
   status: OrderStatus;
   createdAt: any; // Firestore serverTimestamp or Date

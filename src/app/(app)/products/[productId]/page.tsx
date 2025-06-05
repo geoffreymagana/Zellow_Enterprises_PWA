@@ -10,7 +10,7 @@ import type { Product } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Loader2, AlertTriangle, ShoppingCart, PlusCircle, ArrowLeft } from 'lucide-react';
+import { Loader2, AlertTriangle, ShoppingCart, PlusCircle, ArrowLeft, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
@@ -106,6 +106,8 @@ export default function ProductDetailsPage() {
     );
   }
 
+  const hasCustomizations = product.customizationOptions && product.customizationOptions.length > 0;
+
   return (
     <div className="container mx-auto px-4 py-8">
       <Button onClick={() => router.back()} variant="outline" size="sm" className="mb-6">
@@ -120,7 +122,7 @@ export default function ProductDetailsPage() {
                 alt={product.name}
                 fill
                 sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-contain" // Use contain to show full image, or cover if preferred
+                className="object-contain" 
                 data-ai-hint={product.categories?.[0]?.toLowerCase().split(" ")[0] || product.name.split(" ")[0]?.toLowerCase() || "product detail"}
               />
             </div>
@@ -135,8 +137,8 @@ export default function ProductDetailsPage() {
                 {product.description}
               </CardDescription>
               
-              {product.stock < 10 && product.stock > 0 && (
-                <p className="text-sm text-orange-500 mt-1">Only {product.stock} left in stock!</p>
+              {product.stock > 0 && product.stock < 10 && (
+                <p className="text-sm text-orange-500 mt-1">{product.stock} left in stock!</p>
               )}
               {product.stock === 0 && (
                 <p className="text-sm text-destructive mt-1 font-semibold">Out of stock</p>
@@ -144,11 +146,17 @@ export default function ProductDetailsPage() {
 
             </CardContent>
             <CardFooter className="p-0 mt-6 pt-6 border-t flex flex-col sm:flex-row gap-3">
-              <Link href={`/products/${product.id}/customize`} passHref className="w-full sm:w-auto">
-                <Button size="lg" variant="outline" className="w-full" disabled={product.stock === 0}>
-                  <PlusCircle className="mr-2 h-5 w-5" /> Customize Item
+              {hasCustomizations ? (
+                <Link href={`/products/${product.id}/customize`} passHref className="w-full sm:w-auto">
+                  <Button size="lg" variant="outline" className="w-full" disabled={product.stock === 0}>
+                    <Settings className="mr-2 h-5 w-5" /> Customize Item
+                  </Button>
+                </Link>
+              ) : (
+                <Button size="lg" variant="outline" className="w-full" disabled={true} title="No customization options available for this product">
+                    <Settings className="mr-2 h-5 w-5" /> No Customizations
                 </Button>
-              </Link>
+              )}
               <Button size="lg" className="w-full sm:w-auto" disabled={product.stock === 0}>
                 <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
               </Button>
