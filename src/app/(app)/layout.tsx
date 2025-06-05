@@ -5,7 +5,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, ReactNode } from 'react';
-import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Search as SearchIcon, Aperture, PanelLeft } from 'lucide-react';
+import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Search as SearchIcon, PanelLeft } from 'lucide-react';
 import { Logo } from '@/components/common/Logo';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ import {
   SidebarMenuItem, 
   SidebarMenuButton,
   SidebarFooter,
-  // useSidebar // Not explicitly needed in AdminLayout if sidebar is always open on desktop
+  useSidebar 
 } from '@/components/ui/sidebar';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -28,6 +28,8 @@ import { cn } from '@/lib/utils';
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
+  // No need to call useSidebar() here if sidebar is always expanded on desktop and not changing state via this component directly.
+  // The Sidebar component itself and SidebarTrigger will use the context if needed for mobile.
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -48,27 +50,34 @@ function AdminLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Desktop Sidebar - Always Expanded */}
-      <Sidebar 
-        side="left" 
-        className="border-r hidden md:flex bg-card text-card-foreground w-[var(--sidebar-width)]"
+      {/* Desktop Sidebar - Always Expanded and Sticky */}
+      <Sidebar
+        side="left"
+        className="border-r hidden md:flex flex-col bg-card text-card-foreground w-[var(--sidebar-width)] h-screen sticky top-0"
       >
         <SidebarHeader className="p-4 border-b flex justify-start items-center h-16">
-          <Logo textSize="text-xl" />
+          {/* Logo for expanded sidebar */}
+          <Logo textSize="text-xl" iconSize={24} />
         </SidebarHeader>
-        <SidebarContent> {/* Removed className="flex flex-col" as base component handles it */}
-          <ScrollArea className="h-full"> {/* Changed flex-grow to h-full */}
+        <SidebarContent> {/* Base component is flex-col, flex-1, overflow-auto */}
+          <div className="p-2"> {/* Search input wrapper */}
+            <div className="relative">
+              <SearchIcon className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input placeholder="Search sidebar..." className="pl-8 h-9 bg-background focus-visible:ring-sidebar-ring" />
+            </div>
+          </div>
+          <ScrollArea className="h-full"> {/* h-full makes ScrollArea fill SidebarContent */}
             <SidebarMenu className="p-2">
               {mainAdminNavItems.map((item) => (
                 <SidebarMenuItem key={item.label}>
                   <Link href={item.href} passHref legacyBehavior>
                     <SidebarMenuButton
                       asChild
-                      tooltip={item.label} 
+                      tooltip={item.label}
                       className="w-full justify-start"
                       variant="ghost"
                     >
-                      <a> 
+                      <a>
                         <item.icon className="mr-2" />
                         <span>{item.label}</span>
                       </a>
@@ -79,11 +88,11 @@ function AdminLayout({ children }: { children: ReactNode }) {
             </SidebarMenu>
           </ScrollArea>
         </SidebarContent>
-        <SidebarFooter className="p-2 border-t mt-auto">
+        <SidebarFooter className="p-2 border-t mt-auto"> {/* mt-auto pushes footer to bottom */}
           <SidebarMenu className="p-0">
             {footerAdminNavItems.map((item) => (
               <SidebarMenuItem key={item.label}>
-                 <Link href={item.href} passHref legacyBehavior>
+                <Link href={item.href} passHref legacyBehavior>
                   <SidebarMenuButton
                     asChild
                     tooltip={item.label}
@@ -99,11 +108,11 @@ function AdminLayout({ children }: { children: ReactNode }) {
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
-          <div className="p-2 mt-1 md:hidden"> {/* ThemeToggle for mobile sidebar */}
+          <div className="p-2 mt-1 md:hidden"> {/* ThemeToggle for mobile sidebar (sheet) */}
             <ThemeToggle />
           </div>
           <div className="mt-2 p-2">
-            <Button variant="outline" onClick={logout} className="w-full">
+            <Button variant="outline" onClick={logout} className="w-full justify-start">
               <LogOutIcon className="mr-2 h-4 w-4" />
               <span>Logout</span>
             </Button>
@@ -111,14 +120,14 @@ function AdminLayout({ children }: { children: ReactNode }) {
         </SidebarFooter>
       </Sidebar>
 
+      {/* This div wraps the main header and main content area, taking remaining width */}
       <div className="flex flex-col flex-grow">
         <header className="sticky top-0 z-40 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-          {/* Modified inner div for full width content */}
-          <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8"> {/* Ensures header content uses full width of this column */}
             <div className="flex items-center gap-2">
               {/* Mobile Sidebar Toggle - only for mobile */}
               <div className="md:hidden">
-                <SidebarTrigger> 
+                <SidebarTrigger>
                   <PanelLeft />
                 </SidebarTrigger>
               </div>
@@ -133,7 +142,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
               {/* Desktop Search Input for Admin */}
               <div className="relative hidden md:block">
                 <SearchIcon className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="Search..." className="pl-8 h-9 w-[200px] lg:w-[250px] bg-background" />
+                <Input placeholder="Search app..." className="pl-8 h-9 w-[200px] lg:w-[250px] bg-background" />
               </div>
               {/* Mobile Search Icon Button for Admin */}
               <div className="md:hidden">
@@ -179,10 +188,10 @@ function NonAdminLayout({ children }: { children: ReactNode }) {
   );
 }
 
-
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, loading, role } = useAuth();
   const router = useRouter();
+  const sidebar = useSidebar(); // Get sidebar context for AppLayout
 
   useEffect(() => {
     if (!loading && !user) {
@@ -204,12 +213,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   const isAdmin = role === 'Admin';
 
-  // For Admin, SidebarProvider wraps AdminLayout.
-  // defaultOpen={true} makes sidebar expanded by default on desktop.
-  // On mobile, Sidebar component internally uses a Sheet controlled by SidebarProvider's context.
   if (isAdmin) {
     return (
-      <SidebarProvider defaultOpen={true}> 
+      // SidebarProvider should wrap any component that uses useSidebar or renders Sidebar/SidebarTrigger
+      <SidebarProvider defaultOpen={!sidebar?.isMobile}> 
         <AdminLayout>{children}</AdminLayout>
       </SidebarProvider>
     );
