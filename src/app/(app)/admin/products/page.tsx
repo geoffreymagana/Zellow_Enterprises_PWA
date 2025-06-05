@@ -82,7 +82,7 @@ export default function AdminProductsPage() {
       const q = query(collection(db, 'products'), orderBy("createdAt", "desc"));
       const querySnapshot = await getDocs(q);
       const fetchedProducts: ProductType[] = [];
-      querySnapshot.forEach((docSnapshot) => { // Using docSnapshot
+      querySnapshot.forEach((docSnapshot) => {
         fetchedProducts.push({ id: docSnapshot.id, ...docSnapshot.data() } as ProductType);
       });
       setProducts(fetchedProducts);
@@ -122,10 +122,13 @@ export default function AdminProductsPage() {
   const onSubmit: SubmitHandler<ProductFormValues> = async (values) => {
     if (!db) return;
     setIsSubmitting(true);
-    const dataToSave = {
+    const dataToSave: any = {
       ...values,
       updatedAt: serverTimestamp(),
     };
+    if (!editingProduct) {
+        dataToSave.createdAt = serverTimestamp();
+    }
 
     try {
       if (editingProduct) {
@@ -133,7 +136,7 @@ export default function AdminProductsPage() {
         await updateDoc(productRef, dataToSave);
         toast({ title: "Product Updated", description: `"${values.name}" has been updated.` });
       } else {
-        await addDoc(collection(db, 'products'), { ...dataToSave, createdAt: serverTimestamp() });
+        await addDoc(collection(db, 'products'), dataToSave);
         toast({ title: "Product Created", description: `"${values.name}" has been added.` });
       }
       setIsDialogOpen(false);
@@ -176,9 +179,10 @@ export default function AdminProductsPage() {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   if (role !== 'Admin') {
+    // This should not be reached if auth checks are done correctly, but as a fallback.
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">Unauthorized or session changed.</div>;
   }
-  
+  // console.log("Rendering AdminProductsPage, user role:", role); // For debugging
 
   return (
     <div className="space-y-6">
@@ -381,3 +385,4 @@ export default function AdminProductsPage() {
     </div>
   );
 }
+    
