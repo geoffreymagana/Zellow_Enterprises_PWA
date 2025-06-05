@@ -34,6 +34,9 @@ const rateFormSchema = z.object({
 
 type RateFormValues = z.infer<typeof rateFormSchema>;
 
+const ALL_REGIONS_SENTINEL = "ALL_REGIONS_FILTER_VALUE";
+const ALL_METHODS_SENTINEL = "ALL_METHODS_FILTER_VALUE";
+
 export default function AdminShippingRatesPage() {
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -185,21 +188,27 @@ export default function AdminShippingRatesPage() {
         <CardContent className="p-4 space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
             <p className="font-medium text-sm">Filter Rates:</p>
             <div className="flex flex-col md:flex-row gap-2">
-                <Select value={filterRegion} onValueChange={setFilterRegion}>
+                <Select 
+                  value={filterRegion === "" ? ALL_REGIONS_SENTINEL : filterRegion} 
+                  onValueChange={(value) => setFilterRegion(value === ALL_REGIONS_SENTINEL ? "" : value)}
+                >
                     <SelectTrigger className="w-full md:w-[200px]">
                         <SelectValue placeholder="Filter by Region" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="">All Regions</SelectItem>
+                        <SelectItem value={ALL_REGIONS_SENTINEL}>All Regions</SelectItem>
                         {regions.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                     </SelectContent>
                 </Select>
-                <Select value={filterMethod} onValueChange={setFilterMethod}>
+                <Select 
+                  value={filterMethod === "" ? ALL_METHODS_SENTINEL : filterMethod} 
+                  onValueChange={(value) => setFilterMethod(value === ALL_METHODS_SENTINEL ? "" : value)}
+                >
                     <SelectTrigger className="w-full md:w-[200px]">
                         <SelectValue placeholder="Filter by Method" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="">All Methods</SelectItem>
+                        <SelectItem value={ALL_METHODS_SENTINEL}>All Methods</SelectItem>
                         {methods.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
                     </SelectContent>
                 </Select>
@@ -381,3 +390,4 @@ export default function AdminShippingRatesPage() {
     </div>
   );
 }
+
