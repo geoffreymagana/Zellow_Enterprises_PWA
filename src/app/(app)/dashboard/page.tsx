@@ -11,6 +11,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { collection, getDocs, query, where, onSnapshot, Unsubscribe, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User, Order, OrderStatus } from '@/types';
+import { useRouter } from 'next/navigation'; // Added useRouter
 
 // Helper component for dashboard items
 const DashboardItem = ({ title, value, icon: Icon, link, description, isLoadingValue }: { title: string; value?: string | number; icon: React.ElementType; link?: string; description?: string, isLoadingValue?: boolean }) => (
@@ -36,6 +37,7 @@ const DashboardItem = ({ title, value, icon: Icon, link, description, isLoadingV
 
 export default function DashboardPage() {
   const { user, role, loading: authLoading } = useAuth();
+  const router = useRouter(); // Added useRouter
   
   // General Admin stats
   const [activeUserCount, setActiveUserCount] = useState<number | string>("...");
@@ -64,8 +66,13 @@ export default function DashboardPage() {
 
 
   useEffect(() => {
+    if (!authLoading && role === 'Customer') {
+      router.replace('/products');
+      return; // Stop further execution for customers on this page
+    }
+
     let unsubscribers: Unsubscribe[] = [];
-    if (!authLoading && db) {
+    if (!authLoading && db && role !== 'Customer') { // Ensure role is not Customer before fetching
       if (role === 'Admin') {
         setIsLoadingUserCount(true);
         setIsLoadingProductCount(true);
@@ -187,17 +194,17 @@ export default function DashboardPage() {
       }
     }
     return () => unsubscribers.forEach(unsub => unsub());
-  }, [authLoading, role, db]);
+  }, [authLoading, role, db, router]);
 
 
-  if (authLoading || !user) {
+  if (authLoading || !user || role === 'Customer') { // Also show loader if customer before redirect happens
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
   const getRoleSpecificGreeting = () => {
     switch (role) {
       case 'Admin': return "Admin Control Panel";
-      case 'Customer': return "Welcome, valued Customer!";
+      // Customer case removed as they are redirected
       case 'Technician': return "Technician Dashboard";
       case 'Rider': return "Rider Dashboard";
       case 'Supplier': return "Supplier Portal";
@@ -237,15 +244,7 @@ export default function DashboardPage() {
             <DashboardItem title="Full Dispatch Center" value={"Open"} icon={Component} link="/admin/dispatch" description="Access all dispatch tools." />
           </>
         );
-      case 'Customer':
-        return (
-          <>
-            <DashboardItem title="Active Orders" value={0} icon={ShoppingCart} link="/orders" isLoadingValue={false} description="Your current orders." />
-            <DashboardItem title="Wishlist Items" value={0} icon={Package} link="/products" isLoadingValue={false} description="Items you love."/>
-            <DashboardItem title="Browse Services" value={"Explore"} icon={Layers} link="/services" description="Discover our services."/>
-            <DashboardItem title="Gift Customizations" value={"Create"} icon={UsersIcon} link="/customizations/gift" description="Personalize a gift."/>
-          </>
-        );
+      // Customer case removed
       case 'Technician':
         return (
           <>
@@ -274,7 +273,7 @@ export default function DashboardPage() {
         Hello, {user.displayName || user.email}! Your role is: <span className="font-semibold text-primary">{role || 'Not Assigned'}</span>.
       </p>
       
-      {role !== 'Admin' && role !== 'Customer' && role !== 'DispatchManager' && (
+      {role !== 'Admin' && role !== 'DispatchManager' && ( // Customer case handled by redirect
         <Alert>
           <BarChart className="h-4 w-4 mr-2" />
           <AlertTitle>Data Overview</AlertTitle>
@@ -301,15 +300,7 @@ export default function DashboardPage() {
           </AlertDescription>
         </Alert>
       )}
-      {role === 'Customer' && (
-         <Alert variant="default">
-          <ShoppingCart className="h-4 w-4 mr-2" />
-          <AlertTitle>Welcome to Zellow Enterprises!</AlertTitle>
-          <AlertDescription>
-            Browse products, manage your orders, and customize items. Some data is placeholder.
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* Customer Alert Removed */}
 
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -317,15 +308,13 @@ export default function DashboardPage() {
       </div>
 
 
-      {role !== 'Admin' && (
+      {role !== 'Admin' && ( // Customer case handled by redirect
         <Card>
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            {role === 'Customer' && <Link href="/products"><Button><Package className="mr-2 h-4 w-4" />Browse Products</Button></Link>}
-            {role === 'Customer' && <Link href="/orders"><Button variant="outline"><ShoppingCart className="mr-2 h-4 w-4" />My Orders</Button></Link>}
-            {role === 'Customer' && <Link href="/customizations/gift"><Button variant="outline"><UsersIcon className="mr-2 h-4 w-4" />Customize Gift</Button></Link>}
+            {/* Customer Quick Actions Removed */}
             {(role === 'Technician' || role === 'ServiceManager') && <Link href="/tasks"><Button>View Tasks</Button></Link>}
             {(role === 'Rider') && <Link href="/deliveries"><Button>Manage Deliveries</Button></Link>}
              {role === 'DispatchManager' && <Link href="/admin/dispatch"><Button><Component className="mr-2 h-4 w-4" />Open Dispatch Center</Button></Link>}

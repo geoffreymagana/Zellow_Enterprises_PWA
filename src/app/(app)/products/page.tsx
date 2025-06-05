@@ -2,17 +2,21 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import type { Product } from "@/types";
-import { PlusCircle, ShoppingCart, Loader2, AlertTriangle } from "lucide-react";
+import { ShoppingCart, Loader2, AlertTriangle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
+
+const formatPrice = (price: number): string => {
+  return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
+};
 
 export default function ProductsPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -33,8 +37,6 @@ export default function ProductsPage() {
     setIsLoadingProducts(true);
     setFetchError(null);
     try {
-      // Assuming products collection has an 'active' field or similar for customer visibility
-      // For now, fetching all products. Add 'where("active", "==", true)' if applicable.
       const productsQuery = query(collection(db, "products"), orderBy("createdAt", "desc"));
       const querySnapshot = await getDocs(productsQuery);
       const fetchedProducts: Product[] = [];
@@ -58,13 +60,12 @@ export default function ProductsPage() {
       router.replace('/login');
       return;
     }
-    if (role && role !== 'Customer') {
-      router.replace('/dashboard');
-      return;
+    // This page is now primarily for customers, but Admins might want to see it too.
+    // Other roles might be redirected from their dashboard if it points here.
+    if (role && !['Customer', 'Admin'].includes(role)) {
+        // Allow if navigated to directly, but dashboard for other roles won't point here by default.
     }
-    if (role === 'Customer') {
-      fetchProducts();
-    }
+    fetchProducts();
   }, [authLoading, user, role, router, fetchProducts]);
 
   if (authLoading || isLoadingProducts) {
@@ -86,23 +87,21 @@ export default function ProductsPage() {
       </div>
     );
   }
-  
-  if (role !== 'Customer' && !authLoading) { // Additional check after loading in case role changes
-    return <div className="text-center py-10">Access denied. This page is for customers only.</div>;
-  }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-headline font-semibold">Our Products</h1>
-        <Link href="/orders/cart" passHref>
-           <Button variant="outline">
-            <ShoppingCart className="mr-2 h-4 w-4" /> View Cart (0)
-          </Button>
-        </Link>
+        <h1 className="text-3xl font-headline font-semibold">Discover Our Products</h1>
+        {role === 'Customer' && (
+          <Link href="/orders/cart" passHref>
+            <Button variant="outline">
+              <ShoppingCart className="mr-2 h-4 w-4" /> View Cart (0) {/* TODO: Implement cart count */}
+            </Button>
+          </Link>
+        )}
       </div>
       
-      <p className="text-muted-foreground">Browse our collection and customize your items.</p>
+      <p className="text-muted-foreground">Browse our collection and find the perfect item.</p>
 
       {products.length === 0 ? (
         <Card>
@@ -113,52 +112,40 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
           {products.map((product) => (
-            <Card key={product.id} className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group">
-              <CardHeader className="p-0">
-                <Link href={`/products/${product.id}`} passHref>
-                  <div className="aspect-[4/3] relative w-full bg-muted overflow-hidden">
-                    <Image 
-                      src={product.imageUrl || 'https://placehold.co/600x400.png'} 
-                      alt={product.name} 
-                      fill
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                      data-ai-hint={product.dataAiHint || product.categories?.[0] || product.name.split(" ")[0]?.toLowerCase() || "gift item"}
-                    />
+            <Link key={product.id} href={`/products/${product.id}`} passHref>
+              <Card className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group h-full">
+                <CardHeader className="p-0">
+                    <div className="aspect-[4/3] relative w-full bg-muted overflow-hidden rounded-t-lg">
+                      <Image 
+                        src={product.imageUrl || 'https://placehold.co/600x400.png'} 
+                        alt={product.name} 
+                        fill
+                        sizes="(max-width: 640px) 50vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        data-ai-hint={product.categories?.[0]?.toLowerCase().split(" ")[0] || product.name.split(" ")[0]?.toLowerCase() || "gift item"}
+                      />
+                    </div>
+                </CardHeader>
+                <CardContent className="pt-3 pb-4 px-3 flex-grow flex flex-col justify-between">
+                  <div>
+                    <CardTitle className="text-base md:text-lg font-semibold mb-1 font-headline group-hover:text-primary transition-colors line-clamp-2">{product.name}</CardTitle>
                   </div>
-                </Link>
-              </CardHeader>
-              <CardContent className="pt-4 flex-grow">
-                <Link href={`/products/${product.id}`} passHref>
-                    <CardTitle className="text-lg font-semibold mb-1 font-headline hover:text-primary transition-colors">{product.name}</CardTitle>
-                </Link>
-                <CardDescription className="text-sm text-muted-foreground mb-2 h-10 line-clamp-2">{product.description}</CardDescription>
-                <p className="text-xl font-bold text-primary">Ksh {product.price.toFixed(2)}</p>
-                {product.stock < 10 && product.stock > 0 && (
-                  <p className="text-xs text-orange-500 mt-1">Only {product.stock} left in stock!</p>
+                  <p className="text-lg md:text-xl font-bold text-primary mt-1">{formatPrice(product.price)}</p>
+                </CardContent>
+                 {/* Stock information can be added here if desired, e.g., for low stock warnings */}
+                 {product.stock < 10 && product.stock > 0 && (
+                  <div className="px-3 pb-2 text-xs text-orange-500">Low stock!</div>
                 )}
                 {product.stock === 0 && (
-                  <p className="text-xs text-destructive mt-1">Out of stock</p>
+                  <div className="px-3 pb-2 text-xs text-destructive">Out of stock</div>
                 )}
-              </CardContent>
-              <CardFooter className="flex flex-col sm:flex-row justify-between items-center p-4 gap-2">
-                <Link href={`/products/${product.id}/customize`} passHref className="w-full sm:w-auto">
-                  <Button size="sm" variant="outline" className="w-full">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Customize
-                  </Button>
-                </Link>
-                <Button size="sm" className="w-full sm:w-auto" disabled={product.stock === 0}>
-                  <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
-                </Button>
-              </CardFooter>
-            </Card>
+              </Card>
+            </Link>
           ))}
         </div>
       )}
     </div>
   );
 }
-
-    
