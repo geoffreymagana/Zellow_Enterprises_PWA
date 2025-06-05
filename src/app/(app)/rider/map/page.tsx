@@ -6,13 +6,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Loader2, AlertTriangle, Navigation, UserCircle, Phone, Info, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, AlertTriangle, Navigation, UserCircle, Phone, Info, CheckCircle, XCircle, Truck, MapPin } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { Order, OrderStatus } from '@/types';
-import { doc, onSnapshot, updateDoc, arrayUnion, serverTimestamp, Unsubscribe } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, serverTimestamp, Unsubscribe, collection, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 
@@ -42,7 +42,7 @@ export default function RiderMapPage() {
 
   // Fetch assigned orders
   useEffect(() => {
-    if (!user || !db || role !== 'Rider' && role !== 'Admin') return;
+    if (!user || !db || (role !== 'Rider' && role !== 'Admin')) return () => {};
 
     const ordersQuery = query(collection(db, 'orders'), 
       where('riderId', '==', user.uid),
@@ -98,14 +98,20 @@ export default function RiderMapPage() {
               const { longitude, latitude } = position.coords;
               if (mapRef.current) {
                 if (!riderLocationMarkerRef.current) {
-                  riderLocationMarkerRef.current = new mapboxgl.Marker({ color: '#007cbf' }) // Blue for rider
+                  const el = document.createElement('div');
+                  el.style.width = '20px';
+                  el.style.height = '20px';
+                  el.style.borderRadius = '50%';
+                  el.style.backgroundColor = 'hsl(var(--primary))'; // Rider color
+                  el.style.border = '2px solid hsl(var(--card))';
+                  riderLocationMarkerRef.current = new mapboxgl.Marker({ element: el }) 
                     .setLngLat([longitude, latitude])
                     .addTo(mapRef.current);
                 } else {
                   riderLocationMarkerRef.current.setLngLat([longitude, latitude]);
                 }
                  // Center map on rider if it's the first location update
-                if (mapRef.current.getZoom() === 10 && mapRef.current.getCenter().lng === 36.8219) { // if still at default
+                if (mapRef.current.getZoom() === 10 && mapRef.current.getCenter().lng.toFixed(4) === '36.8219' && mapRef.current.getCenter().lat.toFixed(4) === '-1.2921') { // if still at default
                     mapRef.current.flyTo({ center: [longitude, latitude], zoom: 13 });
                 }
                 // TODO: Persist rider location to Firestore (user.currentLocation)
@@ -146,71 +152,94 @@ export default function RiderMapPage() {
 
   // Update map markers when orders change
   useEffect(() => {
-    if (!mapRef.current || !mapRef.current.isStyleLoaded() || assignedOrders.length === 0) return;
+    if (!mapRef.current || !mapRef.current.isStyleLoaded() || mapLoading) return;
 
     const map = mapRef.current;
     
-    // Clear existing order markers (simple way, could be more efficient)
-    assignedOrders.forEach(order => order.marker?.remove());
-    const updatedOrdersWithMarkers: DisplayOrder[] = [];
+    // Manage existing markers: remove markers for orders no longer in assignedOrders
+    const currentOrderIds = new Set(assignedOrders.map(o => o.id));
+    const ordersWithMarkers = assignedOrders.filter(o => o.marker);
+
+    ordersWithMarkers.forEach(order => {
+        if (!currentOrderIds.has(order.id) && order.marker) {
+            order.marker.remove();
+            // Remove from state too (or handle in main order fetching effect)
+            setAssignedOrders(prev => prev.map(o => o.id === order.id ? {...o, marker: undefined} : o));
+        }
+    });
+    
+    const updatedOrdersWithMarkers: DisplayOrder[] = [...assignedOrders]; // Start with current orders
 
     const bounds = new mapboxgl.LngLatBounds();
 
-    assignedOrders.forEach(order => {
-      let newMarker;
+    assignedOrders.forEach((order, index) => {
+      let existingOrderState = updatedOrdersWithMarkers[index];
       if (order.deliveryCoordinates) {
         const { lng, lat } = order.deliveryCoordinates;
-        const el = document.createElement('div');
-        el.className = 'marker';
-        el.style.backgroundImage = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${order.status === 'delivered' ? 'green' : (order.color || 'red')}" width="36px" height="36px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12-2.5-2.5-2.5z"/><circle cx="12" cy="9.5" r="2.5"/></svg>')`;
-        el.style.width = `36px`;
-        el.style.height = `36px`;
-        el.style.backgroundSize = '100%';
-        el.style.cursor = 'pointer';
-        
-        newMarker = new mapboxgl.Marker(el)
-          .setLngLat([lng, lat])
-          .addTo(map);
-        newMarker.getElement().addEventListener('click', () => setSelectedOrder(order));
+        if (existingOrderState.marker) { // Marker exists, update position
+          existingOrderState.marker.setLngLat([lng, lat]);
+        } else { // No marker, create new one
+          const el = document.createElement('div');
+          // el.className = 'marker'; // Generic class if needed
+          el.style.backgroundImage = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${order.status === 'delivered' ? 'hsl(120, 60%, 50%)' : (order.color || 'hsl(var(--destructive))')}" width="32px" height="32px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12-2.5-2.5-2.5z"/><circle cx="12" cy="9.5" r="2.5"/></svg>')`;
+          el.style.width = `32px`;
+          el.style.height = `32px`;
+          el.style.backgroundSize = '100%';
+          el.style.cursor = 'pointer';
+          el.title = `Order ${order.id}`;
+          
+          const newMarker = new mapboxgl.Marker(el)
+            .setLngLat([lng, lat])
+            .addTo(map);
+          newMarker.getElement().addEventListener('click', () => setSelectedOrder(order));
+          updatedOrdersWithMarkers[index] = {...existingOrderState, marker: newMarker};
+        }
         bounds.extend([lng, lat]);
+      } else if (existingOrderState.marker) { // No coords but marker exists, remove it
+        existingOrderState.marker.remove();
+        updatedOrdersWithMarkers[index] = {...existingOrderState, marker: undefined};
       }
-      updatedOrdersWithMarkers.push({...order, marker: newMarker});
     });
-    setAssignedOrders(prev => updatedOrdersWithMarkers); // Update state with marker instances
+    // Only update state if markers actually changed to avoid loop if objects are new but logically same
+    if (JSON.stringify(updatedOrdersWithMarkers.map(o=>({id:o.id, hasMarker: !!o.marker}))) !== JSON.stringify(assignedOrders.map(o=>({id:o.id, hasMarker: !!o.marker})))) {
+      setAssignedOrders(updatedOrdersWithMarkers); 
+    }
+
 
     if (focusedOrderId) {
         const orderToFocus = updatedOrdersWithMarkers.find(o => o.id === focusedOrderId);
         if (orderToFocus?.deliveryCoordinates) {
              map.flyTo({ center: [orderToFocus.deliveryCoordinates.lng, orderToFocus.deliveryCoordinates.lat], zoom: 14 });
         }
-    } else if (!bounds.isEmpty() && riderLocationMarkerRef.current == null) { // Only fit to bounds if no rider location yet, or if specified.
+    } else if (!bounds.isEmpty() && !riderLocationMarkerRef.current) { 
          map.fitBounds(bounds, { padding: 60, maxZoom: 15 });
     }
 
-  }, [assignedOrders, mapRef.current?.isStyleLoaded(), focusedOrderId]); // Rerun when orders change or map loads
+  // eslint-disable-next-line react-hooks/exhaustive-deps 
+  }, [assignedOrders, mapLoading, mapRef.current?.isStyleLoaded(), focusedOrderId]); 
 
 
   const handleUpdateStatus = async (orderId: string, newStatus: OrderStatus, notes?: string) => {
     if (!db || !user) return;
     try {
       const orderRef = doc(db, 'orders', orderId);
-      const currentOrder = assignedOrders.find(o => o.id === orderId);
+      const currentOrder = assignedOrders.find(o => o.id === orderId); // Use local state for current history
       const newHistoryEntry = {
         status: newStatus,
         timestamp: serverTimestamp(),
-        notes: notes || `Status: ${newStatus}`,
+        notes: notes || `Status updated to ${newStatus} by ${role}`,
         actorId: user.uid,
       };
-      const updatedHistory = arrayUnion(newHistoryEntry);
-
+      
       await updateDoc(orderRef, { 
         status: newStatus, 
         updatedAt: serverTimestamp(),
-        deliveryHistory: updatedHistory,
+        deliveryHistory: arrayUnion(newHistoryEntry),
         ...(newStatus === 'delivered' && { actualDeliveryTime: serverTimestamp() })
       });
       toast({ title: "Success", description: `Order ${orderId} marked as ${newStatus}.` });
-      setSelectedOrder(prev => prev && prev.id === orderId ? {...prev, status: newStatus} : prev);
+      setSelectedOrder(prev => prev && prev.id === orderId ? {...prev, status: newStatus, deliveryHistory: [...(prev.deliveryHistory || []), newHistoryEntry] } : prev);
+      // No need to call setAssignedOrders here, onSnapshot will update it
     } catch (error) {
       console.error("Error updating order status:", error);
       toast({ title: "Error", description: "Failed to update order status.", variant: "destructive" });
@@ -226,8 +255,8 @@ export default function RiderMapPage() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-var(--header-height,4rem))] gap-4 p-4"> {/* Adjust header height var if needed */}
-      <div className="md:w-1/3 lg:w-1/4 space-y-4 overflow-y-auto">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-var(--header-height,4rem)-2rem)] p-4 gap-4"> {/* Adjusted for p-4 */}
+      <div className="md:w-1/3 lg:w-1/4 space-y-4 overflow-y-auto pr-2"> {/* Added pr-2 for scrollbar */}
         <h1 className="text-2xl font-headline font-semibold">My Route</h1>
         {assignedOrders.length === 0 && !mapLoading && (
             <Card><CardContent className="pt-6 text-muted-foreground">No active deliveries assigned.</CardContent></Card>
@@ -243,20 +272,20 @@ export default function RiderMapPage() {
                 }}
                 className={`cursor-pointer hover:shadow-lg ${selectedOrder?.id === order.id ? 'border-primary ring-2 ring-primary' : ''}`}
             >
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-base font-medium">Order {order.id}</CardTitle>
+                <CardHeader className="pb-2 pt-4"> {/* Adjusted padding */}
+                    <CardTitle className="text-base font-medium">Order {order.id.substring(0,8)}...</CardTitle>
                     <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'} className="capitalize w-fit">{order.status.replace(/_/g, ' ')}</Badge>
                 </CardHeader>
-                <CardContent className="text-xs">
-                    <p>{order.deliveryAddress}</p>
+                <CardContent className="text-xs pb-4"> {/* Adjusted padding */}
+                    <p className="truncate">{order.deliveryAddress}</p>
                     <p>Customer: {order.customerName || 'N/A'}</p>
                 </CardContent>
             </Card>
         ))}
       </div>
 
-      <div className="flex-1 flex flex-col gap-4">
-        <Card className="flex-grow min-h-[300px] md:min-h-0"> {/* Ensure map card can grow */}
+      <div className="flex-1 flex flex-col gap-4 overflow-hidden"> {/* Added overflow-hidden */}
+        <Card className="flex-grow min-h-[250px] md:min-h-0"> 
           <CardContent className="p-0 h-full relative">
             {mapError && (
               <div className="absolute inset-0 flex items-center justify-center z-10 p-4">
@@ -271,20 +300,21 @@ export default function RiderMapPage() {
         </Card>
         
         {selectedOrder && (
-          <Card className="max-h-[40vh] overflow-y-auto"> {/* Details card with scroll */}
+          <Card className="max-h-[calc(100vh-var(--header-height,4rem)-2rem-250px-4rem-env(safe-area-inset-bottom))] md:max-h-[40vh] overflow-y-auto"> {/* Details card with scroll */}
             <CardHeader>
-              <CardTitle className="font-headline">Order Details: {selectedOrder.id}</CardTitle>
+              <CardTitle className="font-headline">Order Details: {selectedOrder.id.substring(0,12)}...</CardTitle>
               <CardDescription>Status: <Badge variant={selectedOrder.status === 'delivered' ? 'default' : 'secondary'} className="capitalize">{selectedOrder.status.replace(/_/g, ' ')}</Badge></CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <p className="flex items-center"><UserCircle className="h-4 w-4 mr-2 text-muted-foreground" /> Customer: {selectedOrder.customerName || 'N/A'}</p>
-              <p className="flex items-center"><MapPin className="h-4 w-4 mr-2 text-muted-foreground" /> Address: {selectedOrder.deliveryAddress}</p>
-              {selectedOrder.customerPhone && <p className="flex items-center"><Phone className="h-4 w-4 mr-2 text-muted-foreground" /> Phone: <a href={`tel:${selectedOrder.customerPhone}`} className="text-primary hover:underline">{selectedOrder.customerPhone}</a></p>}
-              {selectedOrder.deliveryNotes && <p className="flex items-center"><Info className="h-4 w-4 mr-2 text-muted-foreground" /> Notes: {selectedOrder.deliveryNotes}</p>}
+              <p className="flex items-center text-sm"><UserCircle className="h-4 w-4 mr-2 text-muted-foreground" /> Customer: {selectedOrder.customerName || 'N/A'}</p>
+              <p className="flex items-center text-sm"><MapPin className="h-4 w-4 mr-2 text-muted-foreground" /> Address: {selectedOrder.deliveryAddress}</p>
+              {selectedOrder.customerPhone && <p className="flex items-center text-sm"><Phone className="h-4 w-4 mr-2 text-muted-foreground" /> Phone: <a href={`tel:${selectedOrder.customerPhone}`} className="text-primary hover:underline">{selectedOrder.customerPhone}</a></p>}
+              {selectedOrder.deliveryNotes && <p className="flex items-center text-sm"><Info className="h-4 w-4 mr-2 text-muted-foreground" /> Notes: {selectedOrder.deliveryNotes}</p>}
             </CardContent>
             <CardFooter className="flex-wrap gap-2">
               <Button 
                 variant="outline" 
+                size="sm"
                 onClick={() => {
                   if (selectedOrder.deliveryCoordinates) {
                     const { lng, lat } = selectedOrder.deliveryCoordinates;
@@ -297,22 +327,22 @@ export default function RiderMapPage() {
                 <Navigation className="mr-2 h-4 w-4" /> Navigate
               </Button>
               {selectedOrder.status === 'assigned' && (
-                <Button onClick={() => handleUpdateStatus(selectedOrder.id, 'out_for_delivery')}>
+                <Button size="sm" onClick={() => handleUpdateStatus(selectedOrder.id, 'out_for_delivery')}>
                   <Truck className="mr-2 h-4 w-4" /> Start Delivery
                 </Button>
               )}
               {selectedOrder.status === 'out_for_delivery' && (
                 <>
-                  <Button onClick={() => handleUpdateStatus(selectedOrder.id, 'delivered')}>
+                  <Button size="sm" onClick={() => handleUpdateStatus(selectedOrder.id, 'delivered')}>
                     <CheckCircle className="mr-2 h-4 w-4" /> Mark Delivered
                   </Button>
-                  <Button variant="outline" onClick={() => handleUpdateStatus(selectedOrder.id, 'delivery_attempted')}>
+                  <Button size="sm" variant="outline" onClick={() => handleUpdateStatus(selectedOrder.id, 'delivery_attempted')}>
                     <AlertTriangle className="mr-2 h-4 w-4" /> Attempt Failed
                   </Button>
                 </>
               )}
               {selectedOrder.status === 'delivery_attempted' && (
-                 <Button onClick={() => handleUpdateStatus(selectedOrder.id, 'out_for_delivery')}>
+                 <Button size="sm" onClick={() => handleUpdateStatus(selectedOrder.id, 'out_for_delivery')}>
                     <Truck className="mr-2 h-4 w-4" /> Re-attempt Delivery
                   </Button>
               )}
@@ -326,10 +356,7 @@ export default function RiderMapPage() {
 
 declare global {
   interface Window {
-    mapboxgl?: typeof mapboxgl; // For direct use if needed, though react-map-gl handles this
+    mapboxgl?: typeof mapboxgl; 
   }
 }
 
-function query(arg0: any, arg1: any, arg2: any, arg3: any): import("firebase/firestore").Query<import("@firebase/firestore").DocumentData> | PromiseLike<import("firebase/firestore").Query<import("@firebase/firestore").DocumentData>> {
-    throw new Error('Function not implemented.');
-}
