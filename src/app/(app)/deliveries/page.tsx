@@ -1,84 +1,156 @@
+
 "use client";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
-import type { Order } from "@/types"; // Assuming deliveries relate to orders
-import { MapPin, Navigation, CheckCircle, PackageSearch, UserPlus, Filter } from "lucide-react";
+import type { Order, OrderStatus } from "@/types";
+import { MapPin, Navigation, CheckCircle, PackageSearch, UserPlus, Filter, Loader2, AlertTriangle, Edit } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, Unsubscribe } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 
-// Sample data, assuming a delivery might be linked to an order or be a standalone task
-interface DeliveryTask extends Order { // Extending Order for simplicity, can be a separate type
-  assigneeId?: string; // Rider ID
-  deliveryNotes?: string;
-}
-
-const sampleDeliveries: DeliveryTask[] = [
-  { id: 'DEL001', customerId: 'custXYZ', items: [], totalAmount: 0, status: 'shipped', createdAt: new Date('2023-11-03'), assigneeId: 'rider123', deliveryNotes: 'Gate code: #1234. Leave at front porch.' },
-  { id: 'DEL002', customerId: 'custABC', items: [], totalAmount: 0, status: 'pending', createdAt: new Date('2023-11-04'), deliveryNotes: 'Fragile item, handle with care.' }, // Pending assignment
-  { id: 'DEL003', customerId: 'custDEF', items: [], totalAmount: 0, status: 'delivered', createdAt: new Date('2023-11-01'), assigneeId: 'rider456', deliveryNotes: 'Customer received directly.' },
-  { id: 'DEL004', customerId: 'custGHI', items: [], totalAmount: 0, status: 'shipped', createdAt: new Date('2023-11-04'), assigneeId: 'rider123', deliveryNotes: 'Call upon arrival.' },
-];
-
-
 export default function DeliveriesPage() {
-  const { user, role } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [deliveries, setDeliveries] = useState<DeliveryTask[]>([]);
+  const { toast } = useToast();
+  const [deliveries, setDeliveries] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchDeliveries = useCallback(() => {
+    if (!user || !db) {
+      setIsLoading(false);
+      return () => {}; // Return an empty unsubscribe function
+    }
+
+    setIsLoading(true);
+    let q;
+    if (role === 'Rider') {
+      q = query(collection(db, 'orders'), 
+                where('riderId', '==', user.uid), 
+                where('status', 'in', ['assigned', 'out_for_delivery', 'delivery_attempted']));
+    } else if (role === 'DispatchManager' || role === 'Admin') {
+      // Dispatch manager might want to see a broader range of statuses
+      q = query(collection(db, 'orders'), 
+                where('status', 'in', ['assigned', 'out_for_delivery', 'delivered', 'delivery_attempted', 'cancelled', 'awaiting_assignment']));
+    } else {
+      setIsLoading(false);
+      router.replace('/dashboard'); // Redirect if not an authorized role for this page
+      return () => {};
+    }
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const fetchedDeliveries: Order[] = [];
+      querySnapshot.forEach((doc) => {
+        fetchedDeliveries.push({ id: doc.id, ...doc.data() } as Order);
+      });
+      // Sort by creation date, newest first, or by status
+      fetchedDeliveries.sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
+      setDeliveries(fetchedDeliveries);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error fetching deliveries: ", error);
+      toast({ title: "Error", description: "Could not fetch deliveries.", variant: "destructive" });
+      setIsLoading(false);
+    });
+    return unsubscribe;
+  }, [user, role, router, toast]);
 
   useEffect(() => {
-    if (role && !['Rider', 'DispatchManager'].includes(role)) {
-      router.replace('/dashboard');
-    } else if (user) {
-      // Fetch deliveries based on role
-      const userDeliveries = (role === 'Rider')
-        ? sampleDeliveries.filter(d => d.assigneeId === user.uid && d.status === 'shipped')
-        : sampleDeliveries; // DispatchManager sees all/pending
-      setDeliveries(userDeliveries);
+    if (authLoading) return;
+    if (!user) {
+      router.replace('/login');
+      return;
     }
-  }, [user, role, router]);
+    // Redirect DispatchManager to the new Dispatch Center page
+    if (role === 'DispatchManager') {
+        router.replace('/admin/dispatch');
+        return;
+    }
+    if (role !== 'Rider' && role !== 'Admin') { // Admin can view for oversight
+        router.replace('/dashboard');
+        return;
+    }
 
-  if (role && !['Rider', 'DispatchManager'].includes(role)) {
-     return <div className="text-center py-10">Access denied. This page is for Riders and Dispatch Managers only.</div>;
-  }
+    const unsubscribe = fetchDeliveries();
+    return () => unsubscribe(); // Cleanup subscription on unmount
 
-  const handleUpdateStatus = (deliveryId: string, newStatus: DeliveryTask['status']) => {
-    // Update status in Firestore
-    setDeliveries(prev => prev.map(d => d.id === deliveryId ? {...d, status: newStatus} : d));
-    console.log(`Delivery ${deliveryId} status updated to ${newStatus}`);
-    // Potentially upload proof for 'delivered' status
+  }, [authLoading, user, role, router, fetchDeliveries]);
+
+  const handleUpdateStatus = async (deliveryId: string, newStatus: OrderStatus, notes?: string) => {
+    if (!db || !user) return;
+    try {
+      const orderRef = doc(db, 'orders', deliveryId);
+      const newHistoryEntry = {
+        status: newStatus,
+        timestamp: serverTimestamp(),
+        notes: notes || `Status updated to ${newStatus} by ${role}`,
+        actorId: user.uid,
+      };
+      
+      // Firestore update with new status and history
+      const currentOrder = deliveries.find(d => d.id === deliveryId);
+      const updatedHistory = [...(currentOrder?.deliveryHistory || []), newHistoryEntry];
+
+      await updateDoc(orderRef, { 
+        status: newStatus,
+        updatedAt: serverTimestamp(),
+        deliveryHistory: updatedHistory,
+        ...(newStatus === 'delivered' && { actualDeliveryTime: serverTimestamp() })
+      });
+
+      toast({ title: "Status Updated", description: `Delivery ${deliveryId} marked as ${newStatus}.` });
+    } catch (error) {
+      console.error("Error updating status: ", error);
+      toast({ title: "Error", description: "Could not update delivery status.", variant: "destructive" });
+    }
   };
   
-  const getStatusBadgeVariant = (status: DeliveryTask['status']) => {
+  const getStatusBadgeVariant = (status: OrderStatus) => {
     switch (status) {
-      case 'pending': return 'default'; // Dispatch Manager: Pending assignment
-      case 'shipped': return 'secondary'; // Rider: Out for delivery
-      case 'delivered': return 'default'; // Consider green
+      case 'pending': return 'default';
+      case 'awaiting_assignment': return 'secondary';
+      case 'assigned': return 'default';
+      case 'out_for_delivery': return 'secondary';
+      case 'delivered': return 'default'; // Consider success variant
+      case 'delivery_attempted': return 'outline'; // Consider warning variant
       case 'cancelled': return 'destructive';
+      case 'shipped': return 'outline';
       default: return 'outline';
     }
   };
 
+  if (authLoading || isLoading) {
+    return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
+  
+  if (role === 'DispatchManager') { // Should have been redirected, but as a fallback
+    return <div className="p-4 text-center">Redirecting to Dispatch Center... If not redirected, please <Link href="/admin/dispatch" className="text-primary underline">click here</Link>.</div>;
+  }
+
+  if (role !== 'Rider' && role !== 'Admin') {
+     return <div className="text-center py-10">Access denied. This page is for Riders. Admins can view for oversight.</div>;
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-headline font-semibold">
-          {role === 'Rider' ? "My Deliveries" : "Manage Deliveries"}
+          {role === 'Rider' ? "My Active Deliveries" : "All Deliveries (Admin View)"}
         </h1>
         <div className="flex gap-2">
-            <Button variant="outline" size="sm"><Filter className="mr-2 h-4 w-4" /> Filter</Button>
-            {role === 'DispatchManager' && <Button size="sm"><PackageSearch className="mr-2 h-4 w-4" /> Create Delivery</Button>}
+            <Button variant="outline" size="sm" onClick={fetchDeliveries} disabled={isLoading}><Filter className="mr-2 h-4 w-4" /> Refresh</Button>
         </div>
       </div>
 
       {deliveries.length === 0 ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No deliveries assigned or matching filters.
+            {isLoading ? <Loader2 className="h-6 w-6 animate-spin mx-auto" /> : "No active deliveries found."}
           </CardContent>
         </Card>
       ) : (
@@ -87,44 +159,48 @@ export default function DeliveriesPage() {
             <Card key={delivery.id} className="flex flex-col">
               <CardHeader>
                 <div className="flex justify-between items-start">
-                    <CardTitle className="font-headline text-lg">Delivery {delivery.id}</CardTitle>
-                    <Badge variant={getStatusBadgeVariant(delivery.status)} className="capitalize">{delivery.status}</Badge>
+                    <CardTitle className="font-headline text-lg">Order ID: {delivery.id}</CardTitle>
+                    <Badge variant={getStatusBadgeVariant(delivery.status)} className="capitalize">{delivery.status.replace(/_/g, ' ')}</Badge>
                 </div>
-                <CardDescription>For: {delivery.customerId} | Due: {delivery.createdAt.toLocaleDateString()}</CardDescription>
+                <CardDescription>
+                  Customer: {delivery.customerName || delivery.customerId} <br />
+                  Address: {delivery.deliveryAddress || "Not specified"}
+                </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-2">
-                <p className="text-sm flex items-center"><MapPin className="h-4 w-4 mr-2 text-muted-foreground" /> Destination Address Placeholder</p>
+                <p className="text-sm flex items-center"><MapPin className="h-4 w-4 mr-2 text-muted-foreground" /> {delivery.deliveryAddress}</p>
                 {delivery.deliveryNotes && <p className="text-sm text-muted-foreground">Notes: {delivery.deliveryNotes}</p>}
-                {role === 'DispatchManager' && !delivery.assigneeId && delivery.status === 'pending' && (
-                    <Button size="sm" variant="outline" className="w-full"><UserPlus className="mr-2 h-4 w-4"/>Assign to Rider</Button>
-                )}
-                {role === 'DispatchManager' && delivery.assigneeId && (
-                    <p className="text-sm">Assigned to: {delivery.assigneeId}</p>
-                )}
+                 {delivery.estimatedDeliveryTime && <p className="text-sm">ETA: {new Date(delivery.estimatedDeliveryTime.seconds * 1000).toLocaleString()}</p>}
               </CardContent>
-              <CardFooter className="flex flex-col sm:flex-row gap-2 justify-end">
-                <Button variant="outline" size="sm"><Navigation className="mr-2 h-4 w-4" /> Navigate</Button>
-                {role === 'Rider' && delivery.status === 'shipped' && (
-                  <Button size="sm" onClick={() => handleUpdateStatus(delivery.id, 'delivered')}>
-                    <CheckCircle className="mr-2 h-4 w-4" /> Mark Delivered
+              <CardFooter className="flex flex-col sm:flex-row gap-2 justify-end items-center">
+                <Link href={`/rider/map?orderId=${delivery.id}`} passHref>
+                  <Button variant="outline" size="sm"><Navigation className="mr-2 h-4 w-4" /> View on Map</Button>
+                </Link>
+                {role === 'Rider' && delivery.status === 'assigned' && (
+                  <Button size="sm" onClick={() => handleUpdateStatus(delivery.id, 'out_for_delivery')}>
+                    <Truck className="mr-2 h-4 w-4" /> Start Delivery
                   </Button>
                 )}
-                {/* Add options for DispatchManager like reassign, cancel */}
+                {role === 'Rider' && delivery.status === 'out_for_delivery' && (
+                  <>
+                    <Button size="sm" onClick={() => handleUpdateStatus(delivery.id, 'delivered')}>
+                      <CheckCircle className="mr-2 h-4 w-4" /> Mark Delivered
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleUpdateStatus(delivery.id, 'delivery_attempted')}>
+                      <AlertTriangle className="mr-2 h-4 w-4" /> Attempt Failed
+                    </Button>
+                  </>
+                )}
+                 {role === 'Admin' && ( // Admins can edit for correction
+                    <Link href={`/admin/orders/edit/${delivery.id}`} passHref>
+                        <Button variant="ghost" size="icon"><Edit className="h-4 w-4"/></Button>
+                    </Link>
+                 )}
               </CardFooter>
             </Card>
           ))}
         </div>
       )}
-       {role === 'DispatchManager' && (
-         <Card className="mt-6">
-            <CardHeader><CardTitle>Delivery Map Overview</CardTitle></CardHeader>
-            <CardContent>
-                <div className="aspect-video bg-muted rounded-md flex items-center justify-center">
-                    <p className="text-muted-foreground">Map integration placeholder (e.g., Google Maps)</p>
-                </div>
-            </CardContent>
-         </Card>
-       )}
     </div>
   );
 }

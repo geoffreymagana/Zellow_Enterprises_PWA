@@ -5,7 +5,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, ReactNode } from 'react';
-import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Bell, Ship } from 'lucide-react';
+import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Bell, Ship, MapIcon, SlidersHorizontal } from 'lucide-react';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -29,7 +29,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
-  const { searchTerm, setSearchTerm, isMobile, openMobile } = useSidebar()!; 
+  const { searchTerm, setSearchTerm, isMobile, openMobile } = useSidebar()!;
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -39,11 +39,12 @@ function AdminLayout({ children }: { children: ReactNode }) {
     { href: '/admin/customizations', label: 'Customizations', icon: Layers },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign },
     { href: '/admin/deliveries', label: 'Deliveries', icon: Truck },
-    { href: '/admin/shipping', label: 'Shipping', icon: Ship }, // Changed: Single link
+    { href: '/admin/dispatch', label: 'Dispatch Center', icon: SlidersHorizontal },
+    { href: '/admin/shipping', label: 'Shipping', icon: Ship },
     { href: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck },
     { href: '/admin/notifications', label: 'Notifications', icon: Bell },
     { href: '/admin/reports', label: 'Reports', icon: FileArchive },
-    { href: '/rider/map', label: 'Rider Map', icon: LayoutDashboard }, 
+    { href: '/rider/map', label: 'Rider Map', icon: MapIcon },
   ];
 
   const footerAdminNavItems = [
@@ -52,18 +53,23 @@ function AdminLayout({ children }: { children: ReactNode }) {
   ];
 
   const filteredMainAdminNavItems = mainAdminNavItems.map(item => {
-    if (item.subItems) { // This logic can remain for other potential submenus
+    // For items with subItems, filter subItems first
+    if (item.subItems) {
       const filteredSubItems = item.subItems.filter(subItem =>
         subItem.label.toLowerCase().includes(searchTerm.toLowerCase())
       );
+      // If subItems remain after filtering, or if the parent item's label matches, show the parent
       if (filteredSubItems.length > 0) {
         return { ...item, subItems: filteredSubItems, isVisible: true };
       }
+      // If no subItems match, but parent item label matches, show parent with its (now empty) subItems array
       if (item.label.toLowerCase().includes(searchTerm.toLowerCase())) {
-        return { ...item, isVisible: true };
+        return { ...item, subItems: [], isVisible: true }; // Or keep original subItems if you want to show them
       }
+      // Otherwise, this parent item (with subItems) is not visible
       return { ...item, subItems: [], isVisible: false };
     }
+    // For items without subItems, just check the label
     return { ...item, isVisible: item.label.toLowerCase().includes(searchTerm.toLowerCase()) };
   }).filter(item => item.isVisible);
 
@@ -85,7 +91,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <ScrollArea className="h-full">
-             {(isMobile && openMobile || !isMobile && searchTerm) && ( 
+             {(isMobile && openMobile || !isMobile && searchTerm) && (
               <div className="p-2">
                 <Input
                   type="search"
@@ -99,7 +105,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
             {filteredMainAdminNavItems.length > 0 ? (
               <SidebarMenu className="p-2">
                 {filteredMainAdminNavItems.map((item) => (
-                  item.subItems ? (
+                  item.subItems && item.subItems.length > 0 ? ( // Check if subItems exist and are not empty
                     <SidebarMenuItem key={item.label}>
                        <SidebarMenuButton
                         isCollapsible={true}
@@ -169,7 +175,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
               ))}
             </SidebarMenu>
           )}
-          <div className="p-2 mt-1 md:hidden"> 
+          <div className="p-2 mt-1 md:hidden">
             <ThemeToggle />
           </div>
           <div className="mt-2 p-2">
@@ -181,7 +187,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
         </SidebarFooter>
       </Sidebar>
 
-      <div className="flex flex-col flex-1 min-w-0"> 
+      <div className="flex flex-col flex-1 min-w-0">
         <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="w-full h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2">
@@ -265,14 +271,15 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   const isAdmin = role === 'Admin';
+  const isDispatchManager = role === 'DispatchManager';
 
-  if (isAdmin) {
+  if (isAdmin || isDispatchManager) { // Allow Admin and DispatchManager to see AdminLayout
     return (
       <SidebarProvider defaultOpen={true}>
         <AdminLayout>{children}</AdminLayout>
       </SidebarProvider>
     );
   }
-
+  // All other roles (including Rider if they don't need admin sidebar) get NonAdminLayout
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }

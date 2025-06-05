@@ -1,5 +1,5 @@
 
-export type UserRole = 
+export type UserRole =
   | 'Admin'
   | 'Customer'
   | 'Technician'
@@ -10,18 +10,21 @@ export type UserRole =
   | 'ServiceManager'
   | 'InventoryManager'
   | 'DispatchManager'
-  | null; 
+  | null;
 
 export interface User {
   uid: string;
   email: string | null;
   displayName?: string | null;
-  firstName?: string | null; 
-  lastName?: string | null;  
+  firstName?: string | null;
+  lastName?: string | null;
   photoURL?: string | null;
   role: UserRole;
   disabled?: boolean;
-  createdAt?: any; 
+  createdAt?: any;
+  currentLocation?: { lat: number; lng: number; timestamp: any } | null; // For riders
+  currentRouteId?: string | null; // For riders
+  assignedOrdersCount?: number; // Denormalized count for quick display
 }
 
 export interface Product {
@@ -29,25 +32,58 @@ export interface Product {
   name: string;
   description: string;
   price: number;
-  imageUrl?: string; 
+  imageUrl?: string;
   stock: number;
   dataAiHint?: string;
+}
+
+export type OrderStatus =
+  | 'pending' // Customer placed, awaiting admin/dispatch action
+  | 'processing' // Actively being worked on (customization, etc.)
+  | 'awaiting_assignment' // Ready for a rider, but not yet assigned
+  | 'assigned' // Rider assigned, awaiting pickup
+  | 'out_for_delivery' // Rider has picked up and is en route
+  | 'delivered' // Successfully delivered to customer
+  | 'delivery_attempted' // Rider attempted delivery, but failed
+  | 'cancelled' // Order cancelled by customer or admin
+  | 'shipped'; // General shipped status, can be refined by above
+
+
+export interface DeliveryHistoryEntry {
+  status: OrderStatus | string; // More specific status or note
+  timestamp: any; // Firestore serverTimestamp or Date
+  notes?: string;
+  actorId?: string; // UID of user who made the change (rider, dispatcher)
+  location?: { lat: number; lng: number }; // Optional location at status change
 }
 
 export interface Order {
   id: string;
   customerId: string;
-  items: Array<{ productId: string; quantity: number; customization?: any }>;
+  customerName?: string; // Denormalize for easier display
+  customerPhone?: string; // Denormalize
+  items: Array<{ productId: string; quantity: number; customization?: any; name?: string; price?: number }>;
   totalAmount: number;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-  createdAt: Date;
-  deliveryId?: string;
+  status: OrderStatus;
+  createdAt: any; // Firestore serverTimestamp or Date
+  updatedAt?: any; // Firestore serverTimestamp or Date
+  deliveryId?: string; // Could be same as order ID or a separate tracking ID
+  riderId?: string | null;
+  riderName?: string | null; // Denormalized
+  deliveryAddress: string;
+  deliveryCoordinates?: { lat: number; lng: number } | null;
+  deliveryNotes?: string;
+  color?: string | null; // For map color-coding
+  estimatedDeliveryTime?: any | null; // Timestamp or ISO string
+  actualDeliveryTime?: any | null; // Timestamp or ISO string
+  deliveryHistory?: DeliveryHistoryEntry[];
+  paymentStatus?: 'pending' | 'paid' | 'failed' | 'refunded';
 }
 
 export interface Task {
   id:string;
-  assigneeId: string; 
-  type: 'engraving' | 'printing' | 'delivery' | string; 
+  assigneeId: string;
+  type: 'engraving' | 'printing' | 'delivery' | string;
   description: string;
   orderId?: string;
   status: 'pending' | 'in-progress' | 'completed' | 'needs_approval';
