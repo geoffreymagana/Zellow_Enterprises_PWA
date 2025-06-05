@@ -5,7 +5,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, ReactNode } from 'react';
-import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Bell } from 'lucide-react';
+import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Bell, MapPin, Ship, Combine } from 'lucide-react';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -38,6 +38,15 @@ function AdminLayout({ children }: { children: ReactNode }) {
     { href: '/admin/deliveries', label: 'Deliveries', icon: Truck },
     { href: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck },
     { href: '/admin/notifications', label: 'Notifications', icon: Bell },
+    {
+      label: 'Shipping',
+      icon: Ship,
+      subItems: [
+        { href: '/admin/shipping/regions', label: 'Regions', icon: MapPin },
+        { href: '/admin/shipping/methods', label: 'Methods', icon: Truck },
+        { href: '/admin/shipping/rates', label: 'Rates', icon: Combine },
+      ],
+    },
     { href: '/admin/reports', label: 'Reports', icon: FileArchive },
   ];
 
@@ -46,9 +55,23 @@ function AdminLayout({ children }: { children: ReactNode }) {
     { href: '/admin/settings', label: 'Settings', icon: SettingsIcon },
   ];
 
-  const filteredMainAdminNavItems = mainAdminNavItems.filter(item =>
-    item.label.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredMainAdminNavItems = mainAdminNavItems.map(item => {
+    if (item.subItems) {
+      const filteredSubItems = item.subItems.filter(subItem =>
+        subItem.label.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      if (filteredSubItems.length > 0) {
+        return { ...item, subItems: filteredSubItems, isVisible: true };
+      }
+      // If parent itself matches search term, show all its subitems
+      if (item.label.toLowerCase().includes(searchTerm.toLowerCase())) {
+        return { ...item, isVisible: true };
+      }
+      return { ...item, subItems: [], isVisible: false };
+    }
+    return { ...item, isVisible: item.label.toLowerCase().includes(searchTerm.toLowerCase()) };
+  }).filter(item => item.isVisible);
+
 
   const filteredFooterAdminNavItems = footerAdminNavItems.filter(item =>
     item.label.toLowerCase().includes(searchTerm.toLowerCase())
@@ -67,7 +90,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <ScrollArea className="h-full">
-            {(isMobile && openMobile) && ( 
+             {(isMobile && openMobile || !isMobile && searchTerm) && ( 
               <div className="p-2">
                 <Input
                   type="search"
@@ -81,8 +104,32 @@ function AdminLayout({ children }: { children: ReactNode }) {
             {filteredMainAdminNavItems.length > 0 ? (
               <SidebarMenu className="p-2">
                 {filteredMainAdminNavItems.map((item) => (
+                  item.subItems ? (
+                    <SidebarMenuItem key={item.label}>
+                       <SidebarMenuButton
+                        isCollapsible={true}
+                        className="w-full justify-start"
+                        variant="ghost"
+                      >
+                        <item.icon className="mr-2 h-4 w-4" />
+                        <span>{item.label}</span>
+                      </SidebarMenuButton>
+                      <SidebarMenuSub>
+                        {item.subItems.map(subItem => (
+                           <SidebarMenuSubItem key={subItem.label}>
+                            <Link href={subItem.href} passHref legacyBehavior>
+                              <SidebarMenuSubButton>
+                                {subItem.icon && <subItem.icon className="mr-2 h-4 w-4" />}
+                                <span>{subItem.label}</span>
+                              </SidebarMenuSubButton>
+                            </Link>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </SidebarMenuItem>
+                  ) : (
                   <SidebarMenuItem key={item.label}>
-                    <Link href={item.href} passHref legacyBehavior>
+                    <Link href={item.href!} passHref legacyBehavior>
                       <SidebarMenuButton
                         asChild
                         tooltip={item.label}
@@ -96,6 +143,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
                       </SidebarMenuButton>
                     </Link>
                   </SidebarMenuItem>
+                  )
                 ))}
               </SidebarMenu>
             ) : null}
@@ -126,7 +174,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
               ))}
             </SidebarMenu>
           )}
-          <div className="p-2 mt-1 md:hidden"> {/* Hide on desktop, show on mobile */}
+          <div className="p-2 mt-1 md:hidden"> 
             <ThemeToggle />
           </div>
           <div className="mt-2 p-2">
@@ -147,7 +195,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
               <div className="hidden md:block">
-                <Input
+                 <Input
                   type="search"
                   placeholder="Search sections..."
                   className="h-9 w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96"

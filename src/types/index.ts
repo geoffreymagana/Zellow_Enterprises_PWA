@@ -20,8 +20,8 @@ export interface User {
   lastName?: string | null;  
   photoURL?: string | null;
   role: UserRole;
-  disabled?: boolean; // Added for account status
-  createdAt?: any; // Keep serverTimestamp type flexible for Firestore
+  disabled?: boolean;
+  createdAt?: any; 
 }
 
 export interface Product {
@@ -53,4 +53,36 @@ export interface Task {
   status: 'pending' | 'in-progress' | 'completed' | 'needs_approval';
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface ShippingRegion {
+  id: string; // Firestore document ID
+  name: string;
+  county: string;
+  towns: string[]; // Array of town names
+  active: boolean;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export interface ShippingMethod {
+  id: string; // Firestore document ID
+  name: string;
+  description: string;
+  duration: string; // e.g., "24h", "3-5 days"
+  basePrice: number;
+  active: boolean;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export interface ShippingRate {
+  id: string; // Firestore document ID
+  regionId: string; // Reference to ShippingRegions document ID
+  methodId: string; // Reference to ShippingMethods document ID
+  customPrice: number;
+  notes?: string;
+  active: boolean;
+  createdAt?: any;
+  updatedAt?: any;
 }
