@@ -21,7 +21,7 @@ import {
   SidebarMenuButton,
   SidebarInset, 
   SidebarFooter,
-  useSidebar
+  useSidebar // Ensure useSidebar is imported if needed within AdminLayout directly
 } from '@/components/ui/sidebar';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -29,7 +29,8 @@ import { cn } from '@/lib/utils';
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
-  const sidebar = useSidebar(); // Get sidebar context
+  // sidebar context is implicitly available to Sidebar components via SidebarProvider wrapper in AppLayout
+  // No need to call useSidebar() here if it's only used by child Sidebar components.
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -54,9 +55,11 @@ function AdminLayout({ children }: { children: ReactNode }) {
       <Sidebar 
         side="left" 
         className="border-r hidden md:flex bg-card text-card-foreground w-[var(--sidebar-width)]"
+        // Collapsible features removed to make it always expanded on desktop
       >
         <SidebarHeader className="p-4 border-b flex justify-start items-center h-16">
           <Logo textSize="text-xl" />
+          {/* No collapse trigger here for always-expanded desktop sidebar */}
         </SidebarHeader>
         <SidebarContent className="flex flex-col">
           <ScrollArea className="flex-grow">
@@ -66,7 +69,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
                   <Link href={item.href} passHref legacyBehavior>
                     <SidebarMenuButton
                       asChild
-                      tooltip={item.label}
+                      tooltip={item.label} // Tooltip mainly for if it were collapsible to icon
                       className="w-full justify-start"
                       variant="ghost"
                     >
@@ -101,12 +104,11 @@ function AdminLayout({ children }: { children: ReactNode }) {
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
-          {/* ThemeToggle for mobile admin sidebar (Sheet) */}
-          {sidebar?.isMobile && (
-            <div className="p-2 mt-1">
-              <ThemeToggle />
-            </div>
-          )}
+          {/* ThemeToggle for mobile admin sidebar (Sheet) is handled within the Sheet content if needed */}
+          {/* For desktop, ThemeToggle is in the main header */}
+          <div className="p-2 mt-1 md:hidden"> {/* ThemeToggle specific for mobile sheet footer */}
+            <ThemeToggle />
+          </div>
           <div className="mt-2 p-2">
             <Button variant="outline" onClick={logout} className="w-full">
               <LogOutIcon className="mr-2 h-4 w-4" />
@@ -140,11 +142,11 @@ function AdminLayout({ children }: { children: ReactNode }) {
                 <Input placeholder="Search..." className="pl-8 h-9 w-[200px] lg:w-[250px] bg-background" />
               </div>
               {/* Mobile Search Icon Button for Admin */}
-              {sidebar?.isMobile && (
+              <div className="md:hidden">
                 <Button variant="ghost" size="icon" aria-label="Search">
                   <SearchIcon className="h-5 w-5" />
                 </Button>
-              )}
+              </div>
               {/* ThemeToggle: visible on desktop admin header */}
               <div className="hidden md:block">
                 <ThemeToggle />
@@ -152,10 +154,11 @@ function AdminLayout({ children }: { children: ReactNode }) {
             </div>
           </div>
         </header>
-        {/* SidebarInset handles the margin for the always-open desktop sidebar */}
         <SidebarInset> 
-          <main className="flex-grow p-4 md:p-6 lg:p-8">
-            {children}
+          <main className="flex flex-col flex-grow items-center p-4 md:p-6 lg:p-8 overflow-y-auto">
+            <div className="w-full max-w-7xl"> {/* Centered content with max-width */}
+              {children}
+            </div>
           </main>
         </SidebarInset>
       </div>
@@ -211,6 +214,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const isAdmin = role === 'Admin';
 
   if (isAdmin) {
+    // SidebarProvider defaultOpen={true} ensures the context is set for an initially open sidebar.
+    // The Sidebar component itself determines if it's a sheet (mobile) or fixed (desktop).
     return (
       <SidebarProvider defaultOpen={true}> 
         <AdminLayout>{children}</AdminLayout>
