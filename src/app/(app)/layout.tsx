@@ -20,7 +20,7 @@ import {
   SidebarMenuItem, 
   SidebarMenuButton,
   SidebarFooter,
-  useSidebar
+  // useSidebar // Not explicitly needed in AdminLayout if sidebar is always open on desktop
 } from '@/components/ui/sidebar';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -28,7 +28,6 @@ import { cn } from '@/lib/utils';
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
-  // sidebar context is implicitly available to Sidebar components via SidebarProvider wrapper in AppLayout
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -57,8 +56,8 @@ function AdminLayout({ children }: { children: ReactNode }) {
         <SidebarHeader className="p-4 border-b flex justify-start items-center h-16">
           <Logo textSize="text-xl" />
         </SidebarHeader>
-        <SidebarContent className="flex flex-col">
-          <ScrollArea className="flex-grow">
+        <SidebarContent> {/* Removed className="flex flex-col" as base component handles it */}
+          <ScrollArea className="h-full"> {/* Changed flex-grow to h-full */}
             <SidebarMenu className="p-2">
               {mainAdminNavItems.map((item) => (
                 <SidebarMenuItem key={item.label}>
@@ -100,7 +99,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
-          <div className="p-2 mt-1 md:hidden"> 
+          <div className="p-2 mt-1 md:hidden"> {/* ThemeToggle for mobile sidebar */}
             <ThemeToggle />
           </div>
           <div className="mt-2 p-2">
@@ -114,7 +113,8 @@ function AdminLayout({ children }: { children: ReactNode }) {
 
       <div className="flex flex-col flex-grow">
         <header className="sticky top-0 z-40 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-          <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+          {/* Modified inner div for full width content */}
+          <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2">
               {/* Mobile Sidebar Toggle - only for mobile */}
               <div className="md:hidden">
@@ -141,13 +141,12 @@ function AdminLayout({ children }: { children: ReactNode }) {
                   <SearchIcon className="h-5 w-5" />
                 </Button>
               </div>
-              <div className="hidden md:block">
+              <div className="hidden md:block"> {/* ThemeToggle for desktop header */}
                 <ThemeToggle />
               </div>
             </div>
           </div>
         </header>
-        {/* SidebarInset removed to remove left margin from main content */}
         <main className="flex flex-col flex-grow items-center p-4 md:p-6 lg:p-8 overflow-y-auto">
           <div className="w-full max-w-7xl"> 
             {children}
@@ -205,6 +204,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   const isAdmin = role === 'Admin';
 
+  // For Admin, SidebarProvider wraps AdminLayout.
+  // defaultOpen={true} makes sidebar expanded by default on desktop.
+  // On mobile, Sidebar component internally uses a Sheet controlled by SidebarProvider's context.
   if (isAdmin) {
     return (
       <SidebarProvider defaultOpen={true}> 
