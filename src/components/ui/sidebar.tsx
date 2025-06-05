@@ -202,7 +202,7 @@ const Sidebar = React.forwardRef<
   (
     {
       side = "left",
-      className, // User-provided classes from layout.tsx for desktop (e.g., border, width, height, sticky)
+      className, 
       children,
       ...props
     },
@@ -237,18 +237,17 @@ const Sidebar = React.forwardRef<
       );
     }
 
-    // Desktop sidebar
     return (
       <div
         ref={ref}
         data-sidebar="sidebar"
         data-mobile="false"
         className={cn(
-            "group peer hidden md:flex flex-col", // Core visibility & structure for desktop
-            "bg-sidebar text-sidebar-foreground", // Default theme from component
-            className // User-provided classes from layout.tsx (e.g., border, width, height, sticky)
+            "group peer hidden md:flex flex-col", 
+            "bg-sidebar text-sidebar-foreground", 
+            className 
         )}
-        data-state={"expanded"} // Desktop sidebar is always expanded in this design
+        data-state={"expanded"} 
         data-collapsible={"none"}
         data-variant={"sidebar"}
         data-side={side}
@@ -290,15 +289,13 @@ const SidebarTrigger = React.forwardRef<
     );
   }
 
-  // On desktop, this trigger is typically not used if the sidebar is always visible and expanded.
-  // Kept for potential future use or different desktop sidebar interaction models.
   return (
     <Button
       ref={ref}
       data-sidebar="trigger"
       variant="ghost"
       size="icon"
-      className={cn("h-8 w-8 hidden", className)} // Hidden by default on desktop
+      className={cn("h-8 w-8 hidden", className)} 
       onClick={(event) => {
         onClick?.(event);
         toggleSidebar();
@@ -563,14 +560,16 @@ const sidebarMenuButtonVariants = cva(
   }
 )
 
-const SidebarMenuButton = React.forwardRef<
-  HTMLButtonElement,
-  React.ComponentProps<"button"> & {
-    asChild?: boolean
-    isActive?: boolean
-    tooltip?: string | Omit<React.ComponentProps<typeof TooltipContent>, "children">
-  } & VariantProps<typeof sidebarMenuButtonVariants>
->(
+interface SidebarMenuButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof sidebarMenuButtonVariants> {
+  asChild?: boolean;
+  isActive?: boolean;
+  tooltip?: string | Omit<React.ComponentProps<typeof TooltipContent>, "children">;
+  isCollapsible?: boolean; 
+}
+
+const SidebarMenuButton = React.forwardRef<HTMLButtonElement, SidebarMenuButtonProps>(
   (
     {
       asChild = false,
@@ -578,9 +577,10 @@ const SidebarMenuButton = React.forwardRef<
       variant,
       size,
       tooltip,
+      isCollapsible, // Destructured: will not be passed in `...props`
       className,
       children,
-      ...props
+      ...props // `isCollapsible` is no longer in here
     },
     ref
   ) => {
@@ -605,12 +605,9 @@ const SidebarMenuButton = React.forwardRef<
       </Comp>
     )
 
-    if (!tooltip || !isMobile) { // Desktop: no tooltip by default, tooltip is for icon-only collapsed state usually
+    if (!tooltip || !isMobile) { 
       return buttonContent
     }
-     // Mobile: Tooltips are generally not used for bottom nav style items.
-     // If this button were part of a different mobile pattern (e.g., icon-only toolbar), tooltip might be useful.
-     // For now, if 'tooltip' prop is provided, we show it.
      if (isMobile && tooltip) {
         const tooltipContentProps = typeof tooltip === "string" ? { children: tooltip } : tooltip;
         return (
