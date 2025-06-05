@@ -20,15 +20,14 @@ import {
   SidebarMenuItem, 
   SidebarMenuButton,
   SidebarFooter,
-  // useSidebar // No longer needed at this top level of AdminLayout, but children can use it
+  useSidebar 
 } from '@/components/ui/sidebar';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
-  // const sidebar = useSidebar(); // Components inside AdminLayout can use useSidebar()
+  const sidebar = useSidebar(); // Get sidebar context for mobile/desktop specific rendering
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -58,7 +57,6 @@ function AdminLayout({ children }: { children: ReactNode }) {
           <Logo textSize="text-xl" iconSize={24} />
         </SidebarHeader>
         <SidebarContent> {/* Base component is flex-col, flex-1, overflow-auto */}
-          {/* Search input wrapper removed from here based on previous request */}
           <ScrollArea className="h-full"> {/* h-full makes ScrollArea fill SidebarContent */}
             <SidebarMenu className="p-2">
               {mainAdminNavItems.map((item) => (
@@ -151,7 +149,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
         </header>
         {/* Main content area, ensuring it scrolls independently and is centered */}
         <main className="flex flex-col flex-grow items-center p-4 md:p-6 lg:p-8 overflow-y-auto">
-          <div className="w-full max-w-7xl"> 
+          <div className="w-full"> 
             {children}
           </div>
         </main>
@@ -185,7 +183,6 @@ function NonAdminLayout({ children }: { children: ReactNode }) {
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, loading, role } = useAuth();
   const router = useRouter();
-  // const sidebar = useSidebar(); // REMOVED: Called before SidebarProvider
 
   useEffect(() => {
     if (!loading && !user) {
@@ -209,9 +206,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   if (isAdmin) {
     return (
-      // SidebarProvider should wrap any component that uses useSidebar or renders Sidebar/SidebarTrigger
-      // defaultOpen={true} because desktop admin sidebar is always open.
-      // The SidebarProvider itself handles mobile context.
       <SidebarProvider defaultOpen={true}> 
         <AdminLayout>{children}</AdminLayout>
       </SidebarProvider>
