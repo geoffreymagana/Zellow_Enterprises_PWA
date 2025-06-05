@@ -18,7 +18,7 @@ const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
 };
 
-export default function ProductsPage() {
+export default function GiftBoxesPage() { // Renamed component for clarity
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -37,6 +37,7 @@ export default function ProductsPage() {
     setIsLoadingProducts(true);
     setFetchError(null);
     try {
+      // This query fetches all products. If "Gift Boxes" are specific, this query needs adjustment.
       const productsQuery = query(collection(db, "products"), orderBy("createdAt", "desc"));
       const querySnapshot = await getDocs(productsQuery);
       const fetchedProducts: Product[] = [];
@@ -46,8 +47,8 @@ export default function ProductsPage() {
       setProducts(fetchedProducts);
     } catch (error: any) {
       console.error("Error fetching products:", error);
-      toast({ title: "Error Fetching Products", description: error.message || "Could not load products.", variant: "destructive" });
-      setFetchError("Could not load products. Please try again later.");
+      toast({ title: "Error Fetching Gift Boxes", description: error.message || "Could not load items.", variant: "destructive" });
+      setFetchError("Could not load gift boxes. Please try again later.");
     } finally {
       setIsLoadingProducts(false);
     }
@@ -67,7 +68,7 @@ export default function ProductsPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))] space-y-2">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="text-muted-foreground">Loading products...</p>
+        <p className="text-muted-foreground">Loading gift boxes...</p>
       </div>
     );
   }
@@ -76,7 +77,7 @@ export default function ProductsPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">
         <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
-        <p className="text-lg font-semibold">Failed to Load Products</p>
+        <p className="text-lg font-semibold">Failed to Load Gift Boxes</p>
         <p className="text-muted-foreground mb-4">{fetchError}</p>
         <Button onClick={fetchProducts}>Try Again</Button>
       </div>
@@ -86,9 +87,9 @@ export default function ProductsPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-headline font-semibold">Discover Our Products</h1>
+        <h1 className="text-3xl font-headline font-semibold">Discover Our Gift Boxes</h1>
         {role === 'Customer' && (
-          <Link href="/orders/cart" passHref>
+          <Link href="/orders/cart" passHref className="hidden sm:inline-flex"> {/* Hidden on small screens, shown sm and up */}
             <Button variant="outline">
               <ShoppingCart className="mr-2 h-4 w-4" /> View Cart (0) {/* TODO: Implement cart count */}
             </Button>
@@ -96,20 +97,20 @@ export default function ProductsPage() {
         )}
       </div>
       
-      <p className="text-muted-foreground">Browse our collection and find the perfect item.</p>
+      <p className="text-muted-foreground">Browse our curated gift boxes or build your own.</p>
 
       {products.length === 0 ? (
         <Card>
           <CardContent className="pt-10 pb-10 text-center">
             <ShoppingCart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <p className="text-xl font-semibold mb-2">No Products Available Yet</p>
+            <p className="text-xl font-semibold mb-2">No Gift Boxes Available Yet</p>
             <p className="text-muted-foreground">Check back soon for new arrivals!</p>
           </CardContent>
         </Card>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
           {products.map((product) => (
-            <Link key={product.id} href={`/products/${product.id}`} passHref>
+            <Link key={product.id} href={`/products/${product.id}`} passHref> {/* Path remains /products/... */}
               <Card className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group h-full">
                 <CardHeader className="p-0">
                     <div className="aspect-[4/3] relative w-full bg-muted overflow-hidden rounded-t-lg">

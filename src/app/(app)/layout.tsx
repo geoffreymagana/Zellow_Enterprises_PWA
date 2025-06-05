@@ -31,7 +31,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
-  const { searchTerm, setSearchTerm, isMobile: sidebarHookIsMobile, openMobile } = useSidebar()!; 
+  const { searchTerm, setSearchTerm } = useSidebar()!; 
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -41,7 +41,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
     { href: '/admin/customizations', label: 'Customizations', icon: Layers },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign },
     { href: '/admin/deliveries', label: 'Deliveries', icon: Truck },
-    // { href: '/admin/dispatch', label: 'Dispatch Center', icon: SlidersHorizontal }, // Removed as per request
+    { href: '/admin/dispatch', label: 'Dispatch Center', icon: Aperture }, // Changed icon for variety
     { href: '/admin/shipping', label: 'Shipping', icon: Ship },
     { href: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck },
     { href: '/admin/notifications', label: 'Notifications', icon: Bell },
@@ -60,12 +60,14 @@ function AdminLayout({ children }: { children: ReactNode }) {
 
       const labelMatches = item.label.toLowerCase().includes(searchTerm.toLowerCase());
       
-      if (item.subItems && item.subItems.length > 0) {
-        const filteredSubItems = item.subItems.filter(subItem =>
+      // If item has subItems, check them too
+      const subItems = (item as any).subItems; // Type assertion if subItems is not always present
+      if (subItems && subItems.length > 0) {
+        const filteredSubItems = subItems.filter((subItem: any) =>
           subItem.label.toLowerCase().includes(searchTerm.toLowerCase())
         );
         const isVisible = labelMatches || filteredSubItems.length > 0;
-        return { ...item, subItems: isVisible ? (labelMatches ? item.subItems : filteredSubItems) : [], isVisible };
+        return { ...item, subItems: isVisible ? (labelMatches ? subItems : filteredSubItems) : [], isVisible };
       }
       return { ...item, isVisible: labelMatches };
     })
@@ -89,32 +91,22 @@ function AdminLayout({ children }: { children: ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <ScrollArea className="h-full">
-             {(sidebarHookIsMobile && openMobile && !searchTerm) && ( 
-              <div className="p-2">
-                <Input
-                  type="search"
-                  placeholder="Search admin sections..."
-                  className="h-9 w-full"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            )}
             {filteredMainAdminNavItems.length > 0 ? (
               <SidebarMenu className="p-2">
-                {filteredMainAdminNavItems.map((item) => (
-                  item.subItems && item.subItems.length > 0 ? (
-                    <SidebarMenuItem key={item.label}>
+                {filteredMainAdminNavItems.map((item) => {
+                  const typedItem = item as any; // Use any for simplicity with subItems
+                  return typedItem.subItems && typedItem.subItems.length > 0 ? (
+                    <SidebarMenuItem key={typedItem.label}>
                        <SidebarMenuButton
                         isCollapsible={true}
                         className="w-full justify-start"
                         variant="ghost"
                       >
-                        <item.icon className="mr-2 h-4 w-4" />
-                        <span>{item.label}</span>
+                        <typedItem.icon className="mr-2 h-4 w-4" />
+                        <span>{typedItem.label}</span>
                       </SidebarMenuButton>
                       <SidebarMenuSub>
-                        {item.subItems.map(subItem => (
+                        {typedItem.subItems.map((subItem: any) => (
                            <SidebarMenuSubItem key={subItem.label}>
                             <Link href={subItem.href} passHref legacyBehavior>
                               <SidebarMenuSubButton>
@@ -127,23 +119,23 @@ function AdminLayout({ children }: { children: ReactNode }) {
                       </SidebarMenuSub>
                     </SidebarMenuItem>
                   ) : (
-                  <SidebarMenuItem key={item.label}>
-                    <Link href={item.href!} passHref legacyBehavior>
+                  <SidebarMenuItem key={typedItem.label}>
+                    <Link href={typedItem.href!} passHref legacyBehavior>
                       <SidebarMenuButton
                         asChild
-                        tooltip={item.label}
+                        tooltip={typedItem.label}
                         className="w-full justify-start"
                         variant="ghost"
                       >
                         <a>
-                          <item.icon className="mr-2 h-4 w-4" />
-                          <span>{item.label}</span>
+                          <typedItem.icon className="mr-2 h-4 w-4" />
+                          <span>{typedItem.label}</span>
                         </a>
                       </SidebarMenuButton>
                     </Link>
                   </SidebarMenuItem>
                   )
-                ))}
+                })}
               </SidebarMenu>
             ) : null}
              {searchTerm && filteredMainAdminNavItems.length === 0 && filteredFooterAdminNavItems.length === 0 && (
@@ -188,21 +180,21 @@ function AdminLayout({ children }: { children: ReactNode }) {
       <div className="flex flex-col flex-1 min-w-0"> 
         <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="w-full h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2"> {/* Left side of header */}
               <SidebarTrigger className="md:hidden" /> 
-               <h1 className="text-xl font-semibold font-headline hidden md:block">Admin Panel</h1>
+              <h1 className="text-xl font-semibold font-headline hidden md:block">Admin Panel</h1>
             </div>
-            <div className="flex items-center gap-2 sm:gap-4">
-               <div className="hidden md:block"> 
-                 <Input
+            <div className="flex flex-1 md:flex-none items-center gap-2 sm:gap-4 justify-end md:justify-normal"> {/* Right side of header */}
+              <div className="flex-grow max-w-xs sm:max-w-sm md:w-64 lg:w-96"> {/* Search input takes available space on mobile */}
+                <Input
                   type="search"
-                  placeholder="Search admin sections..."
-                  className="h-9 w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96"
+                  placeholder="Search sections..."
+                  className="h-9 w-full"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <div className="hidden md:block"> 
+              <div className="hidden md:block"> {/* Theme toggle hidden on mobile */}
                 <ThemeToggle />
               </div>
             </div>

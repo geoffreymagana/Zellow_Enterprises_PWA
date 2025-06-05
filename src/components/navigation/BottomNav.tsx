@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ShoppingCart, ListChecks, UserCircle, Package, Truck, FileText, DollarSign, Settings, Warehouse, Users, Layers, MapPin, SlidersHorizontal } from 'lucide-react';
+import { Home, ShoppingCart, ListChecks, UserCircle, Package, Truck, FileText, DollarSign, Settings, Warehouse, Users, Layers, MapPin, SlidersHorizontal, Gift } from 'lucide-react'; // Added Gift
 import { useAuth } from '@/hooks/useAuth';
 import type { UserRole } from '@/types';
 import { cn } from '@/lib/utils';
@@ -12,32 +12,32 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ElementType;
-  roles: UserRole[]; // Roles that can see this item. `null` can be included for "Not Assigned".
+  roles: UserRole[]; 
 }
 
 const allAppRoles: UserRole[] = ['Customer', 'Technician', 'Rider', 'Supplier', 'SupplyManager', 'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'];
 
 const navItems: NavItem[] = [
-  { href: '/dashboard', label: 'Home', icon: Home, roles: [...allAppRoles, 'Admin', null] }, // Accessible to all authenticated users
-  { href: '/products', label: 'Products', icon: Package, roles: ['Customer'] },
+  { href: '/dashboard', label: 'Home', icon: Home, roles: [...allAppRoles, 'Admin', null] }, 
+  { href: '/products', label: 'Gift Boxes', icon: Gift, roles: ['Customer'] }, // Changed label and icon
   { href: '/orders', label: 'Orders', icon: ShoppingCart, roles: ['Customer'] },
   { href: '/tasks', label: 'Tasks', icon: ListChecks, roles: ['Technician', 'ServiceManager'] },
-  { href: '/deliveries', label: 'My Deliveries', icon: Truck, roles: ['Rider'] }, // Rider specific deliveries view
-  { href: '/admin/dispatch', label: 'Dispatch', icon: SlidersHorizontal, roles: ['DispatchManager', 'Admin'] }, // Dispatch Center
+  { href: '/deliveries', label: 'My Deliveries', icon: Truck, roles: ['Rider'] }, 
+  { href: '/admin/dispatch', label: 'Dispatch', icon: SlidersHorizontal, roles: ['DispatchManager', 'Admin'] }, 
   { href: '/rider/map', label: 'Route Map', icon: MapPin, roles: ['Rider'] },
   { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['Supplier', 'FinanceManager'] },
   { href: '/payments', label: 'Payments', icon: DollarSign, roles: ['FinanceManager'] },
   { href: '/inventory', label: 'Inventory', icon: Warehouse, roles: ['InventoryManager', 'SupplyManager'] },
   { href: '/suppliers', label: 'Suppliers', icon: Users, roles: ['SupplyManager'] },
   { href: '/services', label: 'Services', icon: Layers, roles: ['ServiceManager'] },
-  { href: '/profile', label: 'Profile', icon: UserCircle, roles: [...allAppRoles, 'Admin', null] }, // Accessible to all authenticated users
+  { href: '/profile', label: 'Profile', icon: UserCircle, roles: [...allAppRoles, 'Admin', null] }, 
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
   const { role, user } = useAuth();
 
-  if (!user || role === 'Admin') return null; // Don't show for Admin (uses sidebar) or if not logged in
+  if (!user || role === 'Admin') return null; 
 
   const filteredNavItems = navItems.filter(item => item.roles.includes(role));
   

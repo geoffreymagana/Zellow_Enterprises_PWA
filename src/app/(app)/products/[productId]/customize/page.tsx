@@ -40,7 +40,6 @@ export default function CustomizeProductPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentPrice, setCurrentPrice] = useState<number>(0);
 
-  // Dynamically build Zod schema based on product customization options
   const [customizationSchema, setCustomizationSchema] = useState<z.ZodObject<any> | null>(null);
   
   const form = useForm<Record<string, any>>({
@@ -63,9 +62,7 @@ export default function CustomizeProductPage() {
           calculatedPrice += choice.priceAdjustment;
         }
       }
-      // Add logic for other types if they affect price (e.g., checkbox for gift wrap)
       if (opt.type === 'checkbox' && selectedValue === true && opt.choices?.[0]?.priceAdjustment) {
-        // Assuming checkbox might have a single "choice" for its price impact
         calculatedPrice += opt.choices[0].priceAdjustment;
       }
     });
@@ -75,14 +72,14 @@ export default function CustomizeProductPage() {
 
   const fetchProductAndBuildSchema = useCallback(async () => {
     if (!productId || !db) {
-      setError("Invalid product ID or database unavailable.");
+      setError("Invalid item ID or database unavailable.");
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
     setError(null);
     try {
-      const productDocRef = doc(db, 'products', productId);
+      const productDocRef = doc(db, 'products', productId); // Path remains 'products'
       const productDoc = await getDoc(productDocRef);
 
       if (productDoc.exists()) {
@@ -120,22 +117,22 @@ export default function CustomizeProductPage() {
             shape[opt.id] = fieldSchema;
           });
           setCustomizationSchema(z.object(shape));
-          form.reset(defaultValues); // Reset form with defaults after schema is ready
+          form.reset(defaultValues);
         } else {
-          setCustomizationSchema(z.object({})); // Empty schema if no options
+          setCustomizationSchema(z.object({}));
         }
       } else {
-        setError("Product not found.");
-        toast({ title: "Not Found", description: "The product you're looking for doesn't exist.", variant: "destructive" });
+        setError("Item not found.");
+        toast({ title: "Not Found", description: "The item you're looking for doesn't exist.", variant: "destructive" });
       }
     } catch (e: any) {
-      console.error("Error fetching product:", e);
-      setError("Failed to load product details. Please try again.");
-      toast({ title: "Error", description: e.message || "Could not load product details.", variant: "destructive" });
+      console.error("Error fetching item:", e);
+      setError("Failed to load item details. Please try again.");
+      toast({ title: "Error", description: e.message || "Could not load item details.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
-  }, [productId, toast, form]); // form added as dependency
+  }, [productId, toast, form]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -146,12 +143,11 @@ export default function CustomizeProductPage() {
     if (productId) {
       fetchProductAndBuildSchema();
     } else {
-      setError("No product ID provided.");
+      setError("No item ID provided.");
       setIsLoading(false);
     }
   }, [authLoading, user, productId, router, fetchProductAndBuildSchema]);
 
-  // Recalculate price when form values change
   useEffect(() => {
     if (product) {
         const subscription = form.watch((value, { name, type }) => {
@@ -164,8 +160,6 @@ export default function CustomizeProductPage() {
 
   const onSubmit: SubmitHandler<Record<string, any>> = async (data) => {
     setIsSubmitting(true);
-    // This is where you'd typically add the customized product to the cart.
-    // For now, we'll just log the data.
     console.log("Customizations submitted:", data);
     console.log("Final Price:", currentPrice);
     toast({
@@ -173,7 +167,6 @@ export default function CustomizeProductPage() {
       description: `Selected options: ${JSON.stringify(data)}. Final Price: ${formatPrice(currentPrice)}. Cart functionality to be implemented.`,
       duration: 5000,
     });
-    // Example: await addToCart(productId, data, currentPrice);
     setIsSubmitting(false);
   };
 
@@ -192,15 +185,15 @@ export default function CustomizeProductPage() {
         <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
         <h2 className="text-xl font-semibold mb-2">Error</h2>
         <p className="text-muted-foreground mb-4">{error}</p>
-        <Button onClick={() => router.push(`/products/${productId}`)} variant="outline">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Product
+        <Button onClick={() => router.push(`/products/${productId}`)} variant="outline"> {/* Path remains /products/... */}
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Item Details
         </Button>
       </div>
     );
   }
 
   if (!product) {
-    return ( /* Should be caught by error state, but as a fallback */ );
+    return ( <></> );
   }
   
   if (!product.customizationOptions || product.customizationOptions.length === 0) {
@@ -208,9 +201,9 @@ export default function CustomizeProductPage() {
       <div className="container mx-auto px-4 py-8 text-center">
         <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4 mx-auto" />
         <h2 className="text-xl font-semibold mb-2">No Customizations Available</h2>
-        <p className="text-muted-foreground mb-4">This product does not have any customization options.</p>
-        <Button onClick={() => router.push(`/products/${productId}`)} variant="outline" className="mr-2">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Product
+        <p className="text-muted-foreground mb-4">This item does not have any customization options.</p>
+        <Button onClick={() => router.push(`/products/${productId}`)} variant="outline" className="mr-2"> {/* Path remains /products/... */}
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Item Details
         </Button>
         <Button size="lg" disabled={product.stock === 0}>
             <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
@@ -221,8 +214,8 @@ export default function CustomizeProductPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <Button onClick={() => router.push(`/products/${productId}`)} variant="outline" size="sm" className="mb-6">
-        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Product Details
+      <Button onClick={() => router.push(`/products/${productId}`)} variant="outline" size="sm" className="mb-6"> {/* Path remains /products/... */}
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Item Details
       </Button>
 
       <Card className="overflow-hidden">
@@ -307,7 +300,7 @@ export default function CustomizeProductPage() {
                         Current Price: {formatPrice(currentPrice)}
                     </div>
                     {product.stock === 0 && (
-                         <p className="text-destructive text-center font-semibold">This product is currently out of stock.</p>
+                         <p className="text-destructive text-center font-semibold">This item is currently out of stock.</p>
                     )}
                   <Button type="submit" size="lg" className="w-full" disabled={isSubmitting || product.stock === 0}>
                     {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ShoppingCart className="mr-2 h-5 w-5" /> }
@@ -325,4 +318,3 @@ export default function CustomizeProductPage() {
     </div>
   );
 }
-

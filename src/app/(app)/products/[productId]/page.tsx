@@ -45,13 +45,13 @@ export default function ProductDetailsPage() {
       if (productDoc.exists()) {
         setProduct({ id: productDoc.id, ...productDoc.data() } as Product);
       } else {
-        setError("Product not found.");
-        toast({ title: "Not Found", description: "The product you're looking for doesn't exist.", variant: "destructive" });
+        setError("Item not found."); // Changed from Product to Item
+        toast({ title: "Not Found", description: "The item you're looking for doesn't exist.", variant: "destructive" });
       }
     } catch (e: any) {
-      console.error("Error fetching product:", e);
-      setError("Failed to load product details. Please try again.");
-      toast({ title: "Error", description: e.message || "Could not load product details.", variant: "destructive" });
+      console.error("Error fetching item:", e);
+      setError("Failed to load item details. Please try again.");
+      toast({ title: "Error", description: e.message || "Could not load item details.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -66,7 +66,7 @@ export default function ProductDetailsPage() {
     if (productId) {
       fetchProduct();
     } else {
-      setError("No product ID provided.");
+      setError("No item ID provided.");
       setIsLoading(false);
     }
   }, [authLoading, user, productId, router, fetchProduct]);
@@ -75,7 +75,7 @@ export default function ProductDetailsPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-2 text-muted-foreground">Loading product details...</p>
+        <p className="mt-2 text-muted-foreground">Loading item details...</p>
       </div>
     );
   }
@@ -84,7 +84,7 @@ export default function ProductDetailsPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))] text-center p-4">
         <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Error Loading Product</h2>
+        <h2 className="text-xl font-semibold mb-2">Error Loading Item</h2>
         <p className="text-muted-foreground mb-4">{error}</p>
         <Button onClick={() => router.back()} variant="outline">
             <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
@@ -97,10 +97,10 @@ export default function ProductDetailsPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))] text-center p-4">
         <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Product Not Found</h2>
-        <p className="text-muted-foreground mb-4">The product you are looking for could not be found.</p>
-        <Button onClick={() => router.push('/products')} variant="outline">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Products
+        <h2 className="text-xl font-semibold mb-2">Item Not Found</h2>
+        <p className="text-muted-foreground mb-4">The item you are looking for could not be found.</p>
+        <Button onClick={() => router.push('/products')} variant="outline"> {/* Path remains /products */}
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Gift Boxes 
         </Button>
       </div>
     );
@@ -110,8 +110,8 @@ export default function ProductDetailsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <Button onClick={() => router.back()} variant="outline" size="sm" className="mb-6">
-        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Products
+      <Button onClick={() => router.push('/products')} variant="outline" size="sm" className="mb-6"> {/* Path remains /products */}
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Gift Boxes
       </Button>
       <Card className="overflow-hidden">
         <div className="md:flex">
@@ -147,7 +147,7 @@ export default function ProductDetailsPage() {
             </CardContent>
             <CardFooter className="p-0 mt-6 pt-6 border-t flex flex-col sm:flex-row gap-3">
               {hasCustomizations ? (
-                <Link href={`/products/${product.id}/customize`} passHref className="w-full sm:w-auto">
+                <Link href={`/products/${product.id}/customize`} passHref className="w-full sm:w-auto"> {/* Path remains /products/.../customize */}
                   <Button size="lg" variant="outline" className="w-full" disabled={product.stock === 0}>
                     <Settings className="mr-2 h-5 w-5" /> Customize Item
                   </Button>
