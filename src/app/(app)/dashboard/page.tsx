@@ -8,7 +8,7 @@ import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon,
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState, useCallback } from 'react';
-import { collection, getDocs, query, where, onSnapshot, Unsubscribe,getCountFromServer } from 'firebase/firestore';
+import { collection, getDocs, query, where, onSnapshot, Unsubscribe, getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User, Order, OrderStatus } from '@/types';
 
@@ -34,8 +34,17 @@ const DashboardItem = ({ title, value, icon: Icon, link, description, isLoadingV
 
 export default function DashboardPage() {
   const { user, role, loading: authLoading } = useAuth();
+  
+  // General Admin stats
   const [activeUserCount, setActiveUserCount] = useState<number | string>("...");
   const [isLoadingUserCount, setIsLoadingUserCount] = useState(true);
+  const [totalProductCount, setTotalProductCount] = useState<number | string>("...");
+  const [isLoadingProductCount, setIsLoadingProductCount] = useState(true);
+  const [totalOrderCount, setTotalOrderCount] = useState<number | string>("...");
+  const [isLoadingOrderCount, setIsLoadingOrderCount] = useState(true);
+  const [activeDeliveriesCountAdmin, setActiveDeliveriesCountAdmin] = useState<number | string>("...");
+  const [isLoadingActiveDeliveriesAdmin, setIsLoadingActiveDeliveriesAdmin] = useState(true);
+
 
   // Dispatch Manager specific state
   const [activeRidersCount, setActiveRidersCount] = useState<number | string>("...");
@@ -51,6 +60,10 @@ export default function DashboardPage() {
     if (!authLoading && db) {
       if (role === 'Admin') {
         setIsLoadingUserCount(true);
+        setIsLoadingProductCount(true);
+        setIsLoadingOrderCount(true);
+        setIsLoadingActiveDeliveriesAdmin(true);
+
         const usersCol = collection(db, 'users');
         const qAdminUsers = query(usersCol, where("disabled", "==", false));
         const unsubAdminUsers = onSnapshot(qAdminUsers, (snapshot) => {
@@ -62,11 +75,49 @@ export default function DashboardPage() {
           setIsLoadingUserCount(false);
         });
         unsubscribers.push(unsubAdminUsers);
+
+        const productsCol = collection(db, 'products'); // Assuming 'products' collection
+        const unsubProducts = onSnapshot(productsCol, (snapshot) => {
+            setTotalProductCount(snapshot.size);
+            setIsLoadingProductCount(false);
+        }, (error) => {
+            console.error("Error fetching product count:", error);
+            setTotalProductCount("Error");
+            setIsLoadingProductCount(false);
+        });
+        unsubscribers.push(unsubProducts);
+
+        const ordersColAdmin = collection(db, 'orders');
+        const unsubOrders = onSnapshot(ordersColAdmin, (snapshot) => {
+            setTotalOrderCount(snapshot.size);
+            setIsLoadingOrderCount(false);
+        }, (error) => {
+            console.error("Error fetching total order count:", error);
+            setTotalOrderCount("Error");
+            setIsLoadingOrderCount(false);
+        });
+        unsubscribers.push(unsubOrders);
+        
+        const activeDeliveryStatusesAdmin: OrderStatus[] = ['assigned', 'out_for_delivery', 'delivery_attempted'];
+        const qActiveDeliveriesAdmin = query(ordersColAdmin, where("status", "in", activeDeliveryStatusesAdmin));
+        const unsubActiveDeliveriesAdmin = onSnapshot(qActiveDeliveriesAdmin, (snapshot) => {
+            setActiveDeliveriesCountAdmin(snapshot.size);
+            setIsLoadingActiveDeliveriesAdmin(false);
+        }, (error) => {
+            console.error("Error fetching active deliveries for admin:", error);
+            setActiveDeliveriesCountAdmin("Error");
+            setIsLoadingActiveDeliveriesAdmin(false);
+        });
+        unsubscribers.push(unsubActiveDeliveriesAdmin);
+
       } else {
         setIsLoadingUserCount(false);
+        setIsLoadingProductCount(false);
+        setIsLoadingOrderCount(false);
+        setIsLoadingActiveDeliveriesAdmin(false);
       }
 
-      if (role === 'DispatchManager' || role === 'Admin') { // Admin might also want to see these stats for their own dashboard, Dispatch Manager for theirs
+      if (role === 'DispatchManager' || role === 'Admin') {
         setIsLoadingActiveRiders(true);
         setIsLoadingOrdersAwaiting(true);
         setIsLoadingOngoingDeliveries(true);
@@ -83,8 +134,8 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubRiders);
 
-        const ordersCol = collection(db, 'orders');
-        const qAwaiting = query(ordersCol, where("status", "==", "awaiting_assignment"));
+        const ordersColDispatch = collection(db, 'orders');
+        const qAwaiting = query(ordersColDispatch, where("status", "==", "awaiting_assignment"));
         const unsubAwaiting = onSnapshot(qAwaiting, (snapshot) => {
           setOrdersAwaitingDispatch(snapshot.size);
           setIsLoadingOrdersAwaiting(false);
@@ -96,7 +147,7 @@ export default function DashboardPage() {
         unsubscribers.push(unsubAwaiting);
         
         const qOngoingStatuses: OrderStatus[] = ['assigned', 'out_for_delivery'];
-        const qOngoingDeliveries = query(ordersCol, where("status", "in", qOngoingStatuses));
+        const qOngoingDeliveries = query(ordersColDispatch, where("status", "in", qOngoingStatuses));
         const unsubOngoing = onSnapshot(qOngoingDeliveries, (snapshot) => {
             setOngoingDeliveries(snapshot.size);
             setIsLoadingOngoingDeliveries(false);
@@ -114,7 +165,7 @@ export default function DashboardPage() {
       }
     }
     return () => unsubscribers.forEach(unsub => unsub());
-  }, [authLoading, role]);
+  }, [authLoading, role, db]);
 
 
   if (authLoading || !user) {
@@ -142,15 +193,15 @@ export default function DashboardPage() {
       case 'Admin':
         return (
           <>
-            <DashboardItem title="Active Users" value={activeUserCount} icon={UserCog} link="/admin/users" description="Manage active users and roles." isLoadingValue={isLoadingUserCount} />
-            <DashboardItem title="Product Catalog" value={"View"} icon={Package} link="/admin/products" description="Manage all products." />
-            <DashboardItem title="Order Processing" value={"View"} icon={ShoppingCart} link="/admin/orders" description="Oversee all customer orders." />
+            <DashboardItem title="Active Users" value={activeUserCount} icon={UserCog} link="/admin/users" description="Manage all active users." isLoadingValue={isLoadingUserCount} />
+            <DashboardItem title="Total Products" value={totalProductCount} icon={Package} link="/admin/products" description="Manage product catalog." isLoadingValue={isLoadingProductCount} />
+            <DashboardItem title="Total Orders" value={totalOrderCount} icon={ShoppingCart} link="/admin/orders" description="Oversee all customer orders." isLoadingValue={isLoadingOrderCount} />
+            <DashboardItem title="Active Deliveries" value={activeDeliveriesCountAdmin} icon={Truck} link="/admin/deliveries" description="Track ongoing deliveries." isLoadingValue={isLoadingActiveDeliveriesAdmin} />
             <DashboardItem title="Payment Records" value={"View"} icon={DollarSign} link="/admin/payments" description="View financial transactions." />
-            <DashboardItem title="Delivery Logistics" value={"View"} icon={Truck} link="/admin/deliveries" description="Track and manage deliveries." />
             <DashboardItem title="Service Approvals" value={"View"} icon={ClipboardCheck} link="/admin/approvals" description="Review pending requests." />
             <DashboardItem title="System Reports" value={"View"} icon={FileArchive} link="/admin/reports" description="Generate and view reports." />
             <DashboardItem title="Customization Hub" value={"View"} icon={Layers} link="/admin/customizations" description="Manage customization options." />
-             <DashboardItem title="Shipping Config" value={"Manage"} icon={Ship} link="/admin/shipping" description="Configure shipping options." />
+            <DashboardItem title="Shipping Config" value={"Manage"} icon={Ship} link="/admin/shipping" description="Configure shipping options." />
             <DashboardItem title="Notifications" value={"Check"} icon={Bell} link="/admin/notifications" description="View system notifications." />
             <DashboardItem title="System Settings" value={"Configure"} icon={Settings} link="/admin/settings" description="Configure application settings." />
           </>
@@ -165,28 +216,31 @@ export default function DashboardPage() {
           </>
         );
       case 'Customer':
+        // Placeholder: Replace with actual data fetching for customer orders/wishlist if needed
         return (
           <>
-            <DashboardItem title="Active Orders" value={3} icon={ShoppingCart} link="/orders" />
-            <DashboardItem title="Wishlist Items" value={12} icon={Package} link="/products" />
-            <DashboardItem title="Browse Services" value={5} icon={Layers} link="/services" />
-            <DashboardItem title="Gift Customizations" value={2} icon={UsersIcon} link="/customizations/gift" />
+            <DashboardItem title="Active Orders" value={0} icon={ShoppingCart} link="/orders" isLoadingValue={false} description="Your current orders." />
+            <DashboardItem title="Wishlist Items" value={0} icon={Package} link="/products" isLoadingValue={false} description="Items you love."/>
+            <DashboardItem title="Browse Services" value={"Explore"} icon={Layers} link="/services" description="Discover our services."/>
+            <DashboardItem title="Gift Customizations" value={"Create"} icon={UsersIcon} link="/customizations/gift" description="Personalize a gift."/>
           </>
         );
       case 'Technician':
+         // Placeholder: Replace with actual data fetching for technician tasks
         return (
           <>
-            <DashboardItem title="Assigned Tasks" value={7} icon={Wrench} link="/tasks" />
-            <DashboardItem title="Pending Approvals" value={2} icon={AlertTriangle} />
-            <DashboardItem title="Completed Today" value={4} icon={Wrench} />
+            <DashboardItem title="Assigned Tasks" value={0} icon={Wrench} link="/tasks" isLoadingValue={false} description="Your current workload."/>
+            <DashboardItem title="Pending Approvals" value={0} icon={AlertTriangle} isLoadingValue={false} description="Items needing review."/>
+            <DashboardItem title="Completed Today" value={0} icon={Wrench} isLoadingValue={false} description="Tasks finished today."/>
           </>
         );
        case 'Rider':
+        // Placeholder: Replace with actual data fetching for rider deliveries
         return (
           <>
-            <DashboardItem title="Active Deliveries" value={5} icon={Truck} link="/deliveries" />
-            <DashboardItem title="Completed Today" value={11} icon={Truck} />
-            <DashboardItem title="View Route Map" value={"Open"} icon={MapIcon} link="/rider/map" />
+            <DashboardItem title="Active Deliveries" value={0} icon={Truck} link="/deliveries" isLoadingValue={false} description="Your current deliveries."/>
+            <DashboardItem title="Completed Today" value={0} icon={Truck} isLoadingValue={false} description="Deliveries made today."/>
+            <DashboardItem title="View Route Map" value={"Open"} icon={MapIcon} link="/rider/map" description="See your route."/>
           </>
         );
       default:
@@ -215,7 +269,7 @@ export default function DashboardPage() {
           <AlertTriangle className="h-4 w-4 mr-2 text-primary" />
           <AlertTitle className="text-primary">Admin Panel Active</AlertTitle>
           <AlertDescription className="text-primary/90">
-            You have administrative privileges. Manage system data and operations from here. Some data is live, some is placeholder.
+            You have administrative privileges. Manage system data and operations from here. Key metrics are updated in real-time.
           </AlertDescription>
         </Alert>
       )}
@@ -233,7 +287,7 @@ export default function DashboardPage() {
           <ShoppingCart className="h-4 w-4 mr-2" />
           <AlertTitle>Welcome to Zellow Enterprises!</AlertTitle>
           <AlertDescription>
-            Browse products, manage your orders, and customize items. Placeholder values are currently shown.
+            Browse products, manage your orders, and customize items. Some data is placeholder.
           </AlertDescription>
         </Alert>
       )}
@@ -262,6 +316,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-
-    
