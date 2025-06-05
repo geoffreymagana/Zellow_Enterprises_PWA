@@ -90,12 +90,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               </div>
             </SidebarHeader>
             <SidebarContent className="flex flex-col"> {/* Ensures content can grow and push footer */}
-              <div className="p-2">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input placeholder="Search..." className="pl-8 h-9 w-full" />
-                </div>
-              </div>
+              {/* Search bar removed from here */}
               <ScrollArea className="flex-grow">
                 <SidebarMenu className="p-2">
                   {mainAdminNavItems.map((item) => (
@@ -150,23 +145,29 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           <div className="flex flex-col flex-grow">
             <header className="sticky top-0 z-40 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
               <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-                {/* Mobile Sidebar Toggle */}
-                <div className="md:hidden">
-                   <SidebarTrigger />
-                </div>
-                {/* Desktop: Show trigger to expand if sidebar is collapsed to icon mode */}
-                <div className="hidden md:block">
-                  <div className="group-data-[state=collapsed]:block hidden">
-                     <SidebarTrigger />
+                <div className="flex items-center gap-2">
+                  {/* Mobile Sidebar Toggle */}
+                  <div className="md:hidden">
+                    <SidebarTrigger />
+                  </div>
+                  {/* Desktop: Show trigger to expand if sidebar is collapsed to icon mode, BEFORE title */}
+                  <div className="hidden md:block">
+                    <div className="group-data-[state=collapsed]:block hidden">
+                      <SidebarTrigger />
+                    </div>
+                  </div>
+                  <div className="text-left"> {/* Title now explicitly to the left */}
+                    <span className="font-headline text-xl font-bold text-foreground">
+                      Zellow Enterprises - Admin
+                    </span>
                   </div>
                 </div>
                 
-                <div className="flex-1 text-center md:text-left pl-0 md:pl-2"> {/* Adjust padding */}
-                  <span className="font-headline text-xl font-bold text-foreground">
-                    Zellow Enterprises - Admin
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="relative hidden md:block">
+                    <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input placeholder="Search..." className="pl-8 h-9 w-[200px] lg:w-[250px] bg-background" />
+                  </div>
                   <ThemeToggle />
                   <Button variant="ghost" size="icon" onClick={logout} className="md:hidden">
                      <LogOutIcon className="h-5 w-5" />
@@ -209,5 +210,4 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
-
     

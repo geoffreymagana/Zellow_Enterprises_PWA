@@ -57,40 +57,40 @@ export default function DashboardPage() {
       case 'Admin':
         return (
           <>
-            <DashboardItem title="User Management" value="N/A" icon={UserCog} link="/admin/users" description="Add, edit, delete users and roles." />
-            <DashboardItem title="Product Catalog" value="N/A" icon={Package} link="/admin/products" description="Manage all products." />
-            <DashboardItem title="Order Processing" value="N/A" icon={ShoppingCart} link="/admin/orders" description="Oversee all customer orders." />
-            <DashboardItem title="Payment Records" value="N/A" icon={DollarSign} link="/admin/payments" description="View financial transactions." />
-            <DashboardItem title="Delivery Logistics" value="N/A" icon={Truck} link="/admin/deliveries" description="Track and manage deliveries." />
-            <DashboardItem title="Service Approvals" value="N/A" icon={ClipboardCheck} link="/admin/approvals" description="Review pending requests." />
-            <DashboardItem title="System Reports" value="N/A" icon={FileArchive} link="/admin/reports" description="Generate and view reports." />
-            <DashboardItem title="Customization Hub" value="N/A" icon={Layers} link="/admin/customizations" description="Manage customization options." />
-            <DashboardItem title="System Settings" value="N/A" icon={Settings} link="/admin/settings" description="Configure application settings." />
+            <DashboardItem title="User Management" value={124} icon={UserCog} link="/admin/users" description="Add, edit, delete users and roles." />
+            <DashboardItem title="Product Catalog" value={87} icon={Package} link="/admin/products" description="Manage all products." />
+            <DashboardItem title="Order Processing" value={256} icon={ShoppingCart} link="/admin/orders" description="Oversee all customer orders." />
+            <DashboardItem title="Payment Records" value={103} icon={DollarSign} link="/admin/payments" description="View financial transactions." />
+            <DashboardItem title="Delivery Logistics" value={42} icon={Truck} link="/admin/deliveries" description="Track and manage deliveries." />
+            <DashboardItem title="Service Approvals" value={12} icon={ClipboardCheck} link="/admin/approvals" description="Review pending requests." />
+            <DashboardItem title="System Reports" value={35} icon={FileArchive} link="/admin/reports" description="Generate and view reports." />
+            <DashboardItem title="Customization Hub" value={8} icon={Layers} link="/admin/customizations" description="Manage customization options." />
+            <DashboardItem title="System Settings" value={"Online"} icon={Settings} link="/admin/settings" description="Configure application settings." />
           </>
         );
       case 'Customer':
         return (
           <>
-            <DashboardItem title="Active Orders" value={"N/A"} icon={ShoppingCart} link="/orders" />
-            <DashboardItem title="Wishlist Items" value={"N/A"} icon={Package} link="/products" />
-            <DashboardItem title="Browse Services" value={"N/A"} icon={Layers} link="/services" />
-            <DashboardItem title="Gift Customizations" value={"N/A"} icon={UsersIcon} link="/customizations/gift" />
+            <DashboardItem title="Active Orders" value={3} icon={ShoppingCart} link="/orders" />
+            <DashboardItem title="Wishlist Items" value={12} icon={Package} link="/products" />
+            <DashboardItem title="Browse Services" value={5} icon={Layers} link="/services" />
+            <DashboardItem title="Gift Customizations" value={2} icon={UsersIcon} link="/customizations/gift" />
           </>
         );
       case 'Technician':
         return (
           <>
-            <DashboardItem title="Assigned Tasks" value={"N/A"} icon={Wrench} link="/tasks" />
-            <DashboardItem title="Pending Approvals" value={"N/A"} icon={AlertTriangle} />
-            <DashboardItem title="Completed Today" value={"N/A"} icon={Wrench} />
+            <DashboardItem title="Assigned Tasks" value={7} icon={Wrench} link="/tasks" />
+            <DashboardItem title="Pending Approvals" value={2} icon={AlertTriangle} />
+            <DashboardItem title="Completed Today" value={4} icon={Wrench} />
           </>
         );
        case 'Rider':
         return (
           <>
-            <DashboardItem title="Active Deliveries" value={"N/A"} icon={Truck} link="/deliveries" />
-            <DashboardItem title="Completed Today" value={"N/A"} icon={Truck} />
-            <DashboardItem title="Next Delivery Area" value="N/A" icon={Truck} />
+            <DashboardItem title="Active Deliveries" value={5} icon={Truck} link="/deliveries" />
+            <DashboardItem title="Completed Today" value={11} icon={Truck} />
+            <DashboardItem title="Next Delivery Area" value={"North Zone"} icon={Truck} />
           </>
         );
       default:
@@ -138,20 +138,7 @@ export default function DashboardPage() {
         {getRoleSpecificItems()}
       </div>
 
-      {role === 'Admin' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Admin Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-                <Link href="/admin/users"><Button><UserCog className="mr-2 h-4 w-4" /> Manage Users</Button></Link>
-                <Link href="/admin/products"><Button variant="outline"><Package className="mr-2 h-4 w-4" /> Manage Products</Button></Link>
-                <Link href="/admin/orders"><Button><ShoppingCart className="mr-2 h-4 w-4" /> Manage Orders</Button></Link>
-                <Link href="/admin/reports"><Button variant="outline"><FileArchive className="mr-2 h-4 w-4" /> View Reports</Button></Link>
-                <Link href="/admin/settings"><Button><Settings className="mr-2 h-4 w-4" /> System Settings</Button></Link>
-          </CardContent>
-        </Card>
-      )}
+      {/* Admin Quick Actions Card removed */}
 
       {role !== 'Admin' && (
         <Card>
@@ -170,3 +157,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
