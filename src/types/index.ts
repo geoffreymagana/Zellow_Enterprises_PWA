@@ -16,10 +16,12 @@ export interface User {
   uid: string;
   email: string | null;
   displayName?: string | null;
-  firstName?: string | null; // Added for more structured name data
-  lastName?: string | null;  // Added for more structured name data
+  firstName?: string | null; 
+  lastName?: string | null;  
   photoURL?: string | null;
   role: UserRole;
+  disabled?: boolean; // Added for account status
+  createdAt?: any; // Keep serverTimestamp type flexible for Firestore
 }
 
 export interface Product {
@@ -43,9 +45,9 @@ export interface Order {
 }
 
 export interface Task {
-  id: string;
+  id:string;
   assigneeId: string; 
-  type: 'engraving' | 'printing' | 'delivery' | string; // string for flexibility
+  type: 'engraving' | 'printing' | 'delivery' | string; 
   description: string;
   orderId?: string;
   status: 'pending' | 'in-progress' | 'completed' | 'needs_approval';

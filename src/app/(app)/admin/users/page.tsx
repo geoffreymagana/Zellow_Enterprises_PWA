@@ -13,13 +13,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Users as UsersIcon, PlusCircle, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Users as UsersIcon, PlusCircle, Edit, Trash2, Eye, EyeOff, UserCheck, UserX } from 'lucide-react';
 import type { User, UserRole } from '@/types';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { Badge } from "@/components/ui/badge";
 
-import { createUserWithEmailAndPassword, updateProfile as updateAuthProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile as updateAuthProfile, signOut as firebaseSignOut } from 'firebase/auth';
 import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
@@ -37,6 +38,7 @@ type CreateUserFormValues = z.infer<typeof createUserFormSchema>;
 
 const editUserFormSchema = z.object({
   role: z.enum([...employeeRoles, 'Admin', 'Customer'] as [string, ...string[]], { required_error: "Role is required" }), 
+  disabled: z.boolean().optional(),
 });
 type EditUserFormValues = z.infer<typeof editUserFormSchema>;
 
@@ -109,21 +111,36 @@ export default function AdminUsersPage() {
     }
     setIsLoading(true);
     const { firstName, lastName, role } = values;
-    let email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}@admin.com`;
+    let email = `${firstName.toLowerCase().replace(/\s+/g, '')}.${lastName.toLowerCase().replace(/\s+/g, '')}@admin.com`;
     let emailIsTaken = await checkEmailExists(email);
 
     if (emailIsTaken) {
-      email = `${lastName.toLowerCase()}.${firstName.toLowerCase()}@admin.com`;
+      email = `${lastName.toLowerCase().replace(/\s+/g, '')}.${firstName.toLowerCase().replace(/\s+/g, '')}@admin.com`;
       emailIsTaken = await checkEmailExists(email);
       if (emailIsTaken) {
-        toast({ title: "Error", description: "Generated email already exists. Try different names or manual creation.", variant: "destructive" });
-        setIsLoading(false);
-        return;
+        // Try adding a number if both are taken
+        let attempt = 1;
+        const baseEmailPartOne = `${firstName.toLowerCase().replace(/\s+/g, '')}.${lastName.toLowerCase().replace(/\s+/g, '')}`;
+        do {
+            email = `${baseEmailPartOne}${attempt}@admin.com`;
+            emailIsTaken = await checkEmailExists(email);
+            attempt++;
+        } while (emailIsTaken && attempt < 10); // Limit attempts to prevent infinite loop
+
+        if (emailIsTaken) {
+            toast({ title: "Error", description: "Could not generate a unique email. Please try different names or manual creation via Firebase console.", variant: "destructive", duration: 7000 });
+            setIsLoading(false);
+            return;
+        }
       }
     }
 
+
     const defaultPassword = "12345678"; 
     try {
+      // Important: createUserWithEmailAndPassword signs in the new user.
+      // The admin's session will be temporarily replaced by the new user's session.
+      // onAuthStateChanged will handle this transition.
       const userCredential = await createUserWithEmailAndPassword(auth, email, defaultPassword);
       const newUser = userCredential.user;
       const displayName = `${firstName} ${lastName}`;
@@ -137,13 +154,19 @@ export default function AdminUsersPage() {
         lastName,
         displayName,
         role,
-        createdAt: serverTimestamp(), 
+        createdAt: serverTimestamp(),
+        disabled: false, // Default to not disabled
       });
 
-      toast({ title: "User Created", description: `${displayName} (${email}) created successfully. Default password is ${defaultPassword}` });
+      toast({ title: "User Created", description: `${displayName} (${email}) created. Default password: ${defaultPassword}`, duration: 7000 });
       setIsCreateUserOpen(false);
       createUserForm.reset();
-      fetchUsers();
+      fetchUsers(); // Refresh the user list
+
+      // No explicit router.push() here. The admin's auth state will change,
+      // and onAuthStateChanged will manage subsequent app state/redirects.
+      // The admin might be redirected if the new user's role isn't 'Admin'.
+
     } catch (error: any) {
       console.error("Failed to create user:", error);
       toast({ title: "Creation Failed", description: error.message || "Could not create user.", variant: "destructive" });
@@ -154,7 +177,7 @@ export default function AdminUsersPage() {
   
   const openEditModal = (user: User) => {
     setUserToEdit(user);
-    editUserForm.reset({ role: user.role || undefined }); 
+    editUserForm.reset({ role: user.role || undefined, disabled: user.disabled || false }); 
     setIsEditUserOpen(true);
   };
 
@@ -163,8 +186,11 @@ export default function AdminUsersPage() {
     setIsLoading(true);
     try {
       const userDocRef = doc(db, 'users', userToEdit.uid);
-      await updateDoc(userDocRef, { role: values.role });
-      toast({ title: "User Updated", description: `${userToEdit.displayName || userToEdit.email}'s role updated to ${values.role}.` });
+      await updateDoc(userDocRef, { 
+        role: values.role,
+        disabled: values.disabled,
+      });
+      toast({ title: "User Updated", description: `${userToEdit.displayName || userToEdit.email}'s details updated.` });
       setIsEditUserOpen(false);
       setUserToEdit(null);
       fetchUsers();
@@ -175,6 +201,31 @@ export default function AdminUsersPage() {
       setIsLoading(false);
     }
   };
+
+  const toggleUserDisabledStatus = async (user: User) => {
+    if (!db || !user || !adminUser) return;
+    if (user.uid === adminUser.uid) {
+        toast({ title: "Action Denied", description: "You cannot disable your own account.", variant: "destructive" });
+        return;
+    }
+    setIsLoading(true);
+    try {
+        const userDocRef = doc(db, 'users', user.uid);
+        const newDisabledStatus = !user.disabled;
+        await updateDoc(userDocRef, { disabled: newDisabledStatus });
+        toast({ 
+            title: `User ${newDisabledStatus ? 'Disabled' : 'Enabled'}`, 
+            description: `${user.displayName || user.email} has been ${newDisabledStatus ? 'disabled' : 'enabled'}.` 
+        });
+        fetchUsers(); // Refresh list to show updated status
+    } catch (error: any) {
+        console.error("Failed to toggle user disabled status:", error);
+        toast({ title: "Update Failed", description: error.message || "Could not update user status.", variant: "destructive" });
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
 
   const openDeleteDialog = (user: User) => {
     setUserToDelete(user);
@@ -191,15 +242,22 @@ export default function AdminUsersPage() {
     try {
       const userDocRef = doc(db, 'users', userToDelete.uid);
       await deleteDoc(userDocRef);
-      toast({ title: "User Deleted", description: `User ${userToDelete.displayName || userToDelete.email} removed from Firestore.` });
+      // Note: This does NOT delete the Firebase Auth user account.
+      // That requires Admin SDK, typically on a backend.
+      toast({ title: "User Record Deleted", description: `User ${userToDelete.displayName || userToDelete.email}'s record removed from Firestore. Their auth account still exists.` });
       setUserToDelete(null); 
       fetchUsers();
     } catch (error: any) {
-      console.error("Failed to delete user:", error);
-      toast({ title: "Deletion Failed", description: error.message || "Could not delete user.", variant: "destructive" });
+      console.error("Failed to delete user record:", error);
+      toast({ title: "Deletion Failed", description: error.message || "Could not delete user record.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const formatDisplayName = (user: User) => {
+    const name = user.displayName || `${user.firstName || ''} ${user.lastName || ''}`.trim();
+    return name || '-';
   };
 
 
@@ -207,7 +265,8 @@ export default function AdminUsersPage() {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   if (!adminUser || adminRole !== 'Admin') { 
-    return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">Unauthorized.</div>;
+    // This check will run if onAuthStateChanged causes the admin to be logged out and a new (non-admin) user to be logged in after createUser.
+    return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">Unauthorized or session changed.</div>;
   }
 
   return (
@@ -225,11 +284,11 @@ export default function AdminUsersPage() {
               <DialogTitle>Create New Employee</DialogTitle>
               <DialogDescription>
                 Fill in the details to create a new employee account. Email will be auto-generated.
-                Default password: <strong>12345678</strong>
-                 <Button variant="ghost" size="sm" onClick={() => setShowDefaultPassword(!showDefaultPassword)} className="ml-2 p-1 h-auto">
+                Default password: 
+                <Button variant="ghost" size="sm" onClick={() => setShowDefaultPassword(!showDefaultPassword)} className="ml-1 p-1 h-auto align-middle">
                   {showDefaultPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
-                {showDefaultPassword && <span className="text-xs"> (12345678)</span>}
+                {showDefaultPassword && <span className="text-xs font-mono"> (12345678)</span>}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={createUserForm.handleSubmit(handleCreateUser)} className="space-y-4 py-4">
@@ -292,17 +351,33 @@ export default function AdminUsersPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.map((user) => (
-                  <TableRow key={user.uid}>
-                    <TableCell className="font-medium">{user.displayName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'N/A'}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>{user.role || 'Not Assigned'}</TableCell>
+                  <TableRow key={user.uid} className={user.disabled ? "opacity-60" : ""}>
+                    <TableCell className={`font-medium ${user.disabled ? 'line-through' : ''}`}>{formatDisplayName(user)}</TableCell>
+                    <TableCell>{user.email || '-'}</TableCell>
+                    <TableCell>{user.role || '-'}</TableCell>
+                    <TableCell>
+                      <Badge variant={user.disabled ? "destructive" : "default"}>
+                        {user.disabled ? "Disabled" : "Active"}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right space-x-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEditModal(user)} aria-label="Edit User">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => toggleUserDisabledStatus(user)} 
+                        disabled={user.uid === adminUser?.uid || isLoading}
+                        aria-label={user.disabled ? "Enable User" : "Disable User"}
+                        title={user.disabled ? "Enable User" : "Disable User"}
+                      >
+                        {user.disabled ? <UserCheck className="h-4 w-4 text-green-600" /> : <UserX className="h-4 w-4 text-orange-600" />}
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => openEditModal(user)} aria-label="Edit User" title="Edit User Role">
                         <Edit className="h-4 w-4" />
                       </Button>
                       <AlertDialog
@@ -314,7 +389,7 @@ export default function AdminUsersPage() {
                         }}
                       >
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(user)} disabled={user.uid === adminUser?.uid} aria-label="Delete User">
+                          <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(user)} disabled={user.uid === adminUser?.uid || isLoading} aria-label="Delete User Record" title="Delete User Record">
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </AlertDialogTrigger>
@@ -322,7 +397,7 @@ export default function AdminUsersPage() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This action will remove user '{userToDelete?.displayName || userToDelete?.email}' from the Firestore database.
+                              This action will remove user '{formatDisplayName(userToDelete || {} as User)}' from the Firestore database.
                               Their Firebase Authentication account will NOT be deleted. This action cannot be undone.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
@@ -351,16 +426,16 @@ export default function AdminUsersPage() {
       }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Edit User Role</DialogTitle>
+            <DialogTitle>Edit User</DialogTitle>
             <DialogDescription>
-              Change the role for {userToEdit?.displayName || userToEdit?.email}.
+              Change details for {userToEdit?.displayName || userToEdit?.email || '-'}.
             </DialogDescription>
           </DialogHeader>
           {userToEdit && (
             <form onSubmit={editUserForm.handleSubmit(handleEditUser)} className="space-y-4 py-4">
                <div>
                 <Label>User</Label>
-                <Input disabled value={userToEdit.displayName || userToEdit.email || 'N/A'} />
+                <Input disabled value={formatDisplayName(userToEdit)} />
               </div>
               <div>
                 <Label htmlFor="edit-role">Role</Label>
@@ -380,6 +455,27 @@ export default function AdminUsersPage() {
                 />
                 {editUserForm.formState.errors.role && <p className="text-sm text-destructive mt-1">{editUserForm.formState.errors.role.message}</p>}
               </div>
+              <div>
+                <Controller
+                    control={editUserForm.control}
+                    name="disabled"
+                    render={({ field }) => (
+                        <div className="flex items-center space-x-2 mt-2">
+                            <input
+                                type="checkbox"
+                                id="edit-disabled"
+                                checked={field.value || false}
+                                onChange={(e) => field.onChange(e.target.checked)}
+                                className="peer h-4 w-4 shrink-0 rounded-sm border border-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                            />
+                            <Label htmlFor="edit-disabled" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                Account Disabled
+                            </Label>
+                        </div>
+                    )}
+                />
+                {editUserForm.formState.errors.disabled && <p className="text-sm text-destructive mt-1">{editUserForm.formState.errors.disabled.message}</p>}
+              </div>
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="outline" onClick={() => { setIsEditUserOpen(false); setUserToEdit(null); }}>Cancel</Button></DialogClose>
                 <Button type="submit" disabled={isLoading}>
@@ -390,8 +486,6 @@ export default function AdminUsersPage() {
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Delete User Alert Dialog is now per row */}
     </div>
   );
 }
