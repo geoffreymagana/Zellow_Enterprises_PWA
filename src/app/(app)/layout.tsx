@@ -20,7 +20,7 @@ import {
   SidebarMenuItem, 
   SidebarMenuButton,
   SidebarFooter,
-  useSidebar 
+  // useSidebar // No longer needed at this top level of AdminLayout, but children can use it
 } from '@/components/ui/sidebar';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -28,8 +28,7 @@ import { cn } from '@/lib/utils';
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
-  // No need to call useSidebar() here if sidebar is always expanded on desktop and not changing state via this component directly.
-  // The Sidebar component itself and SidebarTrigger will use the context if needed for mobile.
+  // const sidebar = useSidebar(); // Components inside AdminLayout can use useSidebar()
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -56,16 +55,10 @@ function AdminLayout({ children }: { children: ReactNode }) {
         className="border-r hidden md:flex flex-col bg-card text-card-foreground w-[var(--sidebar-width)] h-screen sticky top-0"
       >
         <SidebarHeader className="p-4 border-b flex justify-start items-center h-16">
-          {/* Logo for expanded sidebar */}
           <Logo textSize="text-xl" iconSize={24} />
         </SidebarHeader>
         <SidebarContent> {/* Base component is flex-col, flex-1, overflow-auto */}
-          <div className="p-2"> {/* Search input wrapper */}
-            <div className="relative">
-              <SearchIcon className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Search sidebar..." className="pl-8 h-9 bg-background focus-visible:ring-sidebar-ring" />
-            </div>
-          </div>
+          {/* Search input wrapper removed from here based on previous request */}
           <ScrollArea className="h-full"> {/* h-full makes ScrollArea fill SidebarContent */}
             <SidebarMenu className="p-2">
               {mainAdminNavItems.map((item) => (
@@ -123,7 +116,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
       {/* This div wraps the main header and main content area, taking remaining width */}
       <div className="flex flex-col flex-grow">
         <header className="sticky top-0 z-40 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-          <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8"> {/* Ensures header content uses full width of this column */}
+          <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2">
               {/* Mobile Sidebar Toggle - only for mobile */}
               <div className="md:hidden">
@@ -156,6 +149,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
             </div>
           </div>
         </header>
+        {/* Main content area, ensuring it scrolls independently and is centered */}
         <main className="flex flex-col flex-grow items-center p-4 md:p-6 lg:p-8 overflow-y-auto">
           <div className="w-full max-w-7xl"> 
             {children}
@@ -191,7 +185,7 @@ function NonAdminLayout({ children }: { children: ReactNode }) {
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, loading, role } = useAuth();
   const router = useRouter();
-  const sidebar = useSidebar(); // Get sidebar context for AppLayout
+  // const sidebar = useSidebar(); // REMOVED: Called before SidebarProvider
 
   useEffect(() => {
     if (!loading && !user) {
@@ -216,7 +210,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   if (isAdmin) {
     return (
       // SidebarProvider should wrap any component that uses useSidebar or renders Sidebar/SidebarTrigger
-      <SidebarProvider defaultOpen={!sidebar?.isMobile}> 
+      // defaultOpen={true} because desktop admin sidebar is always open.
+      // The SidebarProvider itself handles mobile context.
+      <SidebarProvider defaultOpen={true}> 
         <AdminLayout>{children}</AdminLayout>
       </SidebarProvider>
     );
