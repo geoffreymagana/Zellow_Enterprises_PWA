@@ -5,10 +5,11 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, ReactNode } from 'react';
-import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture } from 'lucide-react';
+import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Search as SearchIcon } from 'lucide-react';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { Input } from '@/components/ui/input';
 import {
   SidebarProvider,
   Sidebar,
@@ -18,13 +19,14 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
-  useSidebar, 
+  useSidebar,
+  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
-  const { searchTerm } = useSidebar()!; 
+  const { searchTerm, setSearchTerm, isMobile } = useSidebar()!; 
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -112,7 +114,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
               ))}
             </SidebarMenu>
           )}
-          <div className="p-2 mt-1 md:hidden">
+          <div className="p-2 mt-1"> {/* Theme toggle visible on all sizes now */}
             <ThemeToggle />
           </div>
           <div className="mt-2 p-2">
@@ -124,9 +126,28 @@ function AdminLayout({ children }: { children: ReactNode }) {
         </SidebarFooter>
       </Sidebar>
 
-      <div className="flex flex-col flex-grow min-w-0">
-        {/* Header has been removed from here */}
-        <main className="flex flex-col flex-grow p-4 md:p-6 lg:px-8 lg:py-6 overflow-y-auto">
+      <div className="flex flex-col flex-1 min-w-0">
+        <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="w-full h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-2">
+              <SidebarTrigger className="md:hidden" /> {/* Mobile only sidebar trigger */}
+              <h1 className="text-xl font-semibold font-headline hidden md:block">Admin Panel</h1>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-4">
+              <Input
+                type="search"
+                placeholder="Search sections..."
+                className="h-9 w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96" // Responsive width
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <div className="hidden md:block"> {/* ThemeToggle visible on desktop here */}
+                <ThemeToggle />
+              </div>
+            </div>
+          </div>
+        </header>
+        <main className="flex-grow p-4 md:p-6 lg:px-8 lg:py-6 overflow-y-auto">
           <div className="w-full">
             {children}
           </div>
@@ -142,13 +163,12 @@ function NonAdminLayout({ children }: { children: ReactNode }) {
     <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2 md:hidden">
-             <Aperture className="text-primary h-6 w-6" />
-             <span className="font-headline text-xl font-bold text-foreground">Zellow</span>
-          </Link>
-           <Link href="/" className="hidden md:flex items-center gap-2">
-             <Aperture className="text-primary h-7 w-7" />
-             <h1 className="font-headline text-2xl font-bold text-foreground">Zellow Enterprises</h1>
+          <Link href="/" className="flex items-center gap-2">
+             <Aperture className="text-primary h-6 w-6 md:h-7 md:w-7" />
+             <span className="font-headline text-xl md:text-2xl font-bold text-foreground">
+                <span className="md:hidden">Zellow</span>
+                <span className="hidden md:inline">Zellow Enterprises</span>
+             </span>
           </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle />
@@ -198,4 +218,3 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
-

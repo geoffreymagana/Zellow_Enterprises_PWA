@@ -4,8 +4,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ClipboardCheck as ClipboardCheckIcon } from 'lucide-react';
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function AdminApprovalsPage() {
   const { user, role, loading } = useAuth();
@@ -24,15 +23,9 @@ export default function AdminApprovalsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-headline font-semibold">Approval Management</h1>
+      <p className="text-muted-foreground mb-6">Manage and process pending approval requests from various parts of the system.</p>
       <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <ClipboardCheckIcon className="h-6 w-6 text-primary" />
-            <CardTitle>Review Pending Approvals</CardTitle>
-          </div>
-          <CardDescription>Manage and process pending approval requests from various parts of the system.</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <p>The approval management interface will be built here. Admins can review items requiring approval (e.g., new user registrations, content submissions, high-value orders) and approve or reject them.</p>
         </CardContent>
       </Card>

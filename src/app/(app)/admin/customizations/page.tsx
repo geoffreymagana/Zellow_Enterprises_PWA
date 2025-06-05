@@ -4,8 +4,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Layers as LayersIcon } from 'lucide-react';
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function AdminCustomizationsPage() {
   const { user, role, loading } = useAuth();
@@ -24,15 +23,9 @@ export default function AdminCustomizationsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-headline font-semibold">Customization Options Management</h1>
+      <p className="text-muted-foreground mb-6">Define and manage the available customization options for products offered.</p>
       <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <LayersIcon className="h-6 w-6 text-primary" />
-            <CardTitle>Manage Customization Options</CardTitle>
-          </div>
-          <CardDescription>Define and manage the available customization options for products offered.</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <p>This section will allow administrators to configure various customization parameters, such as text engraving options, image upload specifications, color choices, and other personalization features.</p>
         </CardContent>
       </Card>

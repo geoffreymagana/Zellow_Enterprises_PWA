@@ -4,8 +4,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings as SettingsIcon } from 'lucide-react';
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function AdminSettingsPage() {
   const { user, role, loading } = useAuth();
@@ -24,15 +23,9 @@ export default function AdminSettingsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-headline font-semibold">System Settings</h1>
+      <p className="text-muted-foreground mb-6">Manage global application settings, integrations, and operational parameters.</p>
       <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <SettingsIcon className="h-6 w-6 text-primary" />
-            <CardTitle>Configure Application Settings</CardTitle>
-          </div>
-          <CardDescription>Manage global application settings, integrations, and operational parameters.</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <p>The system settings page will allow administrators to configure various aspects of the application, such as site branding, email notifications, API keys for third-party services, and other global configurations.</p>
         </CardContent>
       </Card>

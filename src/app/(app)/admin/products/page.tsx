@@ -4,8 +4,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package as PackageIcon } from 'lucide-react';
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function AdminProductsPage() {
   const { user, role, loading } = useAuth();
@@ -24,15 +23,9 @@ export default function AdminProductsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-headline font-semibold">Product Catalog Management</h1>
+      <p className="text-muted-foreground mb-6">Administer all products, including categories, pricing, stock levels, and product details.</p>
       <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <PackageIcon className="h-6 w-6 text-primary" />
-            <CardTitle>Manage Product Catalog</CardTitle>
-          </div>
-          <CardDescription>Administer all products, including categories, pricing, stock levels, and product details.</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <p>Product catalog management tools will be available here. This includes adding new products, editing existing ones, managing inventory links, and setting up product variants and categories.</p>
         </CardContent>
       </Card>

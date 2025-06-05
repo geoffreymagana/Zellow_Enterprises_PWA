@@ -4,7 +4,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
@@ -13,14 +13,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Users as UsersIcon, PlusCircle, Edit, Trash2, Eye, EyeOff, UserCheck, UserX } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Eye, EyeOff, UserCheck, UserX } from 'lucide-react';
 import type { User, UserRole } from '@/types';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Badge } from "@/components/ui/badge";
 
-import { createUserWithEmailAndPassword, updateProfile as updateAuthProfile, signOut as firebaseSignOut } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile as updateAuthProfile } from 'firebase/auth';
 import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
@@ -118,14 +118,13 @@ export default function AdminUsersPage() {
       email = `${lastName.toLowerCase().replace(/\s+/g, '')}.${firstName.toLowerCase().replace(/\s+/g, '')}@admin.com`;
       emailIsTaken = await checkEmailExists(email);
       if (emailIsTaken) {
-        // Try adding a number if both are taken
         let attempt = 1;
         const baseEmailPartOne = `${firstName.toLowerCase().replace(/\s+/g, '')}.${lastName.toLowerCase().replace(/\s+/g, '')}`;
         do {
             email = `${baseEmailPartOne}${attempt}@admin.com`;
             emailIsTaken = await checkEmailExists(email);
             attempt++;
-        } while (emailIsTaken && attempt < 10); // Limit attempts to prevent infinite loop
+        } while (emailIsTaken && attempt < 10); 
 
         if (emailIsTaken) {
             toast({ title: "Error", description: "Could not generate a unique email. Please try different names or manual creation via Firebase console.", variant: "destructive", duration: 7000 });
@@ -138,9 +137,6 @@ export default function AdminUsersPage() {
 
     const defaultPassword = "12345678"; 
     try {
-      // Important: createUserWithEmailAndPassword signs in the new user.
-      // The admin's session will be temporarily replaced by the new user's session.
-      // onAuthStateChanged will handle this transition.
       const userCredential = await createUserWithEmailAndPassword(auth, email, defaultPassword);
       const newUser = userCredential.user;
       const displayName = `${firstName} ${lastName}`;
@@ -155,17 +151,13 @@ export default function AdminUsersPage() {
         displayName,
         role,
         createdAt: serverTimestamp(),
-        disabled: false, // Default to not disabled
+        disabled: false, 
       });
 
       toast({ title: "User Created", description: `${displayName} (${email}) created. Default password: ${defaultPassword}`, duration: 7000 });
       setIsCreateUserOpen(false);
       createUserForm.reset();
-      fetchUsers(); // Refresh the user list
-
-      // No explicit router.push() here. The admin's auth state will change,
-      // and onAuthStateChanged will manage subsequent app state/redirects.
-      // The admin might be redirected if the new user's role isn't 'Admin'.
+      fetchUsers(); 
 
     } catch (error: any) {
       console.error("Failed to create user:", error);
@@ -217,7 +209,7 @@ export default function AdminUsersPage() {
             title: `User ${newDisabledStatus ? 'Disabled' : 'Enabled'}`, 
             description: `${user.displayName || user.email} has been ${newDisabledStatus ? 'disabled' : 'enabled'}.` 
         });
-        fetchUsers(); // Refresh list to show updated status
+        fetchUsers(); 
     } catch (error: any) {
         console.error("Failed to toggle user disabled status:", error);
         toast({ title: "Update Failed", description: error.message || "Could not update user status.", variant: "destructive" });
@@ -242,8 +234,6 @@ export default function AdminUsersPage() {
     try {
       const userDocRef = doc(db, 'users', userToDelete.uid);
       await deleteDoc(userDocRef);
-      // Note: This does NOT delete the Firebase Auth user account.
-      // That requires Admin SDK, typically on a backend.
       toast({ title: "User Record Deleted", description: `User ${userToDelete.displayName || userToDelete.email}'s record removed from Firestore. Their auth account still exists.` });
       setUserToDelete(null); 
       fetchUsers();
@@ -265,7 +255,6 @@ export default function AdminUsersPage() {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   if (!adminUser || adminRole !== 'Admin') { 
-    // This check will run if onAuthStateChanged causes the admin to be logged out and a new (non-admin) user to be logged in after createUser.
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">Unauthorized or session changed.</div>;
   }
 
@@ -330,15 +319,9 @@ export default function AdminUsersPage() {
           </DialogContent>
         </Dialog>
       </div>
+      <p className="text-muted-foreground">View, add, edit, and manage user accounts and their roles within the system.</p>
 
       <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <UsersIcon className="h-6 w-6 text-primary" />
-            <CardTitle>User List</CardTitle>
-          </div>
-          <CardDescription>View, add, edit, and manage user accounts and their roles within the system.</CardDescription>
-        </CardHeader>
         <CardContent className="p-0">
           {isLoading && users.length === 0 ? (
             <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
@@ -377,7 +360,7 @@ export default function AdminUsersPage() {
                       >
                         {user.disabled ? <UserCheck className="h-4 w-4 text-green-600" /> : <UserX className="h-4 w-4 text-orange-600" />}
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => openEditModal(user)} aria-label="Edit User" title="Edit User Role">
+                      <Button variant="ghost" size="icon" onClick={() => openEditModal(user)} aria-label="Edit User" title="Edit User Role & Status">
                         <Edit className="h-4 w-4" />
                       </Button>
                       <AlertDialog
@@ -419,7 +402,6 @@ export default function AdminUsersPage() {
         {users.length > 0 && <CardFooter className="pt-4"><p className="text-xs text-muted-foreground">Showing {users.length} users.</p></CardFooter>}
       </Card>
 
-      {/* Edit User Dialog */}
       <Dialog open={isEditUserOpen} onOpenChange={(isOpen) => {
         setIsEditUserOpen(isOpen);
         if (!isOpen) setUserToEdit(null);
