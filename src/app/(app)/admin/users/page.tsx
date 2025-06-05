@@ -36,7 +36,7 @@ const createUserFormSchema = z.object({
 type CreateUserFormValues = z.infer<typeof createUserFormSchema>;
 
 const editUserFormSchema = z.object({
-  role: z.enum([...employeeRoles, 'Admin', 'Customer'] as [string, ...string[]], { required_error: "Role is required" }), // Allow editing to Admin/Customer too
+  role: z.enum([...employeeRoles, 'Admin', 'Customer'] as [string, ...string[]], { required_error: "Role is required" }), 
 });
 type EditUserFormValues = z.infer<typeof editUserFormSchema>;
 
@@ -95,7 +95,7 @@ export default function AdminUsersPage() {
   }, [adminUser, adminRole, authLoading, router, fetchUsers]);
 
   const checkEmailExists = async (email: string): Promise<boolean> => {
-    if (!db) return true; // Assume exists if db not available to prevent accidental overwrite
+    if (!db) return true; 
     const usersRef = collection(db, "users");
     const q = query(usersRef, where("email", "==", email));
     const querySnapshot = await getDocs(q);
@@ -154,7 +154,7 @@ export default function AdminUsersPage() {
   
   const openEditModal = (user: User) => {
     setUserToEdit(user);
-    editUserForm.reset({ role: user.role || undefined }); // Handle null role if possible
+    editUserForm.reset({ role: user.role || undefined }); 
     setIsEditUserOpen(true);
   };
 
@@ -192,7 +192,7 @@ export default function AdminUsersPage() {
       const userDocRef = doc(db, 'users', userToDelete.uid);
       await deleteDoc(userDocRef);
       toast({ title: "User Deleted", description: `User ${userToDelete.displayName || userToDelete.email} removed from Firestore.` });
-      setUserToDelete(null); // Close dialog by clearing userToDelete
+      setUserToDelete(null); 
       fetchUsers();
     } catch (error: any) {
       console.error("Failed to delete user:", error);
@@ -203,10 +203,10 @@ export default function AdminUsersPage() {
   };
 
 
-  if (authLoading || (!adminUser && !authLoading)) { // Show loader if auth is loading or if not admin and not finished loading
+  if (authLoading || (!adminUser && !authLoading)) { 
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
-  if (!adminUser || adminRole !== 'Admin') { // Should be caught by useEffect redirect, but as a fallback
+  if (!adminUser || adminRole !== 'Admin') { 
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">Unauthorized.</div>;
   }
 
@@ -305,11 +305,35 @@ export default function AdminUsersPage() {
                       <Button variant="ghost" size="icon" onClick={() => openEditModal(user)} aria-label="Edit User">
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(user)} disabled={user.uid === adminUser?.uid} aria-label="Delete User">
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </AlertDialogTrigger>
+                      <AlertDialog
+                        open={userToDelete?.uid === user.uid}
+                        onOpenChange={(isOpen) => {
+                          if (!isOpen && userToDelete?.uid === user.uid) {
+                            setUserToDelete(null);
+                          }
+                        }}
+                      >
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(user)} disabled={user.uid === adminUser?.uid} aria-label="Delete User">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This action will remove user '{userToDelete?.displayName || userToDelete?.email}' from the Firestore database.
+                              Their Firebase Authentication account will NOT be deleted. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDeleteUser} disabled={isLoading} className="bg-destructive hover:bg-destructive/90">
+                              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Delete User Record
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -321,7 +345,10 @@ export default function AdminUsersPage() {
       </Card>
 
       {/* Edit User Dialog */}
-      <Dialog open={isEditUserOpen} onOpenChange={setIsEditUserOpen}>
+      <Dialog open={isEditUserOpen} onOpenChange={(isOpen) => {
+        setIsEditUserOpen(isOpen);
+        if (!isOpen) setUserToEdit(null);
+      }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Edit User Role</DialogTitle>
@@ -346,7 +373,6 @@ export default function AdminUsersPage() {
                         <SelectValue placeholder="Select a role" />
                       </SelectTrigger>
                       <SelectContent>
-                        {/* Allow editing to any role for flexibility in admin panel */}
                         {([...employeeRoles, 'Admin', 'Customer'] as UserRole[]).filter(r => r !== null).map(r => <SelectItem key={r} value={r!}>{r}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -355,7 +381,7 @@ export default function AdminUsersPage() {
                 {editUserForm.formState.errors.role && <p className="text-sm text-destructive mt-1">{editUserForm.formState.errors.role.message}</p>}
               </div>
               <DialogFooter>
-                <DialogClose asChild><Button type="button" variant="outline" onClick={() => setUserToEdit(null)}>Cancel</Button></DialogClose>
+                <DialogClose asChild><Button type="button" variant="outline" onClick={() => { setIsEditUserOpen(false); setUserToEdit(null); }}>Cancel</Button></DialogClose>
                 <Button type="submit" disabled={isLoading}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Changes
                 </Button>
@@ -365,26 +391,7 @@ export default function AdminUsersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete User Alert Dialog */}
-      {userToDelete && (
-        <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action will remove user '{userToDelete.displayName || userToDelete.email}' from the Firestore database.
-                Their Firebase Authentication account will NOT be deleted. This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteUser} disabled={isLoading} className="bg-destructive hover:bg-destructive/90">
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Delete User Record
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+      {/* Delete User Alert Dialog is now per row */}
     </div>
   );
 }
