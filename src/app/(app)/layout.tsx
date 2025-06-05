@@ -26,7 +26,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
-  const { searchTerm, setSearchTerm } = useSidebar()!; 
+  const { searchTerm, setSearchTerm, isMobile } = useSidebar()!; 
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -54,7 +54,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background"> {/* Outer flex container */}
       <Sidebar
         side="left"
         className="border-r border-sidebar w-[var(--sidebar-width)] h-screen sticky top-0"
@@ -66,6 +66,17 @@ function AdminLayout({ children }: { children: ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <ScrollArea className="h-full">
+            {(!isMobile || (isMobile && !searchTerm)) && ( // On mobile, only show search input if there's no search term yet
+              <div className="p-2 md:hidden">
+                <Input
+                  type="search"
+                  placeholder="Search sections..."
+                  className="h-9 w-full"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            )}
             {filteredMainAdminNavItems.length > 0 ? (
               <SidebarMenu className="p-2">
                 {filteredMainAdminNavItems.map((item) => (
@@ -88,7 +99,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
               </SidebarMenu>
             ) : null}
              {searchTerm && filteredMainAdminNavItems.length === 0 && filteredFooterAdminNavItems.length === 0 && (
-              <p className="p-4 text-sm text-muted-foreground">No admin sections found matching your search.</p>
+              <p className="p-4 text-sm text-muted-foreground">No admin sections found.</p>
             )}
           </ScrollArea>
         </SidebarContent>
@@ -126,35 +137,38 @@ function AdminLayout({ children }: { children: ReactNode }) {
         </SidebarFooter>
       </Sidebar>
 
-      <div className="flex flex-col flex-1"> {/* This is the container for header + main scrollable area */}
+      {/* This div is the "Right Panel" taking up space next to the Sidebar */}
+      <div className="flex flex-col flex-1 min-w-0"> 
         <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="w-full h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2">
-              <SidebarTrigger className="md:hidden" />
+              <SidebarTrigger className="md:hidden" /> {/* Only show trigger on mobile */}
               <h1 className="text-xl font-semibold font-headline hidden md:block">Admin Panel</h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
-              <Input
-                type="search"
-                placeholder="Search sections..."
-                className="h-9 w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+              {/* Search input for desktop and larger tablets */}
               <div className="hidden md:block">
+                <Input
+                  type="search"
+                  placeholder="Search sections..."
+                  className="h-9 w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="hidden md:block"> {/* Theme toggle for desktop */}
                 <ThemeToggle />
               </div>
             </div>
           </div>
         </header>
-        {/* This div now wraps the main content, providing flex-grow and overflow handling */}
-        <div className="flex flex-col flex-1 min-w-0 overflow-y-auto"> 
-          <main className="p-4 md:p-6 lg:px-8 lg:py-6"> {/* Removed flex-grow & overflow-y-auto */}
-            <div className="w-full">
-              {children}
-            </div>
-          </main>
-        </div>
+        
+        {/* This main element will take the remaining vertical space and scroll */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:px-8 lg:py-6">
+          <div className="w-full">
+            {children}
+          </div>
+        </main>
       </div>
     </div>
   );
@@ -221,3 +235,5 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
+
+    

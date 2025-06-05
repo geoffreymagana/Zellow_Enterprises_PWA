@@ -6,14 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
 import { UserCircle2, Edit3, ShieldCheck, LogOut, Loader2, HelpCircle, ShieldQuestion, Info } from "lucide-react";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
@@ -45,7 +44,7 @@ export default function ProfilePage() {
   }
 
   const getInitials = (name?: string | null) => {
-    if (!name) return <UserCircle2 className="h-12 w-12" />; // Adjusted size for avatar
+    if (!name) return <UserCircle2 className="h-12 w-12" />;
     const names = name.split(' ');
     if (names.length > 1) {
       return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
@@ -65,98 +64,93 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="space-y-6 w-full max-w-4xl mx-auto"> {/* Made card container wider */}
+    <div className="space-y-6 w-full max-w-2xl mx-auto">
       <h1 className="text-3xl font-headline font-semibold">My Profile</h1>
       
       <Card className="shadow-lg w-full">
-        <CardContent className="p-6 md:p-8">
-          <div className="grid md:grid-cols-2 md:gap-x-8 lg:gap-x-12 gap-y-8">
-            {/* Column 1: Profile Details */}
-            <div className="space-y-6">
-              <div className="flex flex-col items-center text-center sm:flex-row sm:text-left sm:items-start">
-                <Avatar className="h-24 w-24 text-3xl mb-4 sm:mb-0 sm:mr-6">
-                  <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email || 'User'} />
-                  <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
-                </Avatar>
-                <div className="flex-grow">
-                  <h2 className="text-2xl font-headline font-semibold mb-1">{user.displayName || "User Name Not Set"}</h2>
-                  <p className="text-muted-foreground">{user.email}</p>
-                  <RoleBadge role={role} />
-                </div>
-              </div>
-
-              <Separator className="md:hidden" /> 
-
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="displayName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel htmlFor="displayName">Display Name</FormLabel>
-                        <FormControl>
-                          <Input id="displayName" placeholder="Your Name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div>
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input id="email" type="email" value={user.email || ""} disabled className="mt-1" />
-                  </div>
-                  <Button type="submit" className="w-full sm:w-auto" disabled={isUpdating || authLoading}>
-                    {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Edit3 className="mr-2 h-4 w-4" />}
-                    Save Changes
-                  </Button>
-                </form>
-              </Form>
-            </div>
-
-            {/* Column 2: Account Settings & Links */}
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-3 font-headline">Account Settings</h3>
-                <div className="space-y-3">
-                  <Button variant="outline" className="w-full justify-start">
-                    <ShieldCheck className="mr-2 h-4 w-4" /> Change Password
-                  </Button>
-                  <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                    <p className="text-sm font-medium">Dark Mode</p>
-                    <ThemeToggle />
-                  </div>
-                  <Button variant="destructive" className="w-full justify-start" onClick={logout} disabled={authLoading}>
-                    {authLoading && logout === undefined ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
-                    Logout
-                  </Button>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div>
-                <h3 className="text-lg font-semibold mb-3 font-headline">Resources</h3>
-                <div className="space-y-3">
-                  <Link href="/help" passHref legacyBehavior>
-                    <Button asChild variant="outline" className="w-full justify-start">
-                      <a><HelpCircle className="mr-2 h-4 w-4" /> Help Center</a>
-                    </Button>
-                  </Link>
-                  <Link href="/support" passHref legacyBehavior>
-                     <Button asChild variant="outline" className="w-full justify-start">
-                       <a><ShieldQuestion className="mr-2 h-4 w-4" /> Contact Support</a>
-                     </Button>
-                  </Link>
-                  <Link href="/about" passHref legacyBehavior>
-                    <Button asChild variant="outline" className="w-full justify-start">
-                     <a><Info className="mr-2 h-4 w-4" /> About Zellow</a>
-                    </Button>
-                  </Link>
-                </div>
-              </div>
+        <CardHeader>
+          <CardTitle className="font-headline">User Details</CardTitle>
+        </CardHeader>
+        <CardContent className="p-6 md:p-8 space-y-6">
+          <div className="flex flex-col items-center text-center sm:flex-row sm:text-left sm:items-start">
+            <Avatar className="h-24 w-24 text-3xl mb-4 sm:mb-0 sm:mr-6">
+              <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email || 'User'} />
+              <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
+            </Avatar>
+            <div className="flex-grow">
+              <h2 className="text-2xl font-headline font-semibold mb-1">{user.displayName || "User Name Not Set"}</h2>
+              <p className="text-muted-foreground">{user.email}</p>
+              <RoleBadge role={role} />
             </div>
           </div>
+
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="displayName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel htmlFor="displayName">Display Name</FormLabel>
+                    <FormControl>
+                      <Input id="displayName" placeholder="Your Name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div>
+                <Label htmlFor="email">Email Address (Cannot be changed)</Label>
+                <Input id="email" type="email" value={user.email || ""} disabled className="mt-1" />
+              </div>
+              <Button type="submit" className="w-full sm:w-auto" disabled={isUpdating || authLoading}>
+                {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Edit3 className="mr-2 h-4 w-4" />}
+                Save Display Name
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-lg w-full">
+        <CardHeader>
+          <CardTitle className="font-headline">Account Settings</CardTitle>
+        </CardHeader>
+        <CardContent className="p-6 md:p-8 space-y-3">
+          <Button variant="outline" className="w-full justify-start">
+            <ShieldCheck className="mr-2 h-4 w-4" /> Change Password
+          </Button>
+          <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+            <p className="text-sm font-medium">Dark Mode</p>
+            <ThemeToggle />
+          </div>
+          <Button variant="destructive" className="w-full justify-start" onClick={logout} disabled={authLoading}>
+            {authLoading && logout === undefined ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
+            Logout
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-lg w-full">
+        <CardHeader>
+          <CardTitle className="font-headline">Resources</CardTitle>
+        </CardHeader>
+        <CardContent className="p-6 md:p-8 space-y-3">
+          <Link href="/help" passHref legacyBehavior>
+            <Button asChild variant="outline" className="w-full justify-start">
+              <a><HelpCircle className="mr-2 h-4 w-4" /> Help Center</a>
+            </Button>
+          </Link>
+          <Link href="/support" passHref legacyBehavior>
+              <Button asChild variant="outline" className="w-full justify-start">
+                <a><ShieldQuestion className="mr-2 h-4 w-4" /> Contact Support</a>
+              </Button>
+          </Link>
+          <Link href="/about" passHref legacyBehavior>
+            <Button asChild variant="outline" className="w-full justify-start">
+              <a><Info className="mr-2 h-4 w-4" /> About Zellow</a>
+            </Button>
+          </Link>
         </CardContent>
       </Card>
     </div>
@@ -183,3 +177,5 @@ function RoleBadge({ role }: { role: string | null }) {
     </span>
   );
 }
+
+    
