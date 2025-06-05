@@ -5,7 +5,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, ReactNode } from 'react';
-import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Bell, Ship, MapIcon, ChevronLeft } from 'lucide-react';
+import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Bell, Ship, MapIcon, ChevronLeft, Search as SearchIcon } from 'lucide-react';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -215,7 +215,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
 }
 
 function NonAdminLayout({ children }: { children: ReactNode }) {
-  const { logout } = useAuth();
+  const { logout } = useAuth(); // Logout might be used by profile or bottom nav in future
   const router = useRouter();
   const pathname = usePathname();
   const isMobile = useIsMobile();
@@ -223,26 +223,25 @@ function NonAdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-        <div className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-1 sm:gap-2"> 
-            {!isMobile && pathname !== '/dashboard' && !pathname.startsWith('/products') && !pathname.startsWith('/gift-boxes') && ( 
-              <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-1 sm:mr-2">
-                <ChevronLeft className="h-5 w-5" />
-                <span className="sr-only">Back</span>
-              </Button>
-            )}
-            <Link href="/dashboard" className="flex items-center gap-2"> 
-               <Aperture className="text-primary h-6 w-6 md:h-7 md:w-7" />
-               <span className="font-headline text-xl md:text-2xl font-bold text-foreground">
-                  <span className="md:hidden">Zellow</span>
-                  <span className="hidden md:inline">Zellow Enterprises</span>
-               </span>
-            </Link>
+        <div className="w-full flex h-16 items-center px-4 sm:px-6 lg:px-8 gap-2">
+          {/* Conditional Back Button */}
+          {(!isMobile && pathname !== '/dashboard' && !pathname.startsWith('/products') && !pathname.startsWith('/gift-boxes')) && (
+            <Button variant="ghost" size="icon" onClick={() => router.back()} className="shrink-0 mr-1 sm:mr-2">
+              <ChevronLeft className="h-5 w-5" />
+              <span className="sr-only">Back</span>
+            </Button>
+          )}
+          {/* Search Bar Area */}
+          <div className="flex-grow relative">
+            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Input
+              type="search"
+              placeholder="Search..." // Generic placeholder
+              className="w-full h-10 pl-9 pr-3 rounded-md border-input bg-background focus:ring-primary"
+              // Add value and onChange handlers for search functionality in a future step
+            />
           </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Button variant="outline" size="sm" onClick={logout}>Logout</Button>
-          </div>
+          {/* ThemeToggle and Logout button are removed from here for non-admin top bar */}
         </div>
       </header>
       <main className="flex-grow w-full mx-auto px-4 py-8 pb-20 md:pb-8">
