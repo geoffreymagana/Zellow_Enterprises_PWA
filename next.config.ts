@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'drive.google.com',
         port: '',
-        pathname: '/**', // Or be more specific if needed, e.g., '/uc/**' or '/file/d/**'
+        pathname: '/**',
       },
       {
         protocol: 'https',
@@ -31,13 +31,19 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'i.imgur.com', // Often direct image links are on i.imgur.com
+        hostname: 'i.imgur.com', 
         port: '',
         pathname: '/**',
       },
       {
         protocol: 'https',
         hostname: 'photos.google.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com', // Added for Cloudinary
         port: '',
         pathname: '/**',
       }

@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PlusCircle, Edit, Trash2, Search, FilterIcon, ExternalLink, ImageOff } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Search, FilterIcon, ExternalLink, ImageOff, UploadCloud } from 'lucide-react';
 import type { Product as ProductType } from '@/types';
 import { useForm, Controller, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -44,13 +44,12 @@ const productFormSchema = z.object({
   categories: z.array(z.string()).min(1, "Select at least one category"),
   imageUrl: z.string().url({ message: "Please enter a valid URL" }).optional().or(z.literal('')),
   supplier: z.string().optional(),
-  sku: z.string().optional(),
-  dataAiHint: z.string().optional(),
 });
 
 type ProductFormValues = z.infer<typeof productFormSchema>;
 
 const ALL_CATEGORIES_SENTINEL = "__ALL_CATEGORIES__";
+const CLOUDINARY_COLLECTION_URL = "https://collection.cloudinary.com/dwqwwb2fh/6376c18334415e9e66450df7af51e5a0";
 
 export default function AdminProductsPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -65,12 +64,12 @@ export default function AdminProductsPage() {
   const [productToDelete, setProductToDelete] = useState<ProductType | null>(null);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [categoryFilter, setCategoryFilter] = useState<string>(ALL_CATEGORIES_SENTINEL);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
-      name: "", description: "", price: 0, stock: 0, categories: [], imageUrl: "", supplier: "", sku: "", dataAiHint: ""
+      name: "", description: "", price: 0, stock: 0, categories: [], imageUrl: "", supplier: ""
     },
   });
 
@@ -110,12 +109,17 @@ export default function AdminProductsPage() {
     setEditingProduct(product);
     if (product) {
       form.reset({
-        ...product,
+        name: product.name || "",
+        description: product.description || "",
+        price: product.price || 0,
+        stock: product.stock || 0,
         categories: product.categories || [],
+        imageUrl: product.imageUrl || "",
+        supplier: product.supplier || "",
       });
     } else {
       form.reset({
-        name: "", description: "", price: 0, stock: 0, categories: [], imageUrl: "", supplier: "", sku: "", dataAiHint: ""
+        name: "", description: "", price: 0, stock: 0, categories: [], imageUrl: "", supplier: ""
       });
     }
     setIsDialogOpen(true);
@@ -125,7 +129,13 @@ export default function AdminProductsPage() {
     if (!db) return;
     setIsSubmitting(true);
     const dataToSave: any = {
-      ...values,
+      name: values.name,
+      description: values.description,
+      price: values.price,
+      stock: values.stock,
+      categories: values.categories,
+      imageUrl: values.imageUrl,
+      supplier: values.supplier,
       updatedAt: serverTimestamp(),
     };
     if (!editingProduct) {
@@ -171,9 +181,9 @@ export default function AdminProductsPage() {
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const nameMatch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const skuMatch = product.sku ? product.sku.toLowerCase().includes(searchTerm.toLowerCase()) : false;
-      const categoryMatch = categoryFilter ? product.categories?.includes(categoryFilter) : true;
-      return (nameMatch || skuMatch) && categoryMatch;
+      // SKU match removed as SKU field is removed
+      const categoryMatch = categoryFilter !== ALL_CATEGORIES_SENTINEL ? product.categories?.includes(categoryFilter) : true;
+      return nameMatch && categoryMatch;
     });
   }, [products, searchTerm, categoryFilter]);
 
@@ -200,15 +210,15 @@ export default function AdminProductsPage() {
             <div className="relative w-full sm:max-w-xs">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name or SKU..."
+                placeholder="Search by name..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-8 w-full"
               />
             </div>
             <Select
-              value={categoryFilter === "" ? ALL_CATEGORIES_SENTINEL : categoryFilter}
-              onValueChange={(value) => setCategoryFilter(value === ALL_CATEGORIES_SENTINEL ? "" : value)}
+              value={categoryFilter}
+              onValueChange={(value) => setCategoryFilter(value)}
             >
               <SelectTrigger className="w-full sm:w-[200px]">
                 <SelectValue placeholder="Filter by category" />
@@ -220,8 +230,8 @@ export default function AdminProductsPage() {
                 ))}
               </SelectContent>
             </Select>
-            {(searchTerm || categoryFilter) && (
-                <Button variant="outline" size="sm" onClick={() => {setSearchTerm(""); setCategoryFilter("");}}>Clear Filters</Button>
+            {(searchTerm || categoryFilter !== ALL_CATEGORIES_SENTINEL) && (
+                <Button variant="outline" size="sm" onClick={() => {setSearchTerm(""); setCategoryFilter(ALL_CATEGORIES_SENTINEL);}}>Clear Filters</Button>
             )}
           </div>
         </CardHeader>
@@ -236,7 +246,6 @@ export default function AdminProductsPage() {
                 <TableRow>
                   <TableHead className="w-[80px]">Image</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>SKU</TableHead>
                   <TableHead>Categories</TableHead>
                   <TableHead className="text-right">Price</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
@@ -249,14 +258,13 @@ export default function AdminProductsPage() {
                     <TableCell>
                       <div className="w-16 h-16 relative bg-muted rounded-md overflow-hidden flex items-center justify-center">
                         {product.imageUrl ? (
-                          <Image src={product.imageUrl} alt={product.name} fill sizes="64px" className="object-cover" data-ai-hint={product.dataAiHint || product.categories?.[0]?.toLowerCase() || "gift"}/>
+                          <Image src={product.imageUrl} alt={product.name} fill sizes="64px" className="object-cover" data-ai-hint={product.categories?.[0]?.toLowerCase() || "gift"}/>
                         ) : (
                           <ImageOff className="h-6 w-6 text-muted-foreground"/>
                         )}
                       </div>
                     </TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>{product.sku || '-'}</TableCell>
                     <TableCell className="max-w-xs">
                       <div className="flex flex-wrap gap-1">
                         {product.categories?.map(cat => <Badge key={cat} variant="secondary">{cat.split(' (')[0]}</Badge>)}
@@ -298,37 +306,51 @@ export default function AdminProductsPage() {
                   <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Product Name</FormLabel><FormControl><Input {...field} placeholder="e.g., Ceramic Mug 11oz" /></FormControl><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field} placeholder="Detailed description of the product..." /></FormControl><FormMessage /></FormItem>)} />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="price" render={({ field }) => (<FormItem><FormLabel>Price (Ksh)</FormLabel><FormControl><Input type="number" step="0.01" {...field} placeholder="e.g., 350.00" /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name="stock" render={({ field }) => (<FormItem><FormLabel>Stock Quantity</FormLabel><FormControl><Input type="number" {...field} placeholder="e.g., 100" /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="price" render={({ field }) => (<FormItem><FormLabel>Price (Ksh)</FormLabel><FormControl><Input type="number" step="0.01" {...field} placeholder="0.00" /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="stock" render={({ field }) => (<FormItem><FormLabel>Stock Quantity</FormLabel><FormControl><Input type="number" {...field} placeholder="0" /></FormControl><FormMessage /></FormItem>)} />
                   </div>
+                  
+                  <div className="space-y-2">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => window.open(CLOUDINARY_COLLECTION_URL, '_blank')}
+                    >
+                      <UploadCloud className="mr-2 h-4 w-4" /> Browse Cloudinary Collection
+                    </Button>
+                    <FormDescription>Open the Cloudinary collection, copy the desired image URL, and paste it below.</FormDescription>
+                  </div>
+
                   <FormField control={form.control} name="imageUrl" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Image URL</FormLabel>
+                      <FormLabel>Image URL (Paste from Cloudinary)</FormLabel>
                        <div className="flex items-center gap-2">
-                        <FormControl><Input {...field} placeholder="https://..." /></FormControl>
+                        <FormControl><Input {...field} placeholder="https://res.cloudinary.com/..." /></FormControl>
                         {field.value && (
                           <a href={field.value} target="_blank" rel="noopener noreferrer" title="Open image in new tab">
                             <Button type="button" variant="outline" size="icon"><ExternalLink className="h-4 w-4"/></Button>
                           </a>
                         )}
                       </div>
-                      <FormDescription>Enter a direct link to the product image (e.g., from Google Drive, Imgur, or your own CDN).</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )} />
                   {form.watch("imageUrl") && (
                     <div className="my-2 p-2 border rounded-md flex justify-center items-center bg-muted aspect-video max-h-48 relative">
                       <Image src={form.watch("imageUrl")!} alt="Image Preview" fill className="object-contain"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement?.querySelector('.error-placeholder')?.classList.remove('hidden');}}
-                        data-ai-hint={form.watch("dataAiHint") || "product image"}
+                        onError={(e) => { 
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none'; 
+                          const errorPlaceholder = target.parentElement?.querySelector('.error-placeholder');
+                          if (errorPlaceholder) errorPlaceholder.classList.remove('hidden');
+                        }}
+                        data-ai-hint={"product image"}
                       />
                       <div className="error-placeholder hidden text-muted-foreground text-xs flex flex-col items-center"><ImageOff className="h-8 w-8 mb-1"/><span>Invalid URL or image</span></div>
                     </div>
                   )}
 
-                  <FormField control={form.control} name="sku" render={({ field }) => (<FormItem><FormLabel>SKU (Optional)</FormLabel><FormControl><Input {...field} placeholder="e.g., ZMUG-WHT-11" /></FormControl><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="supplier" render={({ field }) => (<FormItem><FormLabel>Supplier (Optional)</FormLabel><FormControl><Input {...field} placeholder="e.g., Acme Supplies" /></FormControl><FormMessage /></FormItem>)} />
-                  <FormField control={form.control} name="dataAiHint" render={({ field }) => (<FormItem><FormLabel>AI Image Hint (Optional)</FormLabel><FormControl><Input {...field} placeholder="e.g., white mug, blue t-shirt" /></FormControl><FormDescription>Max 2 keywords for AI placeholder generation if image URL is missing/invalid.</FormDescription><FormMessage /></FormItem>)} />
                   
                   <FormField
                     control={form.control}
@@ -388,5 +410,3 @@ export default function AdminProductsPage() {
     </div>
   );
 }
-
-    
