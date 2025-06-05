@@ -168,7 +168,7 @@ export default function DispatchCenterPage() {
           newMarker.getElement().addEventListener('click', (e) => {
             e.stopPropagation();
             setSelectedOrder(order);
-            map.flyTo({center: [order.deliveryCoordinates!.lng, order.deliveryCoordinates!.lat], zoom: 14});
+            if(order.deliveryCoordinates) map.flyTo({center: [order.deliveryCoordinates.lng, order.deliveryCoordinates.lat], zoom: 14});
           });
           orderMarkersRef.current.set(order.id, newMarker);
         }
@@ -347,8 +347,8 @@ export default function DispatchCenterPage() {
                   <SelectItem value="assigned">Assigned</SelectItem>
                   <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
                   <SelectItem value="delivery_attempted">Delivery Attempted</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="delivered">Delivered (View Only)</SelectItem>
+                  <SelectItem value="cancelled">Cancelled (View Only)</SelectItem>
                 </SelectContent>
               </Select>
             </CardHeader>
@@ -363,7 +363,7 @@ export default function DispatchCenterPage() {
                      }}>
                   <p className="font-semibold text-sm">ID: {order.id.substring(0,8)}...</p>
                   <p className="text-xs text-muted-foreground truncate" title={order.deliveryAddress}>{order.deliveryAddress}</p>
-                  <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'} className="capitalize text-xs mt-1">{order.status.replace(/_/g, " ")}</Badge>
+                  <Badge variant={order.status === 'delivered' ? 'default' : (order.status === 'cancelled' ? 'destructive' : 'secondary')} className="capitalize text-xs mt-1">{order.status.replace(/_/g, " ")}</Badge>
                   {order.riderName && <p className="text-xs mt-1">Rider: {order.riderName}</p>}
                 </div>
               ))}
@@ -399,12 +399,12 @@ export default function DispatchCenterPage() {
                 <div className="flex justify-between items-start">
                   <div>
                     <CardTitle className="font-headline">Order: {selectedOrder.id.substring(0,12)}...</CardTitle>
-                    <CardDescription>Status: <Badge variant={selectedOrder.status === 'delivered' ? 'default' : 'secondary'} className="capitalize">{selectedOrder.status.replace(/_/g, ' ')}</Badge></CardDescription>
+                    <CardDescription>Status: <Badge variant={selectedOrder.status === 'delivered' ? 'default' : (selectedOrder.status === 'cancelled' ? 'destructive' : 'secondary')} className="capitalize">{selectedOrder.status.replace(/_/g, ' ')}</Badge></CardDescription>
                   </div>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => setOrderColorToEdit({orderId: selectedOrder.id, currentColor: selectedOrder.color || null})}><Palette className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => setOrderColorToEdit({orderId: selectedOrder.id, currentColor: selectedOrder.color || null})} aria-label="Set order color"><Palette className="h-4 w-4" /></Button>
                     {selectedOrder.status !== 'delivered' && selectedOrder.status !== 'cancelled' && (
-                        <Button variant="ghost" size="icon" onClick={() => setOrderToCancel(selectedOrder)}><XCircle className="h-4 w-4 text-destructive" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => setOrderToCancel(selectedOrder)} aria-label="Cancel order"><XCircle className="h-4 w-4 text-destructive" /></Button>
                     )}
                   </div>
                 </div>
@@ -422,6 +422,7 @@ export default function DispatchCenterPage() {
                       <Select onValueChange={setSelectedRiderForAssignment} value={selectedRiderForAssignment || undefined}>
                         <SelectTrigger className="flex-grow"><SelectValue placeholder="Select Rider" /></SelectTrigger>
                         <SelectContent>
+                          {riders.length === 0 && <SelectItem value="no-riders" disabled>No riders available</SelectItem>}
                           {riders.map(r => <SelectItem key={r.uid} value={r.uid}>{r.displayName || r.email}</SelectItem>)}
                         </SelectContent>
                       </Select>
@@ -445,12 +446,13 @@ export default function DispatchCenterPage() {
             </DialogHeader>
             <div className="flex flex-wrap gap-2 py-4">
               {defaultOrderColors.map(color => (
-                <Button key={color} style={{ backgroundColor: color, border: orderColorToEdit.currentColor === color ? '3px solid black' : '3px solid transparent' }} className="h-10 w-10 rounded-full" onClick={() => handleSetOrderColor(color)} />
+                <Button key={color} style={{ backgroundColor: color, border: orderColorToEdit.currentColor === color ? '3px solid hsl(var(--foreground))' : '3px solid transparent' }} className="h-10 w-10 rounded-full" onClick={() => handleSetOrderColor(color)} aria-label={`Set color to ${color}`} />
               ))}
-              <Input type="color" defaultValue={orderColorToEdit.currentColor || '#CCCCCC'} onChange={(e) => handleSetOrderColor(e.target.value)} className="h-10 w-16" />
+              <Input type="color" defaultValue={orderColorToEdit.currentColor || '#CCCCCC'} onChange={(e) => handleSetOrderColor(e.target.value)} className="h-10 w-16" aria-label="Custom color picker"/>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setOrderColorToEdit(null)}>Close</Button>
+              <Button variant="outline" onClick={() => handleSetOrderColor(orderColorToEdit.currentColor || 'hsl(var(--primary))')}>Reset to Default</Button>
+              <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -474,3 +476,6 @@ export default function DispatchCenterPage() {
     </div>
   );
 }
+
+
+    
