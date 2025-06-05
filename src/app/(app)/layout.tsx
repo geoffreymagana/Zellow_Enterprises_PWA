@@ -5,7 +5,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, ReactNode } from 'react';
-import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Search as SearchIcon } from 'lucide-react';
+import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture } from 'lucide-react';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -26,7 +26,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
-  const { searchTerm, setSearchTerm, isMobile } = useSidebar()!; 
+  const { searchTerm, setSearchTerm } = useSidebar()!; 
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -114,7 +114,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
               ))}
             </SidebarMenu>
           )}
-          <div className="p-2 mt-1"> {/* Theme toggle visible on all sizes now */}
+          <div className="p-2 mt-1">
             <ThemeToggle />
           </div>
           <div className="mt-2 p-2">
@@ -126,32 +126,35 @@ function AdminLayout({ children }: { children: ReactNode }) {
         </SidebarFooter>
       </Sidebar>
 
-      <div className="flex flex-col flex-1 min-w-0">
+      <div className="flex flex-col flex-1"> {/* This is the container for header + main scrollable area */}
         <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="w-full h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2">
-              <SidebarTrigger className="md:hidden" /> {/* Mobile only sidebar trigger */}
+              <SidebarTrigger className="md:hidden" />
               <h1 className="text-xl font-semibold font-headline hidden md:block">Admin Panel</h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
               <Input
                 type="search"
                 placeholder="Search sections..."
-                className="h-9 w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96" // Responsive width
+                className="h-9 w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              <div className="hidden md:block"> {/* ThemeToggle visible on desktop here */}
+              <div className="hidden md:block">
                 <ThemeToggle />
               </div>
             </div>
           </div>
         </header>
-        <main className="flex-grow p-4 md:p-6 lg:px-8 lg:py-6 overflow-y-auto">
-          <div className="w-full">
-            {children}
-          </div>
-        </main>
+        {/* This div now wraps the main content, providing flex-grow and overflow handling */}
+        <div className="flex flex-col flex-1 min-w-0 overflow-y-auto"> 
+          <main className="p-4 md:p-6 lg:px-8 lg:py-6"> {/* Removed flex-grow & overflow-y-auto */}
+            <div className="w-full">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );
