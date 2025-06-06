@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { collection, addDoc, serverTimestamp, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order, OrderItem, OrderStatus } from '@/types';
+import type { Order, OrderItem, OrderStatus, DeliveryHistoryEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, PackageCheck } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
@@ -39,7 +39,6 @@ export default function ReviewOrderPage() {
 
   useEffect(() => {
     if (!shippingAddress || !paymentMethod || !selectedShippingMethodInfo || cartItems.length === 0) {
-      // If any crucial piece of info is missing, redirect back through the checkout flow
       if (cartItems.length === 0) {
         router.replace('/orders/cart');
       } else if (!shippingAddress) {
@@ -61,11 +60,18 @@ export default function ReviewOrderPage() {
     const orderItems: OrderItem[] = cartItems.map(item => ({
       productId: item.productId,
       name: item.name,
-      price: item.currentPrice, // Price for one unit at time of purchase, including customizations
+      price: item.currentPrice,
       quantity: item.quantity,
       imageUrl: item.imageUrl || null,
       customizations: item.customizations || null,
     }));
+
+    const initialDeliveryHistoryEntry: DeliveryHistoryEntry = {
+      status: 'pending',
+      timestamp: Timestamp.now(), // Use client-side timestamp for initial entry
+      notes: 'Order placed by customer.',
+      actorId: user.uid,
+    };
 
     const newOrder: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> = {
       customerId: user.uid,
@@ -82,19 +88,14 @@ export default function ReviewOrderPage() {
       paymentStatus: 'pending',
       shippingMethodId: selectedShippingMethodInfo.id,
       shippingMethodName: selectedShippingMethodInfo.name,
-      deliveryHistory: [{
-        status: 'pending',
-        timestamp: serverTimestamp() as Timestamp, // Cast to Timestamp here for initial entry
-        notes: 'Order placed by customer.',
-        actorId: user.uid,
-      }],
+      deliveryHistory: [initialDeliveryHistoryEntry],
       deliveryId: null,
       riderId: null,
       riderName: null,
-      deliveryCoordinates: null, // This would be set later if applicable
-      deliveryNotes: shippingAddress.addressLine2, // Using addressLine2 as potential delivery notes, or add dedicated field
+      deliveryCoordinates: null, 
+      deliveryNotes: shippingAddress.addressLine2 || null,
       color: null,
-      estimatedDeliveryTime: null, // This would be calculated/set later
+      estimatedDeliveryTime: null, 
       actualDeliveryTime: null,
       transactionId: null,
     };
@@ -107,16 +108,19 @@ export default function ReviewOrderPage() {
         updatedAt: serverTimestamp(),
       });
 
-      const batch = writeBatch(db);
-      cartItems.forEach(item => {
-        if (item.stock !== undefined && item.quantity !== undefined) {
-          const productRef = doc(db, 'products', item.productId);
-          batch.update(productRef, { stock: item.stock - item.quantity });
-        }
-      });
-      await batch.commit();
+      if (cartItems.some(item => item.stock !== undefined && item.quantity !== undefined)) {
+        const batch = writeBatch(db);
+        cartItems.forEach(item => {
+          if (item.stock !== undefined && item.quantity !== undefined) { // Check again for safety
+            const productRef = doc(db, 'products', item.productId);
+            batch.update(productRef, { stock: item.stock - item.quantity });
+          }
+        });
+        await batch.commit();
+      }
+      
 
-      toast({ title: "Order Placed!", description: `Your order #${newOrderRef.id.substring(0, 8)} has been successfully placed.` });
+      toast({ title: "Order Placed!", description: `Your order #${newOrderRef.id.substring(0, 8)}... has been successfully placed.` });
       clearCart();
       router.push(`/checkout/success/${newOrderRef.id}`);
     } catch (error: any) {
@@ -127,7 +131,6 @@ export default function ReviewOrderPage() {
   };
   
   if (!shippingAddress || !paymentMethod || !selectedShippingMethodInfo) {
-    // This check should ideally be caught by the useEffect redirect
     return (
         <div className="flex items-center justify-center min-h-screen">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -144,7 +147,6 @@ export default function ReviewOrderPage() {
           <CardDescription>Please check your order details below before placing your order.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
-          {/* Shipping Details Section */}
           <section>
             <h3 className="text-lg font-semibold mb-3">Shipping To:</h3>
             <Card className="bg-muted/50 p-4">
@@ -157,7 +159,6 @@ export default function ReviewOrderPage() {
             </Card>
           </section>
 
-          {/* Shipping Method Section */}
           <section>
             <h3 className="text-lg font-semibold mb-3">Shipping Method:</h3>
             <Card className="bg-muted/50 p-4">
@@ -167,7 +168,6 @@ export default function ReviewOrderPage() {
             </Card>
           </section>
 
-          {/* Payment Method Section */}
           <section>
             <h3 className="text-lg font-semibold mb-3">Payment Method:</h3>
             <Card className="bg-muted/50 p-4">
@@ -180,7 +180,6 @@ export default function ReviewOrderPage() {
             </Card>
           </section>
 
-          {/* Order Items Section */}
           <section>
             <h3 className="text-lg font-semibold mb-3">Items in Your Order:</h3>
             <ul role="list" className="divide-y divide-border border rounded-md">
@@ -212,7 +211,6 @@ export default function ReviewOrderPage() {
              <Link href="/orders/cart" className="text-sm text-primary hover:underline mt-3 inline-block">Edit Cart</Link>
           </section>
           
-          {/* Order Summary */}
           <section className="pt-6 border-t">
             <h3 className="text-lg font-semibold mb-4">Order Summary</h3>
             <div className="space-y-2">
@@ -243,3 +241,5 @@ export default function ReviewOrderPage() {
     </div>
   );
 }
+
+    
