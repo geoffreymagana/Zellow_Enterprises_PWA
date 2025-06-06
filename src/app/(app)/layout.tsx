@@ -1,9 +1,9 @@
 
 "use client";
-import { ReactNode, FC } from 'react'; // Added FC
+import { ReactNode, FC } from 'react'; 
 import { useAuth } from '@/hooks/useAuth';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { Logo } from '@/components/common/Logo';
+// Logo removed from here as it's no longer directly used in NonAdminLayout header
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarHeader as AdminSidebarHeader, // Renamed to avoid conflict with SheetHeader
+  SidebarHeader as AdminSidebarHeader, 
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
@@ -23,11 +23,11 @@ import {
 } from "@/components/ui/sidebar";
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation'; // Added usePathname
+import { usePathname } from 'next/navigation'; 
 import {
   LayoutDashboard, Users, Package, ShoppingCart, Layers, DollarSign,
   Truck, Settings as SettingsIcon, UserCircle, LogOutIcon, Menu, Bell,
-  FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIcon, ListChecks, Aperture // Aperture still needed for main header
+  FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIcon, ListChecks
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
@@ -40,7 +40,7 @@ interface LayoutProps {
 const AdminLayout: FC<LayoutProps> = ({ children }) => {
   const { logout } = useAuth();
   const sidebarContext = useSidebar();
-  const pathname = usePathname(); // Get current pathname
+  const pathname = usePathname(); 
 
   if (!sidebarContext) {
     return <div className="flex items-center justify-center min-h-screen">Error: Sidebar context not found.</div>;
@@ -54,7 +54,6 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
     { href: '/admin/customizations', label: 'Customizations', icon: Layers },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign },
-    // { href: '/admin/dispatch', label: 'Dispatch Center', icon: Aperture }, // Removed Dispatch Center
     { href: '/admin/shipping', label: 'Shipping', icon: Ship },
     { href: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck },
     { href: '/admin/notifications', label: 'Notifications', icon: Bell },
@@ -153,12 +152,13 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
               </SheetContent>
             </Sheet>
             <Link href="/dashboard" className="hidden md:flex items-center gap-2" aria-label="Admin Dashboard Home">
-               <Aperture className="text-primary h-6 w-6" />
+               {/* Logo removed from Admin Header as per previous request, can be uncommented if needed */}
+               {/* <Aperture className="text-primary h-6 w-6" /> */}
                <h1 className="text-xl font-semibold font-headline">Admin Panel</h1>
             </Link>
           </div>
-          <div className="flex items-center gap-2 sm:gap-4"> {/* Removed flex-1 from here */}
-            <div className="relative w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96"> {/* Removed flex-grow */}
+          <div className="flex items-center gap-2 sm:gap-4"> 
+            <div className="relative w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96">
                <SearchIcon className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
@@ -187,7 +187,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
               {filteredMainAdminNavItems.length > 0 ? (
                 <SidebarMenu className="p-2">
                   {filteredMainAdminNavItems.map((item) => {
-                    const typedItem = item as any; // To access subItems
+                    const typedItem = item as any; 
                     const directMatch = typedItem.href === pathname;
                     const childMatch = typedItem.subItems?.some((sub: any) => sub.href === pathname);
                     const isActive = directMatch || childMatch;
@@ -198,7 +198,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                           isCollapsible={true}
                           className="w-full justify-start"
                           variant="ghost"
-                          isActive={isActive} // Apply active state to parent
+                          isActive={isActive} 
                         >
                           <typedItem.icon className="mr-2 h-4 w-4" />
                           <span>{typedItem.label}</span>
@@ -285,12 +285,25 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
 const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   const { user, role, logout } = useAuth();
   const { cartTotalItems } = useCart();
+  // For now, search bar in NonAdminLayout is visual only. State can be added later.
+  // const [searchTerm, setSearchTerm] = useState(""); 
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto h-16 flex items-center justify-between px-4">
-          <Logo iconSize={28} textSize="text-2xl" />
+        <div className="container mx-auto h-16 flex items-center justify-between px-4 gap-4">
+          {/* Logo removed from here */}
+          <div className="relative flex-1 max-w-2xl"> {/* Search bar takes up space */}
+            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder={role === 'Customer' ? "Search products, gift boxes..." : "Search..."}
+              className="h-10 w-full pl-10 rounded-full bg-muted border-transparent focus:border-primary focus:bg-background"
+              // value={searchTerm}
+              // onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
           <div className="flex items-center gap-2">
             <ThemeToggle />
             {user && role === 'Customer' && (
@@ -319,7 +332,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
                     </SheetTrigger>
                     <SheetContent side="left" className="w-[280px] p-0 bg-card text-card-foreground flex flex-col">
                         <SheetHeader className="p-4 border-b">
-                            <SheetTitle>Menu</SheetTitle>
+                            <SheetTitle>Menu</SheetTitle> {/* Logo removed from SheetHeader */}
                         </SheetHeader>
                         <nav className="py-4 px-2 flex-1">
                             <Link href="/dashboard" className="flex items-center p-2 rounded-md hover:bg-muted"><Home className="mr-2 h-4 w-4" />Dashboard</Link>
@@ -352,6 +365,8 @@ export default function AppGroupLayout({ children }: LayoutProps) {
   }
 
   if (!user) {
+    // This check might be redundant if page-level checks redirect to /login,
+    // but it's a good failsafe for the layout itself.
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
   
