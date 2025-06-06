@@ -254,7 +254,7 @@ export default function DispatchCenterPage() {
       const orderRef = doc(db, 'orders', selectedOrder.id);
       const historyEntry: DeliveryHistoryEntry = {
         status: 'assigned',
-        timestamp: Timestamp.now(), // Use client-side timestamp
+        timestamp: Timestamp.now(),
         notes: `Assigned to ${riderToAssign.displayName || riderToAssign.email} by dispatcher ${user.displayName || user.email}`,
         actorId: user.uid,
       };
@@ -280,7 +280,6 @@ export default function DispatchCenterPage() {
       const orderRef = doc(db, 'orders', orderColorToEdit.orderId);
       await updateDoc(orderRef, { color: color, updatedAt: serverTimestamp() });
       toast({ title: "Success", description: `Order color updated for ${orderColorToEdit.orderId}.` });
-      // Manually update local state for immediate reflection on map if needed, or rely on onSnapshot
       setAllOrders(prevOrders => prevOrders.map(o => o.id === orderColorToEdit.orderId ? {...o, color: color} : o));
       if(selectedOrder && selectedOrder.id === orderColorToEdit.orderId) {
         setSelectedOrder(prev => prev ? {...prev, color: color} : null);
@@ -298,7 +297,7 @@ export default function DispatchCenterPage() {
       const orderRef = doc(db, 'orders', orderToCancel.id);
       const historyEntry: DeliveryHistoryEntry = {
         status: 'cancelled',
-        timestamp: Timestamp.now(), // Use client-side timestamp
+        timestamp: Timestamp.now(), 
         notes: `Order cancelled by dispatcher ${user.displayName || user.email}`,
         actorId: user.uid,
       };
@@ -330,113 +329,114 @@ export default function DispatchCenterPage() {
     <div className="flex flex-col h-[calc(100vh-var(--header-height,4rem)-2rem)] p-4 gap-4">
       <div className="flex justify-between items-center">
          <h1 className="text-3xl font-headline font-semibold">Dispatch Center</h1>
-         {/* Add any header controls for Dispatch Center here, if needed */}
       </div>
       
-      <div className="flex flex-col md:flex-row flex-grow gap-4 overflow-hidden">
-        <div className="md:w-1/3 lg:w-1/4 flex flex-col gap-4 overflow-y-auto pr-2">
-          <Card>
+      <div className="flex flex-col flex-grow gap-4 overflow-auto"> {/* Changed layout to flex-col and overflow-auto */}
+        
+        {/* Orders Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" /> Orders</CardTitle>
+            <Select value={orderFilterStatus} onValueChange={(value) => setOrderFilterStatus(value as OrderStatus | "all")}>
+              <SelectTrigger><SelectValue placeholder="Filter by status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Active (Non-Delivered/Cancelled)</SelectItem>
+                <SelectItem value="awaiting_assignment">Awaiting Assignment</SelectItem>
+                <SelectItem value="pending">Pending Confirmation</SelectItem>
+                <SelectItem value="assigned">Assigned</SelectItem>
+                <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                <SelectItem value="delivery_attempted">Delivery Attempted</SelectItem>
+                <SelectItem value="delivered">Delivered (View Only)</SelectItem>
+                <SelectItem value="cancelled">Cancelled (View Only)</SelectItem>
+              </SelectContent>
+            </Select>
+          </CardHeader>
+          <CardContent className="space-y-2 max-h-[25vh] sm:max-h-[20vh] overflow-y-auto"> {/* Adjusted max-h */}
+            {filteredOrders.length === 0 && <p className="text-muted-foreground text-sm">No orders match filter.</p>}
+            {filteredOrders.map(order => (
+              <div key={order.id} 
+                   className={`p-2 rounded-md border cursor-pointer hover:bg-muted ${selectedOrder?.id === order.id ? 'ring-2 ring-primary bg-muted' : ''}`}
+                   onClick={() => {
+                      setSelectedOrder(order);
+                      if(order.deliveryCoordinates && mapRef.current) mapRef.current.flyTo({center: [order.deliveryCoordinates.lng, order.deliveryCoordinates.lat], zoom: 14});
+                   }}>
+                <p className="font-semibold text-sm">ID: {order.id.substring(0,8)}...</p>
+                <p className="text-xs text-muted-foreground truncate" title={order.deliveryAddress}>{order.deliveryAddress}</p>
+                <Badge variant={order.status === 'delivered' ? 'default' : (order.status === 'cancelled' ? 'destructive' : 'secondary')} className="capitalize text-xs mt-1">{order.status.replace(/_/g, " ")}</Badge>
+                {order.riderName && <p className="text-xs mt-1">Rider: {order.riderName}</p>}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Riders Card */}
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><UsersRound className="h-5 w-5" /> Riders ({riders.length})</CardTitle></CardHeader>
+          <CardContent className="space-y-2 max-h-[20vh] sm:max-h-[15vh] overflow-y-auto"> {/* Adjusted max-h */}
+            {riders.length === 0 && <p className="text-muted-foreground text-sm">No active riders.</p>}
+            {riders.map(rider => (
+              <div key={rider.uid} className="p-2 rounded-md border">
+                <p className="font-semibold text-sm">{rider.displayName || rider.email}</p>
+                <p className="text-xs text-muted-foreground">Orders: {allOrders.filter(o => o.riderId === rider.uid && (o.status === 'assigned' || o.status === 'out_for_delivery')).length}</p> 
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Map Card */}
+        <Card className="flex-grow relative min-h-[300px]"> {/* Map takes remaining space */}
+          <CardContent className="p-0 h-full">
+            {mapError && <Alert variant="destructive" className="m-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Map Error</AlertTitle><AlertDescription>{mapError}</AlertDescription></Alert>}
+            {mapLoading && !mapError && <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10"><Loader2 className="h-10 w-10 animate-spin text-primary" /><p className="ml-2">Loading map...</p></div>}
+            <div ref={mapContainerRef} className="w-full h-full rounded-md" />
+          </CardContent>
+        </Card>
+
+        {/* Selected Order Details Card (if an order is selected) */}
+        {selectedOrder && (
+          <Card className="overflow-y-auto max-h-[30vh] shrink-0"> {/* Adjusted max-h and added shrink-0 */}
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" /> Orders</CardTitle>
-              <Select value={orderFilterStatus} onValueChange={(value) => setOrderFilterStatus(value as OrderStatus | "all")}>
-                <SelectTrigger><SelectValue placeholder="Filter by status" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Active (Non-Delivered/Cancelled)</SelectItem>
-                  <SelectItem value="awaiting_assignment">Awaiting Assignment</SelectItem>
-                  <SelectItem value="pending">Pending Confirmation</SelectItem>
-                  <SelectItem value="assigned">Assigned</SelectItem>
-                  <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
-                  <SelectItem value="delivery_attempted">Delivery Attempted</SelectItem>
-                  <SelectItem value="delivered">Delivered (View Only)</SelectItem>
-                  <SelectItem value="cancelled">Cancelled (View Only)</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="font-headline">Order: {selectedOrder.id.substring(0,12)}...</CardTitle>
+                  <CardDescription>Status: <Badge variant={selectedOrder.status === 'delivered' ? 'default' : (selectedOrder.status === 'cancelled' ? 'destructive' : 'secondary')} className="capitalize">{selectedOrder.status.replace(/_/g, ' ')}</Badge></CardDescription>
+                </div>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" onClick={() => setOrderColorToEdit({orderId: selectedOrder.id, currentColor: selectedOrder.color || null})} aria-label="Set order color"><Palette className="h-4 w-4" /></Button>
+                  {selectedOrder.status !== 'delivered' && selectedOrder.status !== 'cancelled' && (
+                      <Button variant="ghost" size="icon" onClick={() => setOrderToCancel(selectedOrder)} aria-label="Cancel order"><XCircle className="h-4 w-4 text-destructive" /></Button>
+                  )}
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-2 max-h-[calc(50vh-100px)] overflow-y-auto"> {/* Adjusted max height */}
-              {filteredOrders.length === 0 && <p className="text-muted-foreground text-sm">No orders match filter.</p>}
-              {filteredOrders.map(order => (
-                <div key={order.id} 
-                     className={`p-2 rounded-md border cursor-pointer hover:bg-muted ${selectedOrder?.id === order.id ? 'ring-2 ring-primary bg-muted' : ''}`}
-                     onClick={() => {
-                        setSelectedOrder(order);
-                        if(order.deliveryCoordinates && mapRef.current) mapRef.current.flyTo({center: [order.deliveryCoordinates.lng, order.deliveryCoordinates.lat], zoom: 14});
-                     }}>
-                  <p className="font-semibold text-sm">ID: {order.id.substring(0,8)}...</p>
-                  <p className="text-xs text-muted-foreground truncate" title={order.deliveryAddress}>{order.deliveryAddress}</p>
-                  <Badge variant={order.status === 'delivered' ? 'default' : (order.status === 'cancelled' ? 'destructive' : 'secondary')} className="capitalize text-xs mt-1">{order.status.replace(/_/g, " ")}</Badge>
-                  {order.riderName && <p className="text-xs mt-1">Rider: {order.riderName}</p>}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><UsersRound className="h-5 w-5" /> Riders ({riders.length})</CardTitle></CardHeader>
-            <CardContent className="space-y-2 max-h-[calc(40vh-100px)] overflow-y-auto"> {/* Adjusted max height */}
-              {riders.length === 0 && <p className="text-muted-foreground text-sm">No active riders.</p>}
-              {riders.map(rider => (
-                <div key={rider.uid} className="p-2 rounded-md border">
-                  <p className="font-semibold text-sm">{rider.displayName || rider.email}</p>
-                  <p className="text-xs text-muted-foreground">Orders: {allOrders.filter(o => o.riderId === rider.uid && (o.status === 'assigned' || o.status === 'out_for_delivery')).length}</p> 
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="flex-grow flex flex-col gap-4 overflow-hidden">
-          <Card className="flex-grow-[2] relative min-h-[300px]"> 
-            <CardContent className="p-0 h-full">
-              {mapError && <Alert variant="destructive" className="m-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Map Error</AlertTitle><AlertDescription>{mapError}</AlertDescription></Alert>}
-              {mapLoading && !mapError && <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10"><Loader2 className="h-10 w-10 animate-spin text-primary" /><p className="ml-2">Loading map...</p></div>}
-              <div ref={mapContainerRef} className="w-full h-full rounded-md" />
-            </CardContent>
-          </Card>
-
-          {selectedOrder && (
-            <Card className="flex-grow-[1] max-h-[calc(100vh-var(--header-height,4rem)-2rem-300px-4rem-2rem)] overflow-y-auto"> {/* Adjust max-height */}
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="font-headline">Order: {selectedOrder.id.substring(0,12)}...</CardTitle>
-                    <CardDescription>Status: <Badge variant={selectedOrder.status === 'delivered' ? 'default' : (selectedOrder.status === 'cancelled' ? 'destructive' : 'secondary')} className="capitalize">{selectedOrder.status.replace(/_/g, ' ')}</Badge></CardDescription>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => setOrderColorToEdit({orderId: selectedOrder.id, currentColor: selectedOrder.color || null})} aria-label="Set order color"><Palette className="h-4 w-4" /></Button>
-                    {selectedOrder.status !== 'delivered' && selectedOrder.status !== 'cancelled' && (
-                        <Button variant="ghost" size="icon" onClick={() => setOrderToCancel(selectedOrder)} aria-label="Cancel order"><XCircle className="h-4 w-4 text-destructive" /></Button>
-                    )}
+            <CardContent className="space-y-3">
+              <p className="flex items-center text-sm"><User className="h-4 w-4 mr-2 text-muted-foreground" /> Cust: {selectedOrder.customerName || selectedOrder.customerId}</p>
+              <p className="flex items-center text-sm"><MapPin className="h-4 w-4 mr-2 text-muted-foreground" /> Addr: {selectedOrder.deliveryAddress}</p>
+              {selectedOrder.customerPhone && <p className="flex items-center text-sm"><Phone className="h-4 w-4 mr-2 text-muted-foreground" /> Phone: <a href={`tel:${selectedOrder.customerPhone}`} className="text-primary hover:underline">{selectedOrder.customerPhone}</a></p>}
+              {selectedOrder.deliveryNotes && <p className="flex items-center text-sm"><Info className="h-4 w-4 mr-2 text-muted-foreground" /> Notes: {selectedOrder.deliveryNotes}</p>}
+              
+              {(selectedOrder.status === 'awaiting_assignment' || selectedOrder.status === 'pending') && (
+                <div className="pt-2 border-t mt-2">
+                  <p className="font-medium text-sm mb-1">Assign Rider:</p>
+                  <div className="flex gap-2 items-center">
+                    <Select onValueChange={setSelectedRiderForAssignment} value={selectedRiderForAssignment || undefined}>
+                      <SelectTrigger className="flex-grow"><SelectValue placeholder="Select Rider" /></SelectTrigger>
+                      <SelectContent>
+                        {riders.length === 0 && <SelectItem value="no-riders" disabled>No riders available</SelectItem>}
+                        {riders.map(r => <SelectItem key={r.uid} value={r.uid}>{r.displayName || r.email}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={handleAssignRider} disabled={!selectedRiderForAssignment}>Assign</Button>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="flex items-center text-sm"><User className="h-4 w-4 mr-2 text-muted-foreground" /> Cust: {selectedOrder.customerName || selectedOrder.customerId}</p>
-                <p className="flex items-center text-sm"><MapPin className="h-4 w-4 mr-2 text-muted-foreground" /> Addr: {selectedOrder.deliveryAddress}</p>
-                {selectedOrder.customerPhone && <p className="flex items-center text-sm"><Phone className="h-4 w-4 mr-2 text-muted-foreground" /> Phone: <a href={`tel:${selectedOrder.customerPhone}`} className="text-primary hover:underline">{selectedOrder.customerPhone}</a></p>}
-                {selectedOrder.deliveryNotes && <p className="flex items-center text-sm"><Info className="h-4 w-4 mr-2 text-muted-foreground" /> Notes: {selectedOrder.deliveryNotes}</p>}
-                
-                {(selectedOrder.status === 'awaiting_assignment' || selectedOrder.status === 'pending') && (
-                  <div className="pt-2 border-t mt-2">
-                    <p className="font-medium text-sm mb-1">Assign Rider:</p>
-                    <div className="flex gap-2 items-center">
-                      <Select onValueChange={setSelectedRiderForAssignment} value={selectedRiderForAssignment || undefined}>
-                        <SelectTrigger className="flex-grow"><SelectValue placeholder="Select Rider" /></SelectTrigger>
-                        <SelectContent>
-                          {riders.length === 0 && <SelectItem value="no-riders" disabled>No riders available</SelectItem>}
-                          {riders.map(r => <SelectItem key={r.uid} value={r.uid}>{r.displayName || r.email}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <Button onClick={handleAssignRider} disabled={!selectedRiderForAssignment}>Assign</Button>
-                    </div>
-                  </div>
-                )}
-                {selectedOrder.riderName && <p className="text-sm pt-2 border-t mt-2">Assigned Rider: <span className="font-semibold">{selectedOrder.riderName}</span></p>}
-              </CardContent>
-            </Card>
-          )}
-        </div>
+              )}
+              {selectedOrder.riderName && <p className="text-sm pt-2 border-t mt-2">Assigned Rider: <span className="font-semibold">{selectedOrder.riderName}</span></p>}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
+      {/* Dialogs */}
       {orderColorToEdit && (
         <Dialog open={!!orderColorToEdit} onOpenChange={() => setOrderColorToEdit(null)}>
           <DialogContent>
@@ -476,10 +476,6 @@ export default function DispatchCenterPage() {
     </div>
   );
 }
-
-
-    
-
     
 
     
