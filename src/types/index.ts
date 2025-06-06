@@ -52,11 +52,12 @@ export interface Product {
   imageUrl?: string;
   stock: number;
   categories?: string[];
-  supplier?: string;
+  supplier?: string; // Optional: default supplier ID
   createdAt?: any; // Firestore Timestamp or Date
   updatedAt?: any; // Firestore Timestamp or Date
   customizationOptions?: ProductCustomizationOption[]; // Kept for products that might have inline customizations
   customizationGroupId?: string | null; // ID of the assigned CustomizationGroupDefinition
+  dataAiHint?: string;
 }
 
 export type OrderStatus =
@@ -109,10 +110,13 @@ export interface GiftDetails {
   recipientCanViewAndTrack: boolean; // New field
 }
 
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+
 export interface OrderRating {
   value: number; // e.g., 1-5
   comment?: string;
   ratedAt: any; // Firestore Timestamp
+  userId: string;
 }
 
 export interface Order {
@@ -141,7 +145,7 @@ export interface Order {
   actualDeliveryTime?: any | null; // Firestore Timestamp or Date
   deliveryHistory?: DeliveryHistoryEntry[];
   paymentMethod?: string | null; // e.g., 'cod', 'mpesa', 'card'
-  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  paymentStatus: PaymentStatus;
   transactionId?: string | null; // ID from payment gateway
   isGift?: boolean;
   giftDetails?: GiftDetails | null;
@@ -163,13 +167,14 @@ export interface CartItem {
 
 export interface Task {
   id: string;
-  orderId: string;
-  itemName: string; // Denormalized product name
-  taskType: string; // e.g., Engraving, Printing
+  orderId?: string; // Can be null if it's a general task not tied to an order
+  itemName?: string; // Denormalized product name if related to order item
+  taskType: string; // e.g., Engraving, Printing, Stocking, Approval
   description: string; // Specific instructions for the task
-  assigneeId: string; // UID of the technician
-  assigneeName?: string; // Denormalized technician name
-  status: 'pending' | 'in-progress' | 'completed' | 'needs_approval' | 'blocked';
+  assigneeId?: string; // UID of the technician, manager etc.
+  assigneeName?: string; // Denormalized assignee name
+  status: 'pending' | 'in-progress' | 'completed' | 'needs_approval' | 'blocked' | 'rejected';
+  relatedDocId?: string; // e.g. orderId for order tasks, stockRequestId for stock tasks
   createdAt: any; // Firestore Timestamp
   updatedAt: any; // Firestore Timestamp
   dueDate?: any; // Optional Firestore Timestamp
@@ -247,3 +252,32 @@ export interface CustomizationGroupDefinition {
   updatedAt?: any; // Firestore Timestamp
 }
 
+export type StockRequestStatus = 
+  | 'pending_finance_approval'
+  | 'pending_supplier_fulfillment'
+  | 'fulfilled'
+  | 'rejected_finance'
+  | 'rejected_supplier'
+  | 'cancelled';
+
+export interface StockRequest {
+  id: string; // Firestore document ID
+  productId: string;
+  productName: string; // Denormalized
+  requestedQuantity: number;
+  requesterId: string; // Inventory Manager UID
+  requesterName: string; // Inventory Manager Name
+  supplierId?: string; // Optional: Specific supplier targeted (can be product's default supplier)
+  supplierName?: string; // Denormalized
+  status: StockRequestStatus;
+  financeManagerId?: string | null; // UID of Finance Manager who actioned
+  financeManagerName?: string | null; // Name of Finance Manager
+  financeActionTimestamp?: any; // Firestore Timestamp
+  financeNotes?: string; // Notes from finance, e.g., rejection reason
+  supplierNotes?: string; // Notes from supplier, e.g., partial fulfillment
+  fulfilledQuantity?: number; // Quantity actually fulfilled by supplier
+  supplierActionTimestamp?: any; // Firestore Timestamp
+  createdAt: any; // Firestore Timestamp
+  updatedAt: any; // Firestore Timestamp
+  notes?: string; // General notes by requester
+}

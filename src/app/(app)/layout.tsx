@@ -24,7 +24,7 @@ import {
   LayoutDashboard, Users, Package, ShoppingCart, Layers, DollarSign,
   Truck, Settings as SettingsIcon, UserCircle, LogOutIcon, Menu, Bell,
   FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIconLucide, ListChecks,
-  Aperture // Import Aperture for the brand mark
+  Aperture, Coins // Added Coins
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
@@ -35,7 +35,7 @@ interface LayoutProps {
 }
 
 const AdminLayout: FC<LayoutProps> = ({ children }) => {
-  const { logout } = useAuth();
+  const { user, role, logout } = useAuth();
   const sidebarContext = useSidebar();
   const pathname = usePathname();
 
@@ -44,23 +44,27 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   }
   const { searchTerm, setSearchTerm, setOpenMobile } = sidebarContext;
 
-  const mainAdminNavItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/admin/users', label: 'Users', icon: Users },
-    { href: '/admin/products', label: 'Products', icon: Package },
-    { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
-    { href: '/admin/customizations', label: 'Customizations', icon: Layers },
-    { href: '/admin/payments', label: 'Payments', icon: DollarSign },
-    { href: '/admin/shipping', label: 'Shipping', icon: Ship },
-    { href: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck },
-    { href: '/admin/notifications', label: 'Notifications', icon: Bell },
-    { href: '/admin/reports', label: 'Reports', icon: FileArchive },
+  const baseAdminNavItems = [
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'SupplyManager', 'InventoryManager'] },
+    { href: '/admin/users', label: 'Users', icon: Users, roles: ['Admin'] },
+    { href: '/admin/products', label: 'Products', icon: Package, roles: ['Admin', 'SupplyManager', 'InventoryManager'] },
+    { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, roles: ['Admin', 'ServiceManager'] },
+    { href: '/admin/customizations', label: 'Customizations', icon: Layers, roles: ['Admin'] },
+    { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'] },
+    { href: '/admin/shipping', label: 'Shipping', icon: Ship, roles: ['Admin'] },
+    { href: '/admin/approvals', label: 'General Approvals', icon: ClipboardCheck, roles: ['Admin'] }, // Generic approvals
+    { href: '/finance/approvals', label: 'Stock Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] }, // Specific for finance
+    { href: '/admin/dispatch', label: 'Dispatch Center', icon: Truck, roles: ['Admin', 'DispatchManager'] },
+    { href: '/admin/notifications', label: 'Notifications', icon: Bell, roles: ['Admin'] },
+    { href: '/admin/reports', label: 'Reports', icon: FileArchive, roles: ['Admin'] },
   ];
 
   const footerAdminNavItems = [
-    { href: '/profile', label: 'Profile', icon: UserCircle },
-    { href: '/admin/settings', label: 'Settings', icon: SettingsIcon },
+    { href: '/profile', label: 'Profile', icon: UserCircle, roles: ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'SupplyManager', 'InventoryManager'] },
+    { href: '/admin/settings', label: 'Settings', icon: SettingsIcon, roles: ['Admin'] },
   ];
+
+  const mainAdminNavItems = baseAdminNavItems.filter(item => role && item.roles.includes(role));
 
   const filteredMainAdminNavItems = mainAdminNavItems
     .map(item => {
@@ -70,9 +74,12 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     })
     .filter(item => item.isVisible);
 
-  const filteredFooterAdminNavItems = footerAdminNavItems.filter(item =>
-    !searchTerm || item.label.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredFooterAdminNavItems = footerAdminNavItems
+    .filter(item => role && item.roles.includes(role))
+    .filter(item =>
+      !searchTerm || item.label.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
 
   return (
     <div className="flex flex-col w-full min-h-screen bg-background">
@@ -113,7 +120,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                 </ScrollArea>
                 <SidebarFooter className="p-2 border-t border-sidebar">
                   <SidebarMenu className="p-0">
-                    {footerAdminNavItems.map((item) => (
+                    {filteredFooterAdminNavItems.map((item) => ( // Use filtered here too
                       <SidebarMenuItem key={item.label}>
                         <Link href={item.href} passHref legacyBehavior>
                           <SidebarMenuButton
@@ -139,7 +146,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
               </SheetContent>
             </Sheet>
             <Link href="/dashboard" className="hidden md:flex items-center gap-2" aria-label="Admin Dashboard Home">
-               <Aperture className="h-6 w-6 text-primary" /> {/* Added Brand Mark Icon */}
+               <Aperture className="h-6 w-6 text-primary" /> 
                <h1 className="text-xl font-semibold font-headline">Admin Panel</h1>
             </Link>
           </div>
@@ -167,7 +174,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
           className="border-r border-sidebar w-[var(--sidebar-width)] sticky top-[var(--header-height)] hidden md:flex flex-col"
           style={{ height: 'calc(100vh - var(--header-height))' }}
         >
-          <AdminSidebarHeader className="h-[var(--header-height)] border-b border-sidebar flex-shrink-0" />
+          <AdminSidebarHeader className="h-[calc(var(--header-height) - 1px)] border-b border-sidebar flex-shrink-0" />
           <SidebarContent className="flex-1 overflow-y-auto">
             <ScrollArea className="h-full">
               {filteredMainAdminNavItems.length > 0 ? (
@@ -243,17 +250,19 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
 const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   const { user, role, logout } = useAuth();
   const { cartTotalItems } = useCart();
+  const pathname = usePathname();
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-[var(--header-height)]">
         <div className="container mx-auto h-full flex items-center justify-between px-4 gap-4">
-          <div className="relative flex-1 max-w-md sm:max-w-lg md:max-w-xl">
+           <div className="relative flex-1 max-w-md sm:max-w-lg md:max-w-xl">
              <SearchIconLucide className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
-              placeholder={role === 'Customer' ? "Search products, gift boxes..." : "Search..."}
+              placeholder={role === 'Customer' ? "Search products, gift boxes..." : (role === 'InventoryManager' ? "Search inventory..." : "Search...")}
               className="h-9 w-full pl-10"
+              // TODO: Add value and onChange for actual search functionality
             />
           </div>
 
@@ -287,12 +296,16 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
                         <SheetHeader className="p-4 border-b h-[var(--header-height)]">
                             <SheetTitle>Menu</SheetTitle>
                         </SheetHeader>
-                        <nav className="py-4 px-2 flex-1">
-                            <Link href="/dashboard" className="flex items-center p-2 rounded-md hover:bg-muted"><Home className="mr-2 h-4 w-4" />Dashboard</Link>
-                            {role === 'Technician' && <Link href="/tasks" className="flex items-center p-2 rounded-md hover:bg-muted"><ListChecks className="mr-2 h-4 w-4" />Tasks</Link>}
-                            {role === 'Rider' && <Link href="/deliveries" className="flex items-center p-2 rounded-md hover:bg-muted"><Truck className="mr-2 h-4 w-4" />Deliveries</Link>}
-                            <Link href="/profile" className="flex items-center p-2 rounded-md hover:bg-muted"><UserCircle className="mr-2 h-4 w-4" />Profile</Link>
-                        </nav>
+                        <ScrollArea className="flex-1">
+                          <nav className="py-4 px-2">
+                              <Link href="/dashboard" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/dashboard" ? "bg-muted text-primary font-semibold" : ""}`}><Home className="mr-2 h-4 w-4" />Dashboard</Link>
+                              {role === 'Technician' && <Link href="/tasks" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/tasks") ? "bg-muted text-primary font-semibold" : ""}`}><ListChecks className="mr-2 h-4 w-4" />Tasks</Link>}
+                              {role === 'Rider' && <Link href="/deliveries" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/deliveries") ? "bg-muted text-primary font-semibold" : ""}`}><Truck className="mr-2 h-4 w-4" />Deliveries</Link>}
+                              {role === 'Supplier' && <Link href="/supplier/stock-requests" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/supplier/stock-requests") ? "bg-muted text-primary font-semibold" : ""}`}><Truck className="mr-2 h-4 w-4" />Stock Requests</Link>}
+                              {role === 'InventoryManager' && <Link href="/inventory" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/inventory") ? "bg-muted text-primary font-semibold" : ""}`}><Package className="mr-2 h-4 w-4" />Inventory</Link>}
+                              <Link href="/profile" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/profile" ? "bg-muted text-primary font-semibold" : ""}`}><UserCircle className="mr-2 h-4 w-4" />Profile</Link>
+                          </nav>
+                        </ScrollArea>
                         <div className="p-4 border-t">
                           <Button variant="outline" onClick={logout} className="w-full justify-start"><LogOutIcon className="mr-2 h-4 w-4" />Logout</Button>
                         </div>
@@ -312,21 +325,33 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
 
 export default function AppGroupLayout({ children }: LayoutProps) {
   const { user, role, loading } = useAuth();
+  const pathname = usePathname();
 
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
-  if (!user) {
+  if (!user && !pathname.startsWith('/login') && !pathname.startsWith('/signup')) { // Added signup exclusion
     // This case should ideally be handled by redirects in individual pages or a root page.
-    // For now, showing loader, but a proper "redirecting to login" or similar might be better.
-    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
+    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /> Redirecting...</div>;
+  }
+  
+  // For login/signup pages, don't render the main app layout
+  if (!user && (pathname.startsWith('/login') || pathname.startsWith('/signup'))) {
+    return <>{children}</>;
+  }
+  
+  if (!user) { // Fallback if still no user and not login/signup
+    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /> Awaiting authentication...</div>;
   }
 
-  if (role === 'Admin') {
+
+  const isAdminPanelRole = role && ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'SupplyManager'].includes(role);
+
+
+  if (isAdminPanelRole) {
     return <SidebarProvider><AdminLayout>{children}</AdminLayout></SidebarProvider>;
   }
 
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
-    

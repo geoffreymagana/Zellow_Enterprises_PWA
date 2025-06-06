@@ -7,11 +7,11 @@ import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 
 export const metadata: Metadata = {
-  title: 'Zellow Enterprises PWA',
-  description: 'Zellow Enterprises PWA for Customers and Staff',
+  title: 'Zellow Enterprises',
+  description: 'Zellow Enterprises for Customers and Staff',
   manifest: '/manifest.json',
   icons: {
-    apple: "/icons/icon-192x192.png", // Basic apple touch icon
+    apple: "/icons/Zellow-icon-192.png", // Basic apple touch icon
   },
 };
 
