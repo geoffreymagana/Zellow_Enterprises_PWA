@@ -11,17 +11,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import type { Order, OrderStatus } from '@/types';
+import type { Order, OrderStatus, DeliveryHistoryEntry } from '@/types';
 import { doc, onSnapshot, updateDoc, arrayUnion, serverTimestamp, Unsubscribe, collection, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 
 // Ensure this is in a .env.local file as NEXT_PUBLIC_MAPBOX_TOKEN
 const MAPBOX_ACCESS_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1Ijoib2RpbnN3b3JkIiwiYSI6ImNtYmphdTZoaTBldG8ybHFuZDdiZjN3bTMifQ.LdbfK1YplSmP0-tc46cblA';
-
-interface DisplayOrder extends Order {
-  marker?: mapboxgl.Marker;
-}
 
 export default function RiderMapPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -34,9 +30,12 @@ export default function RiderMapPage() {
   const [mapLoading, setMapLoading] = useState(true);
   const [mapError, setMapError] = useState<string | null>(null);
   
-  const [assignedOrders, setAssignedOrders] = useState<DisplayOrder[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<DisplayOrder | null>(null);
+  const [assignedOrders, setAssignedOrders] = useState<Order[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  
   const riderLocationMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const orderMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map()); // Ref for order markers
+
   const [riderLngLat, setRiderLngLat] = useState<[number, number] | null>(null);
   const routeLayerId = 'route-layer';
   const routeSourceId = 'route-source';
@@ -54,12 +53,13 @@ export default function RiderMapPage() {
     );
 
     const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
-      const orders: DisplayOrder[] = [];
-      snapshot.forEach(doc => orders.push({ id: doc.id, ...doc.data() } as DisplayOrder));
+      const orders: Order[] = [];
+      snapshot.forEach(doc => orders.push({ id: doc.id, ...doc.data() } as Order));
       orders.sort((a,b) => (a.createdAt?.toDate?.()?.getTime() || 0) - (b.createdAt?.toDate?.()?.getTime() || 0));
-      console.log('[RiderMapPage] Fetched orders for rider:', user?.uid, orders); // DEBUG LOG
+      console.log('[RiderMapPage] Fetched orders for rider:', user?.uid, orders);
       setAssignedOrders(orders);
-      if(focusedOrderId && !selectedOrder){
+      
+      if(focusedOrderId && !selectedOrder){ // Check if selectedOrder is already set to avoid loop if it's a dependency
         const orderToFocus = orders.find(o => o.id === focusedOrderId);
         if(orderToFocus) setSelectedOrder(orderToFocus);
       }
@@ -68,7 +68,7 @@ export default function RiderMapPage() {
       toast({ title: "Error", description: "Could not fetch assigned orders.", variant: "destructive" });
     });
     return () => unsubscribe();
-  }, [user, db, role, toast, focusedOrderId, selectedOrder]);
+  }, [user, db, role, toast, focusedOrderId]); // Removed selectedOrder from here as it caused issues if setSelectedOrder was called within. Initial focus is handled.
 
 
   // Initialize map
@@ -87,8 +87,8 @@ export default function RiderMapPage() {
     try {
       mapRef.current = new mapboxgl.Map({
         container: mapContainerRef.current,
-        style: 'mapbox://styles/mapbox/streets-v12', // Standard street style
-        center: [36.8219, -1.2921], // Default to Nairobi
+        style: 'mapbox://styles/mapbox/streets-v12', 
+        center: [36.8219, -1.2921], 
         zoom: 10,
       });
 
@@ -100,14 +100,14 @@ export default function RiderMapPage() {
           navigator.geolocation.watchPosition(
             (position) => {
               const { longitude, latitude } = position.coords;
-              setRiderLngLat([longitude, latitude]); // Update rider location state
+              setRiderLngLat([longitude, latitude]); 
               if (mapRef.current) {
                 if (!riderLocationMarkerRef.current) {
                   const el = document.createElement('div');
-                  el.style.width = '24px'; // Slightly larger for rider
+                  el.style.width = '24px'; 
                   el.style.height = '24px';
                   el.style.borderRadius = '50%';
-                  el.style.backgroundColor = 'hsl(var(--accent))'; // Rider color (e.g., blue)
+                  el.style.backgroundColor = 'hsl(var(--accent))'; 
                   el.style.border = '2px solid hsl(var(--card))';
                   el.style.boxShadow = '0 0 5px hsl(var(--accent))';
                   riderLocationMarkerRef.current = new mapboxgl.Marker({ element: el }) 
@@ -116,7 +116,6 @@ export default function RiderMapPage() {
                 } else {
                   riderLocationMarkerRef.current.setLngLat([longitude, latitude]);
                 }
-                // Center map on rider if it's the first location update or no specific order is focused
                 if (!focusedOrderId && mapRef.current.getZoom() < 12) { 
                     mapRef.current.flyTo({ center: [longitude, latitude], zoom: 13 });
                 }
@@ -124,7 +123,7 @@ export default function RiderMapPage() {
             },
             (geoError) => {
               console.warn("Could not get rider location:", geoError.message);
-              if(!mapRef.current?.getSource(routeSourceId)){ // Only toast if not already showing a route/focused
+              if(!mapRef.current?.getSource(routeSourceId)){ 
                 toast({ title: "Location Info", description: "Could not get your current location. Map will default to city center. Routing will activate when location is found.", variant: "default" });
               }
             },
@@ -148,13 +147,15 @@ export default function RiderMapPage() {
     }
 
     return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
+      orderMarkersRef.current.forEach(marker => marker.remove());
+      orderMarkersRef.current.clear();
       if (riderLocationMarkerRef.current) {
         riderLocationMarkerRef.current.remove();
         riderLocationMarkerRef.current = null;
+      }
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
       }
     };
   }, [authLoading, role, toast, focusedOrderId]);
@@ -172,8 +173,8 @@ export default function RiderMapPage() {
   }, []);
 
   const fetchAndDisplayRoute = useCallback(async (start: [number, number], end: [number, number]) => {
-    if (!mapRef.current || !MAPBOX_ACCESS_TOKEN) return;
-    clearRoute(); // Clear previous route
+    if (!mapRef.current || !MAPBOX_ACCESS_TOKEN || !mapRef.current.isStyleLoaded()) return;
+    clearRoute(); 
 
     const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson&access_token=${MAPBOX_ACCESS_TOKEN}&overview=full`;
 
@@ -196,13 +197,12 @@ export default function RiderMapPage() {
             paint: { 'line-color': 'hsl(var(--primary))', 'line-width': 5, 'line-opacity': 0.8 }
           });
         }
-        // Fit map to route bounds
         const coordinates = routeGeoJSON.coordinates;
         const bounds = new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]);
         for (const coord of coordinates) {
           bounds.extend(coord);
         }
-        mapRef.current.fitBounds(bounds, { padding: 80, maxZoom: 16 }); // Increased padding
+        mapRef.current.fitBounds(bounds, { padding: 80, maxZoom: 16 }); 
       } else {
         console.error("No route found by Mapbox Directions API", data);
         toast({ title: "Routing Error", description: data.message || "Could not calculate route to destination.", variant: "destructive" });
@@ -213,12 +213,11 @@ export default function RiderMapPage() {
     }
   }, [clearRoute, toast]);
 
-   // Effect to fetch route when rider location or selected order changes
    useEffect(() => {
     if (riderLngLat && selectedOrder?.deliveryCoordinates) {
       fetchAndDisplayRoute(riderLngLat, [selectedOrder.deliveryCoordinates.lng, selectedOrder.deliveryCoordinates.lat]);
     } else {
-      clearRoute(); // Clear route if no order selected or rider location unknown
+      clearRoute(); 
     }
   }, [riderLngLat, selectedOrder, fetchAndDisplayRoute, clearRoute]);
 
@@ -226,78 +225,83 @@ export default function RiderMapPage() {
   // Update map markers when orders change
   useEffect(() => {
     if (!mapRef.current || !mapRef.current.isStyleLoaded() || mapLoading) return;
-
     const map = mapRef.current;
-    
-    const currentOrderIdsOnMap = new Set(assignedOrders.map(o => o.id));
-    const ordersWithMarkers = assignedOrders.filter(o => o.marker);
 
-    ordersWithMarkers.forEach(order => {
-        if (!currentOrderIdsOnMap.has(order.id) && order.marker) {
-            order.marker.remove();
+    const currentOrderIdsInState = new Set(assignedOrders.map(o => o.id));
+
+    // Add/Update markers for current orders
+    assignedOrders.forEach(order => {
+      if (order.deliveryCoordinates) {
+        const { lng, lat } = order.deliveryCoordinates;
+        const markerFillColor = order.color || 
+                                (order.status === 'delivered' ? 'hsl(120, 60%, 50%)' : // Green for delivered
+                                'hsl(var(--primary))'); // Default to primary for active, non-colored
+
+        const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${markerFillColor}" width="32px" height="32px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12-2.5-2.5-2.5z"/><circle cx="12" cy="9.5" r="2.5"/></svg>`;
+        
+        let existingMarker = orderMarkersRef.current.get(order.id);
+
+        if (existingMarker) {
+          existingMarker.setLngLat([lng, lat]);
+          const el = existingMarker.getElement();
+          if (el instanceof HTMLElement) { 
+            el.style.backgroundImage = `url('data:image/svg+xml;utf8,${encodeURIComponent(svgIcon)}')`;
+          }
+        } else {
+          const el = document.createElement('div');
+          el.style.backgroundImage = `url('data:image/svg+xml;utf8,${encodeURIComponent(svgIcon)}')`;
+          el.style.width = `32px`;
+          el.style.height = `32px`;
+          el.style.backgroundSize = '100%';
+          el.style.cursor = 'pointer';
+          el.title = `Order ${order.id}`;
+          
+          const newMarker = new mapboxgl.Marker(el)
+            .setLngLat([lng, lat])
+            .addTo(map);
+          newMarker.getElement().addEventListener('click', () => setSelectedOrder(order));
+          orderMarkersRef.current.set(order.id, newMarker);
         }
+      } else { // No coordinates, remove marker if it exists
+        const existingMarker = orderMarkersRef.current.get(order.id);
+        if (existingMarker) {
+          existingMarker.remove();
+          orderMarkersRef.current.delete(order.id);
+        }
+      }
+    });
+
+    // Remove markers for orders no longer in assignedOrders
+    orderMarkersRef.current.forEach((marker, orderId) => {
+      if (!currentOrderIdsInState.has(orderId)) {
+        marker.remove();
+        orderMarkersRef.current.delete(orderId);
+      }
     });
     
-    const updatedOrdersWithMarkers: DisplayOrder[] = assignedOrders.map(order => {
-        let currentMarker = order.marker;
-        if (order.deliveryCoordinates) {
-            const { lng, lat } = order.deliveryCoordinates;
-            const markerFillColor = order.color || (order.status === 'delivered' ? 'hsl(120, 60%, 50%)' : 'hsl(var(--primary))'); // Use primary for active non-colored
-            
-            const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${markerFillColor}" width="32px" height="32px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12-2.5-2.5-2.5z"/><circle cx="12" cy="9.5" r="2.5"/></svg>`;
-
-            if (currentMarker) { 
-                currentMarker.setLngLat([lng, lat]);
-                const el = currentMarker.getElement();
-                if (el instanceof HTMLElement) { 
-                    el.style.backgroundImage = `url('data:image/svg+xml;utf8,${encodeURIComponent(svgIcon)}')`;
-                }
-            } else { 
-                const el = document.createElement('div');
-                el.style.backgroundImage = `url('data:image/svg+xml;utf8,${encodeURIComponent(svgIcon)}')`;
-                el.style.width = `32px`;
-                el.style.height = `32px`;
-                el.style.backgroundSize = '100%';
-                el.style.cursor = 'pointer';
-                el.title = `Order ${order.id}`;
-                
-                currentMarker = new mapboxgl.Marker(el)
-                    .setLngLat([lng, lat])
-                    .addTo(map);
-                currentMarker.getElement().addEventListener('click', () => setSelectedOrder(order));
-            }
-        } else if (currentMarker) { // No coords but marker exists, remove it
-            currentMarker.remove();
-            currentMarker = undefined;
-        }
-        return {...order, marker: currentMarker};
-    });
-    
-    setAssignedOrders(updatedOrdersWithMarkers); 
-
-    if (focusedOrderId && !riderLngLat) { // If focusing on an order and rider location not yet known
-        const orderToFocus = updatedOrdersWithMarkers.find(o => o.id === focusedOrderId);
+    // Focusing logic (initial focus or when `focusedOrderId` changes and no rider location)
+    if (focusedOrderId && !riderLngLat) { 
+        const orderToFocus = assignedOrders.find(o => o.id === focusedOrderId);
         if (orderToFocus?.deliveryCoordinates) {
              map.flyTo({ center: [orderToFocus.deliveryCoordinates.lng, orderToFocus.deliveryCoordinates.lat], zoom: 14 });
         }
-    } else if (!riderLngLat && !focusedOrderId && assignedOrders.length > 0) { // If no rider location, no focus, but orders exist
+    } else if (!riderLngLat && !focusedOrderId && assignedOrders.length > 0) { 
         const bounds = new mapboxgl.LngLatBounds();
-        updatedOrdersWithMarkers.forEach(o => {
+        assignedOrders.forEach(o => {
             if (o.deliveryCoordinates) bounds.extend([o.deliveryCoordinates.lng, o.deliveryCoordinates.lat]);
         });
         if (!bounds.isEmpty()) {
             map.fitBounds(bounds, { padding: 60, maxZoom: 15 });
         }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps 
-  }, [assignedOrders, mapLoading, mapRef.current?.isStyleLoaded(), focusedOrderId]); 
+  }, [assignedOrders, mapLoading, mapRef.current?.isStyleLoaded(), focusedOrderId, riderLngLat]);
 
 
   const handleUpdateStatus = async (orderId: string, newStatus: OrderStatus, notes?: string) => {
     if (!db || !user) return;
     try {
       const orderRef = doc(db, 'orders', orderId);
-      const newHistoryEntry = {
+      const newHistoryEntry: DeliveryHistoryEntry = {
         status: newStatus,
         timestamp: Timestamp.now(),
         notes: notes || `Status updated to ${newStatus} by ${role}`,
@@ -338,8 +342,7 @@ export default function RiderMapPage() {
                 key={order.id} 
                 onClick={() => {
                     setSelectedOrder(order);
-                    // Route fetching will be handled by useEffect watching selectedOrder
-                    if (order.deliveryCoordinates && mapRef.current && !riderLngLat) { // If no rider location, fly to order
+                    if (order.deliveryCoordinates && mapRef.current && !riderLngLat) { 
                         mapRef.current.flyTo({ center: [order.deliveryCoordinates.lng, order.deliveryCoordinates.lat], zoom: 15 });
                     }
                 }}
@@ -392,17 +395,14 @@ export default function RiderMapPage() {
                 onClick={() => {
                   if (selectedOrder.deliveryCoordinates) { 
                     const { lng, lat } = selectedOrder.deliveryCoordinates;
-                    // Use riderLngLat if available, otherwise just destination for Google Maps
                     const origin = riderLngLat ? `${riderLngLat[1]},${riderLngLat[0]}` : '';
                     const mapsUrl = origin 
                         ? `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${lat},${lng}`
                         : `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
                     window.open(mapsUrl, '_blank');
-                  } else {
-                    toast({title: "Error", description: "No coordinates for navigation.", variant: "destructive"});
                   }
                 }}
-                title={!selectedOrder.deliveryCoordinates ? "Delivery coordinates not available" : "Open in Google Maps"}
+                title={!selectedOrder.deliveryCoordinates ? "Delivery coordinates not available for navigation" : "Open in Google Maps"}
               >
                 <Navigation className="mr-2 h-4 w-4" /> Navigate
               </Button>
@@ -439,3 +439,4 @@ declare global {
     mapboxgl?: typeof mapboxgl; 
   }
 }
+
