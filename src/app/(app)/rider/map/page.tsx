@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { Order, OrderStatus } from '@/types';
-import { doc, onSnapshot, updateDoc, arrayUnion, serverTimestamp, Unsubscribe, collection, query, where } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, serverTimestamp, Unsubscribe, collection, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 
@@ -53,6 +53,7 @@ export default function RiderMapPage() {
       const orders: DisplayOrder[] = [];
       snapshot.forEach(doc => orders.push({ id: doc.id, ...doc.data() } as DisplayOrder));
       orders.sort((a,b) => (a.createdAt?.toDate?.()?.getTime() || 0) - (b.createdAt?.toDate?.()?.getTime() || 0)); // Example sort
+      console.log('[RiderMapPage] Fetched orders for rider:', user?.uid, orders); // DEBUG LOG
       setAssignedOrders(orders);
       if(focusedOrderId && !selectedOrder){
         const orderToFocus = orders.find(o => o.id === focusedOrderId);
@@ -176,12 +177,17 @@ export default function RiderMapPage() {
       let existingOrderState = updatedOrdersWithMarkers[index];
       if (order.deliveryCoordinates) {
         const { lng, lat } = order.deliveryCoordinates;
-        if (existingOrderState.marker) { // Marker exists, update position
+        const markerFillColor = order.color || (order.status === 'delivered' ? 'hsl(120, 60%, 50%)' : 'hsl(var(--primary))');
+
+        if (existingOrderState.marker) { // Marker exists, update position and potentially color
           existingOrderState.marker.setLngLat([lng, lat]);
+          const el = existingOrderState.marker.getElement();
+          if (el instanceof HTMLElement) { // Check if getElement() returns an HTMLElement
+            el.style.backgroundImage = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${markerFillColor}" width="32px" height="32px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12-2.5-2.5-2.5z"/><circle cx="12" cy="9.5" r="2.5"/></svg>')`;
+          }
         } else { // No marker, create new one
           const el = document.createElement('div');
-          // el.className = 'marker'; // Generic class if needed
-          el.style.backgroundImage = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${order.status === 'delivered' ? 'hsl(120, 60%, 50%)' : (order.color || 'hsl(var(--destructive))')}" width="32px" height="32px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12-2.5-2.5-2.5z"/><circle cx="12" cy="9.5" r="2.5"/></svg>')`;
+          el.style.backgroundImage = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${markerFillColor}" width="32px" height="32px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12-2.5-2.5-2.5z"/><circle cx="12" cy="9.5" r="2.5"/></svg>')`;
           el.style.width = `32px`;
           el.style.height = `32px`;
           el.style.backgroundSize = '100%';
@@ -201,8 +207,8 @@ export default function RiderMapPage() {
       }
     });
     // Only update state if markers actually changed to avoid loop if objects are new but logically same
-    if (JSON.stringify(updatedOrdersWithMarkers.map(o=>({id:o.id, hasMarker: !!o.marker}))) !== JSON.stringify(assignedOrders.map(o=>({id:o.id, hasMarker: !!o.marker})))) {
-      setAssignedOrders(updatedOrdersWithMarkers); 
+    if (JSON.stringify(updatedOrdersWithMarkers.map(o=>({id:o.id, hasMarker: !!o.marker, color: o.color, status: o.status}))) !== JSON.stringify(assignedOrders.map(o=>({id:o.id, hasMarker: !!o.marker, color: o.color, status: o.status})))) {
+       setAssignedOrders(updatedOrdersWithMarkers); 
     }
 
 
@@ -223,23 +229,23 @@ export default function RiderMapPage() {
     if (!db || !user) return;
     try {
       const orderRef = doc(db, 'orders', orderId);
-      const currentOrder = assignedOrders.find(o => o.id === orderId); // Use local state for current history
       const newHistoryEntry = {
         status: newStatus,
-        timestamp: serverTimestamp(),
+        timestamp: Timestamp.now(), // Use client-side timestamp for arrayUnion
         notes: notes || `Status updated to ${newStatus} by ${role}`,
         actorId: user.uid,
       };
       
       await updateDoc(orderRef, { 
         status: newStatus, 
-        updatedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(), // Top-level serverTimestamp is fine for the document
         deliveryHistory: arrayUnion(newHistoryEntry),
         ...(newStatus === 'delivered' && { actualDeliveryTime: serverTimestamp() })
       });
       toast({ title: "Success", description: `Order ${orderId} marked as ${newStatus}.` });
-      setSelectedOrder(prev => prev && prev.id === orderId ? {...prev, status: newStatus, deliveryHistory: [...(prev.deliveryHistory || []), newHistoryEntry] } : prev);
-      // No need to call setAssignedOrders here, onSnapshot will update it
+      // Optimistically update selectedOrder if it's the one being changed
+      setSelectedOrder(prev => prev && prev.id === orderId ? {...prev, status: newStatus, deliveryHistory: [...(prev.deliveryHistory || []), {...newHistoryEntry, timestamp: new Date() }] } : prev);
+      // No need to call setAssignedOrders here, onSnapshot will update it from Firestore changes
     } catch (error) {
       console.error("Error updating order status:", error);
       toast({ title: "Error", description: "Failed to update order status.", variant: "destructive" });
@@ -277,7 +283,7 @@ export default function RiderMapPage() {
                     <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'} className="capitalize w-fit">{order.status.replace(/_/g, ' ')}</Badge>
                 </CardHeader>
                 <CardContent className="text-xs pb-4"> {/* Adjusted padding */}
-                    <p className="truncate">{order.deliveryAddress}</p>
+                    <p className="truncate">{order.shippingAddress?.addressLine1}, {order.shippingAddress?.city}</p>
                     <p>Customer: {order.customerName || 'N/A'}</p>
                 </CardContent>
             </Card>
@@ -307,7 +313,7 @@ export default function RiderMapPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               <p className="flex items-center text-sm"><UserCircle className="h-4 w-4 mr-2 text-muted-foreground" /> Customer: {selectedOrder.customerName || 'N/A'}</p>
-              <p className="flex items-center text-sm"><MapPin className="h-4 w-4 mr-2 text-muted-foreground" /> Address: {selectedOrder.deliveryAddress}</p>
+              <p className="flex items-center text-sm"><MapPin className="h-4 w-4 mr-2 text-muted-foreground" /> Address: {selectedOrder.shippingAddress?.addressLine1}, {selectedOrder.shippingAddress?.city}</p>
               {selectedOrder.customerPhone && <p className="flex items-center text-sm"><Phone className="h-4 w-4 mr-2 text-muted-foreground" /> Phone: <a href={`tel:${selectedOrder.customerPhone}`} className="text-primary hover:underline">{selectedOrder.customerPhone}</a></p>}
               {selectedOrder.deliveryNotes && <p className="flex items-center text-sm"><Info className="h-4 w-4 mr-2 text-muted-foreground" /> Notes: {selectedOrder.deliveryNotes}</p>}
             </CardContent>
