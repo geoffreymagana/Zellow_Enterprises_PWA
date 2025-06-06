@@ -26,7 +26,6 @@ const generateCartItemId = (productId: string, customizations?: Record<string, a
   if (!customizations || Object.keys(customizations).length === 0) {
     return productId;
   }
-  // Create a consistent string representation of customizations
   const sortedCustomizations = Object.entries(customizations)
     .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
     .map(([key, value]) => `${key}:${value}`)
@@ -38,7 +37,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [shippingAddress, setShippingAddressState] = useState<ShippingAddress | null>(null);
   const [paymentMethod, setPaymentMethodState] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true); // For loading cart from localStorage
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -58,7 +57,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error("Failed to load cart from localStorage", error);
-      // Potentially clear corrupted localStorage
       localStorage.removeItem('zellowCart');
       localStorage.removeItem('zellowShippingAddress');
       localStorage.removeItem('zellowPaymentMethod');
@@ -68,7 +66,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (!loading) { // Only save to localStorage after initial load
+    if (!loading) {
       localStorage.setItem('zellowCart', JSON.stringify(cartItems));
     }
   }, [cartItems, loading]);
@@ -93,40 +91,47 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const addToCart = useCallback((product: Product, quantity: number, customizations?: Record<string, any>, customizedPrice?: number) => {
     const cartItemId = generateCartItemId(product.id, customizations);
     const pricePerUnit = customizedPrice !== undefined ? customizedPrice : product.price;
+    let toastInfo: Parameters<typeof toast>[0] | null = null;
 
     setCartItems(prevItems => {
       const existingItem = prevItems.find(item => item.cartItemId === cartItemId);
       if (product.stock === 0) {
-        toast({ title: "Out of Stock", description: `${product.name} is currently out of stock.`, variant: "destructive" });
+        toastInfo = { title: "Out of Stock", description: `${product.name} is currently out of stock.`, variant: "destructive" };
         return prevItems;
       }
       if (existingItem) {
         const newQuantity = existingItem.quantity + quantity;
         if (newQuantity > product.stock) {
-          toast({ title: "Stock Limit", description: `Only ${product.stock} units of ${product.name} available.`, variant: "destructive" });
+          toastInfo = { title: "Stock Limit", description: `Only ${product.stock} units of ${product.name} available.`, variant: "destructive" };
           return prevItems.map(item => item.cartItemId === cartItemId ? { ...item, quantity: product.stock } : item);
         }
-        toast({ title: "Item Updated", description: `${product.name} quantity updated in cart.` });
+        toastInfo = { title: "Item Updated", description: `${product.name} quantity updated in cart.` };
         return prevItems.map(item => item.cartItemId === cartItemId ? { ...item, quantity: newQuantity } : item);
       } else {
+        let newQuantity = quantity;
         if (quantity > product.stock) {
-          toast({ title: "Stock Limit", description: `Only ${product.stock} units of ${product.name} available. Added ${product.stock} to cart.`, variant: "destructive" });
-          quantity = product.stock;
+          toastInfo = { title: "Stock Limit", description: `Only ${product.stock} units of ${product.name} available. Added ${product.stock} to cart.`, variant: "destructive" };
+          newQuantity = product.stock;
+        } else {
+          toastInfo = { title: "Item Added", description: `${product.name} added to cart.` };
         }
-        toast({ title: "Item Added", description: `${product.name} added to cart.` });
         return [...prevItems, {
           productId: product.id,
           name: product.name,
-          unitPrice: product.price, // Base product price
-          currentPrice: pricePerUnit, // Price including customizations for one unit
+          unitPrice: product.price,
+          currentPrice: pricePerUnit,
           imageUrl: product.imageUrl,
-          quantity,
+          quantity: newQuantity,
           stock: product.stock,
           customizations,
           cartItemId,
         }];
       }
     });
+
+    if (toastInfo) {
+      toast(toastInfo);
+    }
   }, [toast]);
 
   const removeFromCart = useCallback((cartItemId: string) => {
@@ -135,26 +140,35 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   }, [toast]);
 
   const updateQuantity = useCallback((cartItemId: string, quantity: number) => {
+    let toastInfo: Parameters<typeof toast>[0] | null = null;
+    let itemActuallyRemoved = false;
+
     setCartItems(prevItems => {
       const itemToUpdate = prevItems.find(item => item.cartItemId === cartItemId);
       if (!itemToUpdate) return prevItems;
 
       if (quantity <= 0) {
+        itemActuallyRemoved = true;
         return prevItems.filter(item => item.cartItemId !== cartItemId);
       }
       if (quantity > itemToUpdate.stock) {
-        toast({ title: "Stock Limit", description: `Only ${itemToUpdate.stock} units of ${itemToUpdate.name} available.`, variant: "destructive" });
+        toastInfo = { title: "Stock Limit", description: `Only ${itemToUpdate.stock} units of ${itemToUpdate.name} available.`, variant: "destructive" };
         return prevItems.map(item => item.cartItemId === cartItemId ? { ...item, quantity: itemToUpdate.stock } : item);
       }
       return prevItems.map(item => item.cartItemId === cartItemId ? { ...item, quantity } : item);
     });
+
+    if (itemActuallyRemoved) {
+      toast({ title: "Item Removed", description: "Item quantity set to 0 and removed from cart." });
+    } else if (toastInfo) {
+      toast(toastInfo);
+    }
   }, [toast]);
 
   const clearCart = useCallback(() => {
     setCartItems([]);
     setShippingAddressState(null);
     setPaymentMethodState(null);
-    // localStorage items will be cleared by their respective useEffects
     toast({ title: "Cart Cleared", description: "Your shopping cart is now empty." });
   }, [toast]);
 
@@ -165,7 +179,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const setPayMethod = useCallback((method: string) => {
     setPaymentMethodState(method);
   }, []);
-
 
   const cartSubtotal = cartItems.reduce((total, item) => total + (item.currentPrice * item.quantity), 0);
   const cartTotalItems = cartItems.reduce((total, item) => total + item.quantity, 0);
