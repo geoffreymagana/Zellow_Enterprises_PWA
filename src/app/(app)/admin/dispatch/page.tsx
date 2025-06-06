@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from '@/components/ui/badge';
-import type { Order, User as AppUser, OrderStatus, DeliveryHistoryEntry } from '@/types';
+import type { Order, User as AppUser, OrderStatus, DeliveryHistoryEntry, ShippingAddress } from '@/types';
 import { collection, query as firestoreQuery, where, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +24,14 @@ const MAPBOX_ACCESS_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1Ijoi
 
 const defaultOrderColors = ['#FF6347', '#4682B4', '#32CD32', '#FFD700', '#DA70D6', '#6A5ACD', '#FFA500', '#8A2BE2'];
 
+const constructDisplayAddress = (shippingAddr: ShippingAddress): string => {
+  let addressParts = [];
+  if (shippingAddr.addressLine1) addressParts.push(shippingAddr.addressLine1);
+  if (shippingAddr.addressLine2) addressParts.push(shippingAddr.addressLine2);
+  if (shippingAddr.city) addressParts.push(shippingAddr.city);
+  if (shippingAddr.county) addressParts.push(shippingAddr.county);
+  return addressParts.join(', ') || 'Address not specified';
+};
 
 export default function DispatchCenterPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -254,7 +262,7 @@ export default function DispatchCenterPage() {
       const orderRef = doc(db, 'orders', selectedOrder.id);
       const historyEntry: DeliveryHistoryEntry = {
         status: 'assigned',
-        timestamp: Timestamp.now(),
+        timestamp: Timestamp.now(), // Changed from serverTimestamp()
         notes: `Assigned to ${riderToAssign.displayName || riderToAssign.email} by dispatcher ${user.displayName || user.email}`,
         actorId: user.uid,
       };
@@ -297,7 +305,7 @@ export default function DispatchCenterPage() {
       const orderRef = doc(db, 'orders', orderToCancel.id);
       const historyEntry: DeliveryHistoryEntry = {
         status: 'cancelled',
-        timestamp: Timestamp.now(), 
+        timestamp: Timestamp.now(), // Changed from serverTimestamp()
         notes: `Order cancelled by dispatcher ${user.displayName || user.email}`,
         actorId: user.uid,
       };
@@ -353,7 +361,9 @@ export default function DispatchCenterPage() {
           </CardHeader>
           <CardContent className="space-y-2 max-h-[25vh] sm:max-h-[20vh] overflow-y-auto"> {/* Adjusted max-h */}
             {filteredOrders.length === 0 && <p className="text-muted-foreground text-sm">No orders match filter.</p>}
-            {filteredOrders.map(order => (
+            {filteredOrders.map(order => {
+              const displayAddress = constructDisplayAddress(order.shippingAddress);
+              return (
               <div key={order.id} 
                    className={`p-2 rounded-md border cursor-pointer hover:bg-muted ${selectedOrder?.id === order.id ? 'ring-2 ring-primary bg-muted' : ''}`}
                    onClick={() => {
@@ -361,11 +371,11 @@ export default function DispatchCenterPage() {
                       if(order.deliveryCoordinates && mapRef.current) mapRef.current.flyTo({center: [order.deliveryCoordinates.lng, order.deliveryCoordinates.lat], zoom: 14});
                    }}>
                 <p className="font-semibold text-sm">ID: {order.id.substring(0,8)}...</p>
-                <p className="text-xs text-muted-foreground truncate" title={order.deliveryAddress}>{order.deliveryAddress}</p>
+                <p className="text-xs text-muted-foreground truncate" title={displayAddress}>{displayAddress}</p>
                 <Badge variant={order.status === 'delivered' ? 'default' : (order.status === 'cancelled' ? 'destructive' : 'secondary')} className="capitalize text-xs mt-1">{order.status.replace(/_/g, " ")}</Badge>
                 {order.riderName && <p className="text-xs mt-1">Rider: {order.riderName}</p>}
               </div>
-            ))}
+            )})}
           </CardContent>
         </Card>
 
@@ -411,7 +421,7 @@ export default function DispatchCenterPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="flex items-center text-sm"><User className="h-4 w-4 mr-2 text-muted-foreground" /> Cust: {selectedOrder.customerName || selectedOrder.customerId}</p>
-              <p className="flex items-center text-sm"><MapPin className="h-4 w-4 mr-2 text-muted-foreground" /> Addr: {selectedOrder.deliveryAddress}</p>
+              <p className="flex items-center text-sm"><MapPin className="h-4 w-4 mr-2 text-muted-foreground" /> Addr: {constructDisplayAddress(selectedOrder.shippingAddress)}</p>
               {selectedOrder.customerPhone && <p className="flex items-center text-sm"><Phone className="h-4 w-4 mr-2 text-muted-foreground" /> Phone: <a href={`tel:${selectedOrder.customerPhone}`} className="text-primary hover:underline">{selectedOrder.customerPhone}</a></p>}
               {selectedOrder.deliveryNotes && <p className="flex items-center text-sm"><Info className="h-4 w-4 mr-2 text-muted-foreground" /> Notes: {selectedOrder.deliveryNotes}</p>}
               
@@ -476,6 +486,8 @@ export default function DispatchCenterPage() {
     </div>
   );
 }
+    
+
     
 
     

@@ -8,14 +8,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react'; // Added React and useMemo
 import { collection, addDoc, serverTimestamp, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, OrderItem, OrderStatus, DeliveryHistoryEntry, GiftDetails } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, PackageCheck, Gift } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { sendGiftNotification, GiftNotificationInput } from '@/ai/flows/send-gift-notification-flow'; // Import the flow
+import { sendGiftNotification, GiftNotificationInput } from '@/ai/flows/send-gift-notification-flow'; 
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -46,8 +46,7 @@ export default function ReviewOrderPage() {
   const shippingCost = selectedShippingMethodInfo?.cost || 0;
   const orderTotal = cartSubtotal + shippingCost;
 
-  // Memoize giftDetailsToSave to avoid re-computation on every render
-  const giftDetailsToSave = React.useMemo((): GiftDetails | null => {
+  const giftDetailsToSave = useMemo((): GiftDetails | null => {
     if (isGiftOrder) {
       return {
         recipientName: giftRecipientName,
@@ -56,7 +55,7 @@ export default function ReviewOrderPage() {
         giftMessage: giftMessage || undefined,
         notifyRecipient: notifyRecipient,
         showPricesToRecipient: notifyRecipient ? showPricesToRecipient : false,
-        recipientCanViewAndTrack: notifyRecipient ? giftRecipientCanViewAndTrack : true, // Default true if notifying
+        recipientCanViewAndTrack: notifyRecipient ? giftRecipientCanViewAndTrack : true, 
       };
     }
     return null;
@@ -101,6 +100,20 @@ export default function ReviewOrderPage() {
 
     const currentPaymentStatus = (paymentMethod === 'mpesa' || paymentMethod === 'card') ? 'paid' : 'pending';
 
+    // TODO: Implement geocoding here.
+    // Use a geocoding service (e.g., Google Geocoding API, Mapbox Geocoding API)
+    // to convert `shippingAddress` (e.g., shippingAddress.addressLine1, shippingAddress.city)
+    // into latitude and longitude.
+    // Store the result in `deliveryCoordinates`.
+    // Example (conceptual):
+    // let geocodedCoordinates = null;
+    // try {
+    //   geocodedCoordinates = await geocodeAddress(shippingAddress);
+    // } catch (geoError) {
+    //   console.error("Geocoding failed:", geoError);
+    //   // Decide how to handle geocoding failure: proceed with null coordinates, or show an error.
+    // }
+
     const newOrderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> = {
       customerId: user.uid,
       customerName: shippingAddress.fullName,
@@ -120,7 +133,7 @@ export default function ReviewOrderPage() {
       deliveryId: null,
       riderId: null,
       riderName: null,
-      deliveryCoordinates: null,
+      deliveryCoordinates: null, // Populate this with geocoded coordinates
       deliveryNotes: shippingAddress.addressLine2 || null,
       color: null,
       estimatedDeliveryTime: null,
@@ -151,7 +164,6 @@ export default function ReviewOrderPage() {
 
       toast({ title: "Order Placed!", description: `Your order #${newOrderRef.id.substring(0, 8)}... has been successfully placed.` });
 
-      // Send gift notification if applicable
       if (isGiftOrder && notifyRecipient && giftDetailsToSave && giftDetailsToSave.recipientContactMethod && giftDetailsToSave.recipientContactValue) {
         try {
           const notificationInput: GiftNotificationInput = {
@@ -317,3 +329,6 @@ export default function ReviewOrderPage() {
     </div>
   );
 }
+
+
+    
