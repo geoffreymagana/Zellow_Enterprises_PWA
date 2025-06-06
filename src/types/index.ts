@@ -200,3 +200,41 @@ export interface ShippingRate {
   createdAt?: any; // Firestore Timestamp or Date
   updatedAt?: any; // Firestore Timestamp or Date
 }
+
+// Customization Group Definitions
+export interface CustomizationGroupChoiceDefinition {
+  value: string;
+  label: string;
+  priceAdjustment?: number;
+}
+
+export interface CustomizationGroupOptionDefinition {
+  id: string; 
+  label: string; 
+  type: 'select' | 'text' | 'checkbox' | 'image_upload';
+  required?: boolean;
+  showToCustomerByDefault?: boolean;
+
+  // For 'select'
+  choices?: CustomizationGroupChoiceDefinition[];
+
+  // For 'text'
+  placeholder?: string;
+  maxLength?: number;
+
+  // For 'checkbox'
+  checkboxLabel?: string;
+  priceAdjustmentIfChecked?: number;
+
+  // For 'image_upload'
+  acceptedFileTypes?: string; // e.g., ".png, .jpg, .jpeg"
+  maxFileSizeMB?: number;
+}
+
+export interface CustomizationGroupDefinition {
+  id: string; // Firestore document ID
+  name: string;
+  options: CustomizationGroupOptionDefinition[];
+  createdAt?: any; // Firestore Timestamp
+  updatedAt?: any; // Firestore Timestamp
+}
