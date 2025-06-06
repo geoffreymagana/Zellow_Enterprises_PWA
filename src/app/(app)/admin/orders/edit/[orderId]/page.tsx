@@ -52,8 +52,9 @@ function OrderTaskItem({ task }: { task: Task }) {
     if (timestamp && typeof timestamp.toDate === 'function') {
       return format(timestamp.toDate(), 'PPp');
     }
+    // Attempt to parse if it's a string or number, though serverTimestamp might be an object before write
     const date = new Date(timestamp);
-    if (isNaN(date.getTime())) return 'Invalid Date';
+    if (isNaN(date.getTime())) return 'Invalid Date'; // Or handle differently
     return format(date, 'PPp');
   };
 
@@ -167,20 +168,21 @@ export default function AdminOrderDetailPage() {
       const orderRef = doc(db, 'orders', orderId);
       const newHistoryEntry: DeliveryHistoryEntry = {
         status: data.status as OrderStatus,
-        timestamp: serverTimestamp(), 
+        timestamp: Timestamp.now(), // Use client-side timestamp for arrayUnion
         notes: `Status updated to ${data.status} by ${user.displayName || user.email}`,
         actorId: user.uid,
       };
       await updateDoc(orderRef, { 
         status: data.status, 
-        updatedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(), // Top-level serverTimestamp is fine
         deliveryHistory: arrayUnion(newHistoryEntry) 
       });
       
+      // Optimistically update local state
       setOrder(prev => prev ? { 
           ...prev, 
           status: data.status as OrderStatus, 
-          deliveryHistory: [...(prev.deliveryHistory || []), {...newHistoryEntry, timestamp: new Date() }] 
+          deliveryHistory: [...(prev.deliveryHistory || []), {...newHistoryEntry, timestamp: new Date() }] // Convert to Date for local display
       } : null);
       statusForm.reset({ status: data.status as OrderStatus }); 
       toast({ title: "Order Status Updated", description: `Order marked as ${data.status}.` });
@@ -210,14 +212,14 @@ export default function AdminOrderDetailPage() {
       return;
     }
 
-    const newTaskData = { 
+    const newTaskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> & { createdAt: any; updatedAt: any } = { 
       orderId: orderId,
       itemName: currentItemForTask.name,
       taskType: data.taskType,
       description: data.description,
       assigneeId: data.assigneeId,
       assigneeName: selectedTechnician.displayName || selectedTechnician.email || 'N/A',
-      status: 'pending' as Task['status'],
+      status: 'pending',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -226,8 +228,8 @@ export default function AdminOrderDetailPage() {
       const createdTask: Task = { 
         ...newTaskData, 
         id: docRef.id, 
-        createdAt: new Date(), 
-        updatedAt: new Date()  
+        createdAt: new Date(), // Optimistic update with current date for local display
+        updatedAt: new Date()  // Optimistic update
       };
       setOrderTasks(prev => [...prev, createdTask]);
       toast({ title: "Task Created", description: `Task for ${currentItemForTask.name} assigned to ${selectedTechnician.displayName || selectedTechnician.email}.` });
@@ -464,3 +466,5 @@ export default function AdminOrderDetailPage() {
     </div>
   );
 }
+
+    
