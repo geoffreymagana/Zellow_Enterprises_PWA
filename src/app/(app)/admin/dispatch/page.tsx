@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Badge } from '@/components/ui/badge';
 import type { Order, User as AppUser, OrderStatus, DeliveryHistoryEntry } from '@/types';
-import { collection, query as firestoreQuery, where, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion, getDocs } from 'firebase/firestore';
+import { collection, query as firestoreQuery, where, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -254,7 +254,7 @@ export default function DispatchCenterPage() {
       const orderRef = doc(db, 'orders', selectedOrder.id);
       const historyEntry: DeliveryHistoryEntry = {
         status: 'assigned',
-        timestamp: serverTimestamp(),
+        timestamp: Timestamp.now(), // Use client-side timestamp
         notes: `Assigned to ${riderToAssign.displayName || riderToAssign.email} by dispatcher ${user.displayName || user.email}`,
         actorId: user.uid,
       };
@@ -298,7 +298,7 @@ export default function DispatchCenterPage() {
       const orderRef = doc(db, 'orders', orderToCancel.id);
       const historyEntry: DeliveryHistoryEntry = {
         status: 'cancelled',
-        timestamp: serverTimestamp(),
+        timestamp: Timestamp.now(), // Use client-side timestamp
         notes: `Order cancelled by dispatcher ${user.displayName || user.email}`,
         actorId: user.uid,
       };
@@ -477,6 +477,8 @@ export default function DispatchCenterPage() {
   );
 }
 
+
+    
 
     
 
