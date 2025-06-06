@@ -186,7 +186,9 @@ function AdminLayout({ children }: { children: ReactNode }) {
                  <h1 className="text-xl font-semibold font-headline">Admin Panel</h1>
               </Link>
             </div>
-            <div className="flex flex-1 md:flex-none items-center gap-2 sm:gap-4 justify-end">
+            {/* Ensure this div also uses flex-1 to allow its children to distribute space */}
+            <div className="flex flex-1 items-center gap-2 sm:gap-4 justify-end">
+              {/* The search input's wrapper can grow, but the input itself has max-width */}
               <div className="flex-grow max-w-xs sm:max-w-sm md:w-64 lg:w-96">
                 <Input
                   type="search"
