@@ -1,38 +1,50 @@
 
 "use client";
-
-import { BottomNav } from '@/components/navigation/BottomNav';
+import { ReactNode, FC } from 'react'; // Added FC
 import { useAuth } from '@/hooks/useAuth';
-import { useRouter, usePathname, useSearchParams } 
-from 'next/navigation';
-import React, { useEffect, ReactNode, useState } from 'react'; 
-import { Loader2, Users, Package, ShoppingCart, DollarSign, Truck, ClipboardCheck, FileArchive, Settings as SettingsIcon, LayoutDashboard, UserCircle, Layers, LogOutIcon, Aperture, Bell, Ship, MapIcon, ChevronLeft, Search as SearchIcon, Menu } from 'lucide-react';
-import { ThemeToggle } from '@/components/common/ThemeToggle';
+// Removed unused useRouter and useEffect from this file
+import { BottomNav } from '@/components/navigation/BottomNav';
+import { Logo } from '@/components/common/Logo';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import {
-  SidebarProvider,
   Sidebar,
-  SidebarHeader,
   SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarProvider,
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
-  SidebarFooter,
   useSidebar,
-  SidebarTrigger,
-} from '@/components/ui/sidebar';
+} from "@/components/ui/sidebar";
+import { ThemeToggle } from '@/components/common/ThemeToggle';
+import Link from 'next/link';
+import {
+  Aperture, LayoutDashboard, Users, Package, ShoppingCart, Layers, DollarSign,
+  Truck, Settings as SettingsIcon, UserCircle, LogOutIcon, Menu, Bell,
+  FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIcon, ListChecks // Renamed Search to SearchIcon, Added ListChecks
+} from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { useCart } from '@/contexts/CartContext'; 
+import { Loader2 } from 'lucide-react';
+import { useCart } from '@/contexts/CartContext'; // Added useCart for NonAdminLayout
 
-function AdminLayout({ children }: { children: ReactNode }) {
+interface LayoutProps {
+  children: ReactNode;
+}
+
+const AdminLayout: FC<LayoutProps> = ({ children }) => {
   const { logout } = useAuth();
-  const { searchTerm, setSearchTerm } = useSidebar()!; 
+  const sidebarContext = useSidebar();
+  
+  if (!sidebarContext) {
+    return <div className="flex items-center justify-center min-h-screen">Error: Sidebar context not found.</div>;
+  }
+  const { searchTerm, setSearchTerm } = sidebarContext;
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -41,13 +53,11 @@ function AdminLayout({ children }: { children: ReactNode }) {
     { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
     { href: '/admin/customizations', label: 'Customizations', icon: Layers },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign },
-    { href: '/admin/deliveries', label: 'Deliveries', icon: Truck },
     { href: '/admin/dispatch', label: 'Dispatch Center', icon: Aperture },
     { href: '/admin/shipping', label: 'Shipping', icon: Ship },
     { href: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck },
     { href: '/admin/notifications', label: 'Notifications', icon: Bell },
     { href: '/admin/reports', label: 'Reports', icon: FileArchive },
-    { href: '/rider/map', label: 'Rider Map', icon: MapIcon },
   ];
 
   const footerAdminNavItems = [
@@ -57,9 +67,9 @@ function AdminLayout({ children }: { children: ReactNode }) {
 
   const filteredMainAdminNavItems = mainAdminNavItems
     .map(item => {
-      if (!searchTerm) return { ...item, isVisible: true }; 
+      if (!searchTerm) return { ...item, isVisible: true };
       const labelMatches = item.label.toLowerCase().includes(searchTerm.toLowerCase());
-      const subItems = (item as any).subItems; 
+      const subItems = (item as any).subItems;
       if (subItems && subItems.length > 0) {
         const filteredSubItems = subItems.filter((subItem: any) =>
           subItem.label.toLowerCase().includes(searchTerm.toLowerCase())
@@ -76,267 +86,269 @@ function AdminLayout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar
-        side="left"
-        className="border-r border-sidebar w-[var(--sidebar-width)] h-screen sticky top-0"
-      >
-        <SidebarHeader className="p-4 border-b border-sidebar flex justify-start items-center h-16">
-          <Link href="/" aria-label="Zellow Enterprises Home">
-            <Aperture className="text-primary" size={24} />
-          </Link>
-        </SidebarHeader>
-        <SidebarContent>
-          <ScrollArea className="h-full">
-            {filteredMainAdminNavItems.length > 0 ? (
-              <SidebarMenu className="p-2">
-                {filteredMainAdminNavItems.map((item) => {
-                  const typedItem = item as any; 
-                  return typedItem.subItems && typedItem.subItems.length > 0 ? (
+    <div className="flex flex-col min-h-screen bg-background">
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="w-full h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Toggle Mobile Sidebar</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[var(--sidebar-width-mobile,280px)] p-0 bg-sidebar text-sidebar-foreground flex flex-col">
+                <SidebarHeader className="p-4 border-b border-sidebar flex justify-start items-center h-16">
+                  <Link href="/dashboard" aria-label="Zellow Enterprises Home">
+                    <Aperture className="text-primary" size={24} />
+                  </Link>
+                </SidebarHeader>
+                <ScrollArea className="flex-1">
+                  <SidebarMenu className="p-2">
+                    {mainAdminNavItems.map((item) => ( // Use unfiltered for mobile for simplicity or filter too
+                      <SidebarMenuItem key={item.label}>
+                        <Link href={item.href} passHref legacyBehavior>
+                          <SidebarMenuButton asChild className="w-full justify-start" variant="ghost" onClick={() => sidebarContext.setOpenMobile(false)}>
+                            <a><item.icon className="mr-2 h-4 w-4" /><span>{item.label}</span></a>
+                          </SidebarMenuButton>
+                        </Link>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </ScrollArea>
+                <SidebarFooter className="p-2 border-t border-sidebar">
+                  <SidebarMenu className="p-0">
+                    {footerAdminNavItems.map((item) => (
+                      <SidebarMenuItem key={item.label}>
+                        <Link href={item.href} passHref legacyBehavior>
+                          <SidebarMenuButton asChild className="w-full justify-start" variant="ghost" onClick={() => sidebarContext.setOpenMobile(false)}>
+                            <a><item.icon className="mr-2 h-4 w-4" /><span>{item.label}</span></a>
+                          </SidebarMenuButton>
+                        </Link>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                  <div className="p-2 mt-1"><ThemeToggle /></div>
+                  <div className="mt-1 p-2">
+                    <Button variant="outline" onClick={() => { logout(); sidebarContext.setOpenMobile(false); }} className="w-full justify-start">
+                      <LogOutIcon className="mr-2 h-4 w-4" /><span>Logout</span>
+                    </Button>
+                  </div>
+                </SidebarFooter>
+              </SheetContent>
+            </Sheet>
+            <Link href="/dashboard" className="hidden md:flex items-center gap-2" aria-label="Admin Dashboard Home">
+               <Aperture className="text-primary h-6 w-6" />
+               <h1 className="text-xl font-semibold font-headline">Admin Panel</h1>
+            </Link>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-4 justify-end">
+            <div className="relative w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96">
+               <SearchIcon className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search sections..."
+                className="h-9 w-full pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="hidden md:block">
+              <ThemeToggle />
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      <div className="flex flex-1" style={{ height: 'calc(100vh - var(--header-height))' }}> {/* Ensure parent flex container for sidebar + main takes full remaining height */}
+        <Sidebar
+          side="left"
+          className="border-r border-sidebar w-[var(--sidebar-width)] sticky top-[var(--header-height)] hidden md:flex flex-col" 
+          style={{ height: 'calc(100vh - var(--header-height))' }} // Explicit height for desktop sidebar
+        >
+          {/* Desktop Sidebar Content */}
+          <SidebarHeader className="p-4 border-b border-sidebar flex justify-start items-center h-16 flex-shrink-0">
+            <Link href="/dashboard" aria-label="Zellow Enterprises Home">
+              <Aperture className="text-primary" size={24} />
+            </Link>
+          </SidebarHeader>
+          <SidebarContent className="flex-1 overflow-y-auto">
+            <ScrollArea className="h-full">
+              {filteredMainAdminNavItems.length > 0 ? (
+                <SidebarMenu className="p-2">
+                  {filteredMainAdminNavItems.map((item) => {
+                    const typedItem = item as any;
+                    return typedItem.subItems && typedItem.subItems.length > 0 ? (
+                      <SidebarMenuItem key={typedItem.label}>
+                         <SidebarMenuButton
+                          isCollapsible={true}
+                          className="w-full justify-start"
+                          variant="ghost"
+                        >
+                          <typedItem.icon className="mr-2 h-4 w-4" />
+                          <span>{typedItem.label}</span>
+                        </SidebarMenuButton>
+                        <SidebarMenuSub>
+                          {typedItem.subItems.map((subItem: any) => (
+                             <SidebarMenuSubItem key={subItem.label}>
+                              <Link href={subItem.href} passHref legacyBehavior>
+                                <SidebarMenuSubButton>
+                                  {subItem.icon && <subItem.icon className="mr-2 h-4 w-4" />}
+                                  <span>{subItem.label}</span>
+                                </SidebarMenuSubButton>
+                              </Link>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </SidebarMenuItem>
+                    ) : (
                     <SidebarMenuItem key={typedItem.label}>
-                       <SidebarMenuButton
-                        isCollapsible={true}
-                        className="w-full justify-start"
-                        variant="ghost"
-                      >
-                        <typedItem.icon className="mr-2 h-4 w-4" />
-                        <span>{typedItem.label}</span>
-                      </SidebarMenuButton>
-                      <SidebarMenuSub>
-                        {typedItem.subItems.map((subItem: any) => (
-                           <SidebarMenuSubItem key={subItem.label}>
-                            <Link href={subItem.href} passHref legacyBehavior>
-                              <SidebarMenuSubButton>
-                                {subItem.icon && <subItem.icon className="mr-2 h-4 w-4" />}
-                                <span>{subItem.label}</span>
-                              </SidebarMenuSubButton>
-                            </Link>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
+                      <Link href={typedItem.href!} passHref legacyBehavior>
+                        <SidebarMenuButton
+                          asChild
+                          tooltip={typedItem.label}
+                          className="w-full justify-start"
+                          variant="ghost"
+                        >
+                          <a>
+                            <typedItem.icon className="mr-2 h-4 w-4" />
+                            <span>{typedItem.label}</span>
+                          </a>
+                        </SidebarMenuButton>
+                      </Link>
                     </SidebarMenuItem>
-                  ) : (
-                  <SidebarMenuItem key={typedItem.label}>
-                    <Link href={typedItem.href!} passHref legacyBehavior>
+                    )
+                  })}
+                </SidebarMenu>
+              ) : null}
+               {searchTerm && filteredMainAdminNavItems.length === 0 && filteredFooterAdminNavItems.length === 0 && (
+                <p className="p-4 text-sm text-muted-foreground">No admin sections found for "{searchTerm}".</p>
+              )}
+            </ScrollArea>
+          </SidebarContent>
+          <SidebarFooter className="p-2 border-t border-sidebar flex-shrink-0">
+            {filteredFooterAdminNavItems.length > 0 && (
+              <SidebarMenu className="p-0">
+                {filteredFooterAdminNavItems.map((item) => (
+                  <SidebarMenuItem key={item.label}>
+                    <Link href={item.href} passHref legacyBehavior>
                       <SidebarMenuButton
                         asChild
-                        tooltip={typedItem.label}
+                        tooltip={item.label}
                         className="w-full justify-start"
                         variant="ghost"
                       >
                         <a>
-                          <typedItem.icon className="mr-2 h-4 w-4" />
-                          <span>{typedItem.label}</span>
+                          <item.icon className="mr-2 h-4 w-4" />
+                          <span>{item.label}</span>
                         </a>
                       </SidebarMenuButton>
                     </Link>
                   </SidebarMenuItem>
-                  )
-                })}
+                ))}
               </SidebarMenu>
-            ) : null}
-             {searchTerm && filteredMainAdminNavItems.length === 0 && filteredFooterAdminNavItems.length === 0 && (
-              <p className="p-4 text-sm text-muted-foreground">No admin sections found.</p>
             )}
-          </ScrollArea>
-        </SidebarContent>
-        <SidebarFooter className="p-2 border-t border-sidebar mt-auto">
-          {filteredFooterAdminNavItems.length > 0 && (
-            <SidebarMenu className="p-0">
-              {filteredFooterAdminNavItems.map((item) => (
-                <SidebarMenuItem key={item.label}>
-                  <Link href={item.href} passHref legacyBehavior>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={item.label}
-                      className="w-full justify-start"
-                      variant="ghost"
-                    >
-                      <a>
-                        <item.icon className="mr-2 h-4 w-4" />
-                        <span>{item.label}</span>
-                      </a>
-                    </SidebarMenuButton>
-                  </Link>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          )}
-          <div className="p-2 mt-1 md:hidden"> 
-            <ThemeToggle />
-          </div>
-          <div className="mt-2 p-2">
-            <Button variant="outline" onClick={logout} className="w-full justify-start">
-              <LogOutIcon className="mr-2 h-4 w-4" />
-              <span>Logout</span>
-            </Button>
-          </div>
-        </SidebarFooter>
-      </Sidebar>
-      
-      <div className="flex flex-col flex-1 min-w-0"> 
-        <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="w-full h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger className="md:hidden">
-                <Menu className="h-5 w-5" /> 
-              </SidebarTrigger> 
-              <Link href="/dashboard" className="hidden md:flex items-center gap-2" aria-label="Admin Dashboard Home">
-                 <Aperture className="text-primary h-6 w-6" />
-                 <h1 className="text-xl font-semibold font-headline">Admin Panel</h1>
-              </Link>
+            {/* ThemeToggle in footer only needed if not in header for desktop */}
+            {/* <div className="mt-1 p-2 hidden md:block"><ThemeToggle /></div> */}
+            <div className="mt-1 p-2">
+              <Button variant="outline" onClick={logout} className="w-full justify-start">
+                <LogOutIcon className="mr-2 h-4 w-4" />
+                <span>Logout</span>
+              </Button>
             </div>
-            <div className="flex items-center gap-2 sm:gap-4 justify-end"> {/* Removed flex-1 here */}
-              <div className="max-w-xs sm:max-w-sm md:w-64 lg:w-96"> {/* Removed flex-grow here */}
-                <Input
-                  type="search"
-                  placeholder="Search sections..."
-                  className="h-9 w-full"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <div className="hidden md:block">
-                <ThemeToggle />
-              </div>
-            </div>
-          </div>
-        </header>
+          </SidebarFooter>
+        </Sidebar>
         
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:px-8 lg:py-6">
-          <div className="w-full">
-            {children}
-          </div>
+          {children}
         </main>
       </div>
-
     </div>
   );
 }
 
-function NonAdminLayout({ children }: { children: ReactNode }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams(); 
-  const { user, role, logout } = useAuth(); // Get role and logout from useAuth
-  const { cartTotalItems } = useCart();
-
-  const [localSearchTerm, setLocalSearchTerm] = useState(searchParams.get('q') || '');
-
-  useEffect(() => {
-    setLocalSearchTerm(searchParams.get('q') || '');
-  }, [searchParams]);
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newSearchTerm = e.target.value;
-    setLocalSearchTerm(newSearchTerm);
-    const currentParams = new URLSearchParams(Array.from(searchParams.entries()));
-    if (newSearchTerm) {
-      currentParams.set('q', newSearchTerm);
-    } else {
-      currentParams.delete('q');
-    }
-    if (pathname === '/products' || pathname === '/gift-boxes') {
-         router.push(`${pathname}?${currentParams.toString()}`, { scroll: false });
-    } else if (!newSearchTerm) { 
-        router.push(`${pathname}?${currentParams.toString()}`, { scroll: false });
-    }
-  };
-  
-  const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      const currentParams = new URLSearchParams(Array.from(searchParams.entries()));
-      if (localSearchTerm) {
-        currentParams.set('q', localSearchTerm);
-      } else {
-        currentParams.delete('q');
-      }
-      router.push(`/products?${currentParams.toString()}`);
-  };
-
-  const mainTabRoutes = ['/dashboard', '/products', '/gift-boxes', '/orders', '/profile'];
-  const showBackButton = !mainTabRoutes.includes(pathname) && !pathname.startsWith('/checkout');
+const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
+  const { user, role, logout } = useAuth();
+  const { cartTotalItems } = useCart(); // Get cart count
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-        <div className="w-full flex h-16 items-center px-4 sm:px-6 lg:px-8 gap-2">
-          {showBackButton && (
-            <Button variant="ghost" size="icon" onClick={() => router.back()} className="shrink-0 mr-1 sm:mr-2">
-              <ChevronLeft className="h-5 w-5" />
-              <span className="sr-only">Back</span>
-            </Button>
-          )}
-          <form onSubmit={handleSearchSubmit} className="flex-grow relative">
-            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-            <Input
-              type="search"
-              placeholder="Search products..."
-              className="w-full h-10 pl-9 pr-3 rounded-md border-input bg-background focus:ring-primary"
-              value={localSearchTerm}
-              onChange={handleSearchChange}
-            />
-          </form>
-          {role === 'Customer' ? (
-            <Link href="/orders/cart" passHref>
-              <Button variant="ghost" size="icon" className="relative">
-                <ShoppingCart className="h-5 w-5" />
-                {cartTotalItems > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                    {cartTotalItems}
-                  </span>
-                )}
-                <span className="sr-only">View Cart</span>
-              </Button>
-            </Link>
-          ) : (
-            user && role !== 'Admin' && ( // Show logout if user is logged in, not an Admin (handled by AdminLayout), and not Customer
-              <Button variant="ghost" size="icon" onClick={logout} aria-label="Logout">
-                <LogOutIcon className="h-5 w-5" />
-                <span className="sr-only">Logout</span>
-              </Button>
-            )
-          )}
+    <div className="flex flex-col min-h-screen bg-background">
+      <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto h-16 flex items-center justify-between px-4">
+          <Logo iconSize={28} textSize="text-2xl" />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            {user && role === 'Customer' && (
+              <Link href="/orders/cart" passHref>
+                <Button variant="ghost" size="icon" aria-label="Cart" className="relative">
+                  <ShoppingCart className="h-5 w-5" />
+                  {cartTotalItems > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                      {cartTotalItems}
+                    </span>
+                  )}
+                </Button>
+              </Link>
+            )}
+            {user && role && !['Customer', 'Admin'].includes(role) && ( // Staff Logout
+                 <Button variant="ghost" size="icon" onClick={logout} aria-label="Logout">
+                    <LogOutIcon className="h-5 w-5" />
+                 </Button>
+            )}
+            {/* Mobile Menu for Staff (if needed beyond BottomNav) */}
+            {user && role && !['Customer', 'Admin'].includes(role) && (
+                <Sheet>
+                    <SheetTrigger asChild>
+                        <Button variant="ghost" size="icon" className="md:hidden">
+                            <Menu className="h-5 w-5" /><span className="sr-only">Open menu</span>
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="w-[280px] p-0 bg-card text-card-foreground flex flex-col">
+                        <SheetHeader className="p-4 border-b">
+                            <SheetTitle>Menu</SheetTitle>
+                        </SheetHeader>
+                        <nav className="py-4 px-2 flex-1">
+                            <Link href="/dashboard" className="flex items-center p-2 rounded-md hover:bg-muted"><Home className="mr-2 h-4 w-4" />Dashboard</Link>
+                            {role === 'Technician' && <Link href="/tasks" className="flex items-center p-2 rounded-md hover:bg-muted"><ListChecks className="mr-2 h-4 w-4" />Tasks</Link>}
+                            {role === 'Rider' && <Link href="/deliveries" className="flex items-center p-2 rounded-md hover:bg-muted"><Truck className="mr-2 h-4 w-4" />Deliveries</Link>}
+                            {/* Add other role-specific links here */}
+                            <Link href="/profile" className="flex items-center p-2 rounded-md hover:bg-muted"><UserCircle className="mr-2 h-4 w-4" />Profile</Link>
+                        </nav>
+                        <div className="p-4 border-t">
+                          <Button variant="outline" onClick={logout} className="w-full justify-start"><LogOutIcon className="mr-2 h-4 w-4" />Logout</Button>
+                        </div>
+                    </SheetContent>
+                </Sheet>
+            )}
+          </div>
         </div>
       </header>
-      <main className="flex-grow w-full mx-auto px-4 py-8 pb-24 md:pb-8"> 
+      <main className="flex-1 container mx-auto px-4 py-6" style={{paddingBottom: user && role !== 'Admin' ? 'calc(var(--bottom-nav-height, 4rem) + 1rem)' : '1rem'}}>
         {children}
       </main>
-      <BottomNav />
+      {user && role !== 'Admin' && <BottomNav />}
     </div>
   );
-}
+};
 
-export default function AppLayout({ children }: { children: ReactNode }) {
-  const { user, loading, role } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!loading && !user) {
-      router.replace('/login');
-    }
-  }, [user, loading, router]);
+export default function AppGroupLayout({ children }: LayoutProps) {
+  const { user, role, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      </div>
-    );
+    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
   if (!user) {
-    return null; 
+    // If user is not logged in, AuthProvider should handle redirection to /login.
+    // Returning a loader here prevents rendering layouts for unauthenticated users.
+    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
-
-  const isAdmin = role === 'Admin';
-
-  if (isAdmin) { 
-    return (
-      <SidebarProvider defaultOpen={true}>
-        <AdminLayout>{children}</AdminLayout>
-      </SidebarProvider>
-    );
+  
+  if (role === 'Admin') {
+    return <SidebarProvider><AdminLayout>{children}</AdminLayout></SidebarProvider>;
   }
+  
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
+
+    
