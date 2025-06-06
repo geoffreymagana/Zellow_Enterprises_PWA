@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { HelpCircle, MessageSquareQuestion } from "lucide-react";
+import { HelpCircle, MessageCircleQuestion } from "lucide-react"; // Changed here
 import Link from "next/link";
 
 const faqs = [
@@ -80,8 +80,8 @@ export default function HelpPage() {
           <div className="mt-10 text-center">
             <p className="mb-3 text-muted-foreground">Can't find what you're looking for?</p>
             <Link href="/support" passHref>
-              <Button size="lg" variant="default">
-                <MessageSquareQuestion className="mr-2 h-5 w-5" />
+              <Button size="lg" variant="default" className="rounded-md"> {/* Ensure rounded-md for "rounded square" */}
+                <MessageCircleQuestion className="mr-2 h-5 w-5" /> {/* Changed here */}
                 Contact Support
               </Button>
             </Link>
