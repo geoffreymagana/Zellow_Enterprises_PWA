@@ -55,7 +55,8 @@ export interface Product {
   supplier?: string;
   createdAt?: any; // Firestore Timestamp or Date
   updatedAt?: any; // Firestore Timestamp or Date
-  customizationOptions?: ProductCustomizationOption[];
+  customizationOptions?: ProductCustomizationOption[]; // Kept for products that might have inline customizations
+  customizationGroupId?: string | null; // ID of the assigned CustomizationGroupDefinition
 }
 
 export type OrderStatus =
@@ -223,8 +224,8 @@ export interface CustomizationGroupOptionDefinition {
   maxLength?: number;
 
   // For 'checkbox'
-  checkboxLabel?: string;
-  priceAdjustmentIfChecked?: number;
+  checkboxLabel?: string; // Label for the checkbox itself
+  priceAdjustmentIfChecked?: number; // Price adjustment if this checkbox is checked
 
   // For 'image_upload'
   acceptedFileTypes?: string; // e.g., ".png, .jpg, .jpeg"
@@ -238,3 +239,4 @@ export interface CustomizationGroupDefinition {
   createdAt?: any; // Firestore Timestamp
   updatedAt?: any; // Firestore Timestamp
 }
+
