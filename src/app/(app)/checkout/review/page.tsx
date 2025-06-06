@@ -15,6 +15,7 @@ import type { Order, OrderItem, OrderStatus, DeliveryHistoryEntry, GiftDetails }
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, PackageCheck, Gift } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { sendGiftNotification, GiftNotificationInput } from '@/ai/flows/send-gift-notification-flow'; // Import the flow
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -22,11 +23,11 @@ const formatPrice = (price: number): string => {
 
 export default function ReviewOrderPage() {
   const { user } = useAuth();
-  const { 
-    cartItems, 
-    shippingAddress, 
-    paymentMethod, 
-    cartSubtotal, 
+  const {
+    cartItems,
+    shippingAddress,
+    paymentMethod,
+    cartSubtotal,
     clearCart,
     selectedShippingMethodInfo,
     isGiftOrder,
@@ -44,6 +45,23 @@ export default function ReviewOrderPage() {
 
   const shippingCost = selectedShippingMethodInfo?.cost || 0;
   const orderTotal = cartSubtotal + shippingCost;
+
+  // Memoize giftDetailsToSave to avoid re-computation on every render
+  const giftDetailsToSave = React.useMemo((): GiftDetails | null => {
+    if (isGiftOrder) {
+      return {
+        recipientName: giftRecipientName,
+        recipientContactMethod: giftRecipientContactMethod,
+        recipientContactValue: giftRecipientContactValue,
+        giftMessage: giftMessage || undefined,
+        notifyRecipient: notifyRecipient,
+        showPricesToRecipient: notifyRecipient ? showPricesToRecipient : false,
+        recipientCanViewAndTrack: notifyRecipient ? giftRecipientCanViewAndTrack : true, // Default true if notifying
+      };
+    }
+    return null;
+  }, [isGiftOrder, giftRecipientName, giftRecipientContactMethod, giftRecipientContactValue, giftMessage, notifyRecipient, showPricesToRecipient, giftRecipientCanViewAndTrack]);
+
 
   useEffect(() => {
     if (!shippingAddress || !paymentMethod || !selectedShippingMethodInfo || cartItems.length === 0) {
@@ -76,27 +94,14 @@ export default function ReviewOrderPage() {
 
     const initialDeliveryHistoryEntry: DeliveryHistoryEntry = {
       status: 'pending',
-      timestamp: Timestamp.now(), 
+      timestamp: Timestamp.now(),
       notes: 'Order placed by customer.',
       actorId: user.uid,
     };
 
-    let giftDetailsToSave: GiftDetails | null = null;
-    if (isGiftOrder) {
-      giftDetailsToSave = {
-        recipientName: giftRecipientName,
-        recipientContactMethod: giftRecipientContactMethod,
-        recipientContactValue: giftRecipientContactValue,
-        giftMessage: giftMessage || undefined, 
-        notifyRecipient: notifyRecipient,
-        showPricesToRecipient: notifyRecipient ? showPricesToRecipient : false, 
-        recipientCanViewAndTrack: notifyRecipient ? giftRecipientCanViewAndTrack : false,
-      };
-    }
-
     const currentPaymentStatus = (paymentMethod === 'mpesa' || paymentMethod === 'card') ? 'paid' : 'pending';
 
-    const newOrder: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> = {
+    const newOrderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> = {
       customerId: user.uid,
       customerName: shippingAddress.fullName,
       customerEmail: shippingAddress.email || user.email || "",
@@ -105,7 +110,7 @@ export default function ReviewOrderPage() {
       subTotal: cartSubtotal,
       shippingCost: selectedShippingMethodInfo.cost,
       totalAmount: orderTotal,
-      status: 'pending' as OrderStatus, 
+      status: 'pending' as OrderStatus,
       shippingAddress: shippingAddress,
       paymentMethod: paymentMethod,
       paymentStatus: currentPaymentStatus,
@@ -115,10 +120,10 @@ export default function ReviewOrderPage() {
       deliveryId: null,
       riderId: null,
       riderName: null,
-      deliveryCoordinates: null, 
+      deliveryCoordinates: null,
       deliveryNotes: shippingAddress.addressLine2 || null,
       color: null,
-      estimatedDeliveryTime: null, 
+      estimatedDeliveryTime: null,
       actualDeliveryTime: null,
       transactionId: null,
       isGift: isGiftOrder,
@@ -128,7 +133,7 @@ export default function ReviewOrderPage() {
     try {
       const ordersCollectionRef = collection(db, 'orders');
       const newOrderRef = await addDoc(ordersCollectionRef, {
-        ...newOrder,
+        ...newOrderData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -136,15 +141,43 @@ export default function ReviewOrderPage() {
       if (cartItems.some(item => item.stock !== undefined && item.quantity !== undefined)) {
         const batch = writeBatch(db);
         cartItems.forEach(item => {
-          if (item.stock !== undefined && item.quantity !== undefined) { 
+          if (item.stock !== undefined && item.quantity !== undefined) {
             const productRef = doc(db, 'products', item.productId);
             batch.update(productRef, { stock: item.stock - item.quantity });
           }
         });
         await batch.commit();
       }
-      
+
       toast({ title: "Order Placed!", description: `Your order #${newOrderRef.id.substring(0, 8)}... has been successfully placed.` });
+
+      // Send gift notification if applicable
+      if (isGiftOrder && notifyRecipient && giftDetailsToSave && giftDetailsToSave.recipientContactMethod && giftDetailsToSave.recipientContactValue) {
+        try {
+          const notificationInput: GiftNotificationInput = {
+            orderId: newOrderRef.id,
+            recipientName: giftDetailsToSave.recipientName,
+            recipientContactMethod: giftDetailsToSave.recipientContactMethod,
+            recipientContactValue: giftDetailsToSave.recipientContactValue,
+            giftMessage: giftDetailsToSave.giftMessage,
+            senderName: user.displayName || shippingAddress.fullName || "A friend",
+            canViewAndTrack: giftDetailsToSave.recipientCanViewAndTrack,
+            showPricesToRecipient: giftDetailsToSave.showPricesToRecipient,
+          };
+          console.log("Attempting to send gift notification with input:", notificationInput);
+          const notificationResult = await sendGiftNotification(notificationInput);
+          console.log("Gift notification flow result:", notificationResult);
+          if (notificationResult.success) {
+            toast({ title: "Gift Notification Update", description: notificationResult.message, variant: "default" });
+          } else {
+            toast({ title: "Gift Notification Issue", description: notificationResult.message, variant: "destructive" });
+          }
+        } catch (notificationError: any) {
+          console.error("Error sending gift notification:", notificationError);
+          toast({ title: "Gift Notification Error", description: "Could not send gift notification: " + notificationError.message, variant: "destructive" });
+        }
+      }
+
       clearCart();
       router.push(`/checkout/success/${newOrderRef.id}`);
     } catch (error: any) {
@@ -153,7 +186,7 @@ export default function ReviewOrderPage() {
       setIsPlacingOrder(false);
     }
   };
-  
+
   if (!shippingAddress || !paymentMethod || !selectedShippingMethodInfo) {
     return (
         <div className="flex items-center justify-center min-h-screen">
@@ -192,7 +225,7 @@ export default function ReviewOrderPage() {
                   <>
                     <p>Recipient will be notified via {giftDetailsToSave.recipientContactMethod}: {giftDetailsToSave.recipientContactValue}</p>
                     {giftDetailsToSave.giftMessage && <p>Message: <em>"{giftDetailsToSave.giftMessage}"</em></p>}
-                    <p>Prices {giftDetailsToSave.showPricesToRecipient ? "will" : "will NOT"} be shown in the notification.</p>
+                    <p>Prices {giftDetailsToSave.showPricesToRecipient ? "WILL" : "will NOT"} be shown in the notification.</p>
                     <p>Recipient {giftDetailsToSave.recipientCanViewAndTrack ? "CAN" : "CANNOT"} view order details & track the gift.</p>
                   </>
                 )}
@@ -253,7 +286,7 @@ export default function ReviewOrderPage() {
             </ul>
              <Link href="/orders/cart" className="text-sm text-primary hover:underline mt-3 inline-block">Edit Cart</Link>
           </section>
-          
+
           <section className="pt-6 border-t">
             <h3 className="text-lg font-semibold mb-4">Order Summary</h3>
             <div className="space-y-2">
@@ -284,4 +317,3 @@ export default function ReviewOrderPage() {
     </div>
   );
 }
-
