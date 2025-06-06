@@ -9,7 +9,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { collection, addDoc, serverTimestamp, doc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, OrderItem, OrderStatus } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -22,22 +22,37 @@ const formatPrice = (price: number): string => {
 
 export default function ReviewOrderPage() {
   const { user } = useAuth();
-  const { cartItems, shippingAddress, paymentMethod, cartSubtotal, clearCart } = useCart();
+  const { 
+    cartItems, 
+    shippingAddress, 
+    paymentMethod, 
+    cartSubtotal, 
+    clearCart,
+    selectedShippingMethodInfo 
+  } = useCart();
   const router = useRouter();
   const { toast } = useToast();
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
-  const shippingCost = cartSubtotal > 0 ? 500 : 0; // Placeholder flat shipping rate
+  const shippingCost = selectedShippingMethodInfo?.cost || 0;
   const orderTotal = cartSubtotal + shippingCost;
 
   useEffect(() => {
-    if (!shippingAddress || !paymentMethod || cartItems.length === 0) {
-      router.replace('/checkout/shipping'); // Or cart if conditions not met
+    if (!shippingAddress || !paymentMethod || !selectedShippingMethodInfo || cartItems.length === 0) {
+      // If any crucial piece of info is missing, redirect back through the checkout flow
+      if (cartItems.length === 0) {
+        router.replace('/orders/cart');
+      } else if (!shippingAddress) {
+        router.replace('/checkout/shipping');
+      } else if (!selectedShippingMethodInfo || !paymentMethod) {
+        router.replace('/checkout/payment');
+      }
+      toast({ title: "Missing Information", description: "Please complete all previous steps.", variant: "destructive" });
     }
-  }, [shippingAddress, paymentMethod, cartItems, router]);
+  }, [shippingAddress, paymentMethod, selectedShippingMethodInfo, cartItems, router, toast]);
 
   const handlePlaceOrder = async () => {
-    if (!user || !shippingAddress || !paymentMethod || cartItems.length === 0) {
+    if (!user || !shippingAddress || !paymentMethod || cartItems.length === 0 || !selectedShippingMethodInfo) {
       toast({ title: "Error", description: "Missing order details. Please review your cart and shipping info.", variant: "destructive" });
       return;
     }
@@ -46,10 +61,10 @@ export default function ReviewOrderPage() {
     const orderItems: OrderItem[] = cartItems.map(item => ({
       productId: item.productId,
       name: item.name,
-      price: item.currentPrice,
+      price: item.currentPrice, // Price for one unit at time of purchase, including customizations
       quantity: item.quantity,
-      imageUrl: item.imageUrl || null, // Ensure undefined becomes null
-      customizations: item.customizations || null, // Ensure undefined becomes null
+      imageUrl: item.imageUrl || null,
+      customizations: item.customizations || null,
     }));
 
     const newOrder: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> = {
@@ -59,23 +74,27 @@ export default function ReviewOrderPage() {
       customerPhone: shippingAddress.phone,
       items: orderItems,
       subTotal: cartSubtotal,
-      shippingCost: shippingCost,
+      shippingCost: selectedShippingMethodInfo.cost,
       totalAmount: orderTotal,
       status: 'pending' as OrderStatus, 
       shippingAddress: shippingAddress,
       paymentMethod: paymentMethod,
       paymentStatus: 'pending',
-      // Optional fields not explicitly set here will be omitted from the document,
-      // which is fine for Firestore (unlike 'undefined' values).
-      // If a field should always exist, it should be explicitly set to null or a default.
-      deliveryHistory: [], // Default to empty array
+      shippingMethodId: selectedShippingMethodInfo.id,
+      shippingMethodName: selectedShippingMethodInfo.name,
+      deliveryHistory: [{
+        status: 'pending',
+        timestamp: serverTimestamp() as Timestamp, // Cast to Timestamp here for initial entry
+        notes: 'Order placed by customer.',
+        actorId: user.uid,
+      }],
       deliveryId: null,
       riderId: null,
       riderName: null,
-      deliveryCoordinates: null,
-      deliveryNotes: null,
+      deliveryCoordinates: null, // This would be set later if applicable
+      deliveryNotes: shippingAddress.addressLine2, // Using addressLine2 as potential delivery notes, or add dedicated field
       color: null,
-      estimatedDeliveryTime: null,
+      estimatedDeliveryTime: null, // This would be calculated/set later
       actualDeliveryTime: null,
       transactionId: null,
     };
@@ -90,7 +109,7 @@ export default function ReviewOrderPage() {
 
       const batch = writeBatch(db);
       cartItems.forEach(item => {
-        if (item.stock !== undefined && item.quantity !== undefined) { // Check if stock and quantity are defined
+        if (item.stock !== undefined && item.quantity !== undefined) {
           const productRef = doc(db, 'products', item.productId);
           batch.update(productRef, { stock: item.stock - item.quantity });
         }
@@ -107,8 +126,14 @@ export default function ReviewOrderPage() {
     }
   };
   
-  if (!shippingAddress || !paymentMethod) {
-    return <div className="text-center p-8">Loading order details or missing information...</div>;
+  if (!shippingAddress || !paymentMethod || !selectedShippingMethodInfo) {
+    // This check should ideally be caught by the useEffect redirect
+    return (
+        <div className="flex items-center justify-center min-h-screen">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="ml-2">Loading order details or redirecting...</p>
+        </div>
+    );
   }
 
   return (
@@ -129,6 +154,16 @@ export default function ReviewOrderPage() {
               <p>{shippingAddress.city}, {shippingAddress.county} {shippingAddress.postalCode}</p>
               <p>Phone: {shippingAddress.phone}</p>
               <Link href="/checkout/shipping" className="text-sm text-primary hover:underline mt-2 inline-block">Edit Shipping Address</Link>
+            </Card>
+          </section>
+
+          {/* Shipping Method Section */}
+          <section>
+            <h3 className="text-lg font-semibold mb-3">Shipping Method:</h3>
+            <Card className="bg-muted/50 p-4">
+                <p className="font-semibold">{selectedShippingMethodInfo.name} ({selectedShippingMethodInfo.duration})</p>
+                <p>Cost: {formatPrice(selectedShippingMethodInfo.cost)}</p>
+                <Link href="/checkout/payment" className="text-sm text-primary hover:underline mt-2 inline-block">Change Shipping Method</Link>
             </Card>
           </section>
 
@@ -157,6 +192,7 @@ export default function ReviewOrderPage() {
                     width={64}
                     height={64}
                     className="w-16 h-16 rounded-md object-cover mr-4 bg-muted"
+                    data-ai-hint="checkout review item"
                   />
                   <div className="flex-grow">
                     <p className="font-semibold">{item.name}</p>
@@ -185,7 +221,7 @@ export default function ReviewOrderPage() {
                   <span>{formatPrice(cartSubtotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Shipping</span>
+                  <span className="text-muted-foreground">Shipping ({selectedShippingMethodInfo.name})</span>
                   <span>{formatPrice(shippingCost)}</span>
                 </div>
                 <Separator className="my-2"/>

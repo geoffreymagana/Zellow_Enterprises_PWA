@@ -20,15 +20,12 @@ export default function CartPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  const shippingCost = cartSubtotal > 0 ? 500 : 0; // Placeholder flat shipping rate
-  const orderTotal = cartSubtotal + shippingCost;
-
   if (authLoading || cartLoading) {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">Loading cart...</div>;
   }
 
   if (!user) {
-    router.push('/login'); // Should be handled by AppLayout, but as a fallback
+    router.push('/login'); 
     return null;
   }
 
@@ -116,19 +113,11 @@ export default function CartPage() {
                 <CardTitle className="text-xl font-headline">Order Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Subtotal ({cartTotalItems} items)</span>
+                <div className="flex justify-between text-lg font-semibold">
+                  <span>Subtotal ({cartTotalItems} items)</span>
                   <span>{formatPrice(cartSubtotal)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Estimated Shipping</span>
-                  <span>{formatPrice(shippingCost)}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-lg font-semibold">
-                  <span>Order Total</span>
-                  <span>{formatPrice(orderTotal)}</span>
-                </div>
+                 <p className="text-xs text-muted-foreground">Shipping costs and final total will be calculated at checkout.</p>
               </CardContent>
               <CardFooter>
                 <Button size="lg" className="w-full" onClick={() => router.push('/checkout/shipping')}>

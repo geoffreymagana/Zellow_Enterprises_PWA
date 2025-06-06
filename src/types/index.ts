@@ -1,4 +1,5 @@
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -21,8 +22,8 @@ export interface User {
   photoURL?: string | null;
   role: UserRole;
   disabled?: boolean;
-  createdAt?: any;
-  currentLocation?: { lat: number; lng: number; timestamp: any } | null;
+  createdAt?: any; // Firestore Timestamp or Date
+  currentLocation?: { lat: number; lng: number; timestamp: any } | null; // Firestore Timestamp or Date for timestamp
   currentRouteId?: string | null;
   assignedOrdersCount?: number;
 }
@@ -34,14 +35,14 @@ export interface CustomizationChoiceOption {
 }
 
 export interface ProductCustomizationOption {
-  id: string;
-  label: string;
+  id: string; // e.g., "engraving_text", "color_option"
+  label: string; // e.g., "Engraving Text", "Select Color"
   type: 'select' | 'text' | 'checkbox';
   required?: boolean;
-  choices?: CustomizationChoiceOption[];
-  maxLength?: number;
-  placeholder?: string;
-  defaultValue?: string | boolean;
+  choices?: CustomizationChoiceOption[]; // For 'select' or 'radio' types
+  maxLength?: number; // For 'text' type
+  placeholder?: string; // For 'text' or 'checkbox' (as label text)
+  defaultValue?: string | boolean; // Default value for the option
 }
 
 export interface Product {
@@ -53,39 +54,40 @@ export interface Product {
   stock: number;
   categories?: string[];
   supplier?: string;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: any; // Firestore Timestamp or Date
+  updatedAt?: any; // Firestore Timestamp or Date
   customizationOptions?: ProductCustomizationOption[];
 }
 
 export type OrderStatus =
-  | 'pending'
-  | 'processing'
-  | 'awaiting_assignment'
-  | 'assigned'
-  | 'out_for_delivery'
-  | 'delivered'
-  | 'delivery_attempted'
-  | 'cancelled'
-  | 'shipped';
+  | 'pending' // Customer placed order, awaiting payment/processing
+  | 'processing' // Payment confirmed, order being prepared
+  | 'awaiting_assignment' // Ready for dispatch, needs rider
+  | 'assigned' // Rider assigned to order
+  | 'out_for_delivery' // Rider has picked up and is en route
+  | 'delivered' // Customer received order
+  | 'delivery_attempted' // Rider attempted delivery but failed
+  | 'cancelled' // Order cancelled by customer or admin
+  | 'shipped'; // Alternative to out_for_delivery for non-local courier
 
 export interface DeliveryHistoryEntry {
-  status: OrderStatus | string;
-  timestamp: any;
+  status: OrderStatus | string; // Could be custom status string
+  timestamp: any; // Firestore Timestamp or Date
   notes?: string;
-  actorId?: string;
-  location?: { lat: number; lng: number };
+  actorId?: string; // UID of user who made the change (admin, rider, system)
+  location?: { lat: number; lng: number }; // Optional location for status update
 }
 
 export interface ShippingAddress {
   fullName: string;
   addressLine1: string;
   addressLine2?: string;
-  city: string;
-  county: string;
+  city: string; // This will be the selected Town
+  county: string; // Derived from selected Town/Region
   postalCode?: string;
   phone: string;
-  email?: string; // Include email in shipping address for guest checkouts or confirmation
+  email?: string;
+  selectedShippingRegionId?: string; // Store the ID of the selected region
 }
 
 export interface OrderItem {
@@ -93,36 +95,38 @@ export interface OrderItem {
   name: string;
   price: number; // Price per item AT TIME OF PURCHASE (incl. customization adjustments)
   quantity: number;
-  imageUrl?: string;
-  customizations?: Record<string, any>; // { optionId: selectedValue, ... }
+  imageUrl?: string | null;
+  customizations?: Record<string, any> | null; // { optionId: selectedValue, ... }
 }
 
 export interface Order {
   id: string; // Firestore document ID
   customerId: string | null; // Null if guest checkout
-  customerName: string; // From shipping details
-  customerEmail: string; // From shipping details or user account
-  customerPhone: string; // From shipping details
+  customerName: string; 
+  customerEmail: string; 
+  customerPhone: string;
   items: OrderItem[];
   totalAmount: number;
   subTotal: number;
   shippingCost: number;
   status: OrderStatus;
-  createdAt: any;
-  updatedAt?: any;
+  createdAt: any; // Firestore Timestamp
+  updatedAt?: any; // Firestore Timestamp
   shippingAddress: ShippingAddress;
-  deliveryId?: string;
+  shippingMethodId?: string | null;
+  shippingMethodName?: string | null;
+  deliveryId?: string | null; // Link to a potential separate delivery document/task
   riderId?: string | null;
-  riderName?: string | null;
+  riderName?: string | null; // Denormalized for quick display
   deliveryCoordinates?: { lat: number; lng: number } | null;
-  deliveryNotes?: string;
-  color?: string | null;
-  estimatedDeliveryTime?: any | null;
-  actualDeliveryTime?: any | null;
+  deliveryNotes?: string | null; // Notes specifically for the delivery driver
+  color?: string | null; // For map marker differentiation, set by admin/dispatcher
+  estimatedDeliveryTime?: any | null; // Firestore Timestamp or Date
+  actualDeliveryTime?: any | null; // Firestore Timestamp or Date
   deliveryHistory?: DeliveryHistoryEntry[];
-  paymentMethod?: string;
-  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded'; // Default to 'pending'
-  transactionId?: string;
+  paymentMethod?: string | null; // e.g., 'cod', 'mpesa', 'card'
+  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  transactionId?: string | null; // ID from payment gateway
 }
 
 export interface CartItem {
@@ -140,43 +144,48 @@ export interface CartItem {
 
 export interface Task {
   id:string;
-  assigneeId: string;
-  type: 'engraving' | 'printing' | 'delivery' | string;
+  assigneeId: string; // UID of the staff member
+  type: 'engraving' | 'printing' | 'assembly' | 'quality_check' | string; // Task category
   description: string;
-  orderId?: string;
-  status: 'pending' | 'in-progress' | 'completed' | 'needs_approval';
-  createdAt: Date;
-  updatedAt: Date;
+  orderId?: string; // Associated order, if any
+  status: 'pending' | 'in-progress' | 'completed' | 'needs_approval' | 'blocked';
+  createdAt: any; // Firestore Timestamp or Date
+  updatedAt: any; // Firestore Timestamp or Date
+  dueDate?: any; // Firestore Timestamp or Date
+  notes?: string;
+  attachments?: { name: string; url: string }[]; // e.g., proof of work images
 }
 
 export interface ShippingRegion {
   id: string;
-  name: string;
-  county: string;
-  towns: string[];
+  name: string; // e.g., "Nairobi CBD & Westlands", "Mombasa Island"
+  county: string; // e.g., "Nairobi", "Mombasa"
+  towns: string[]; // List of towns/areas covered by this region
   active: boolean;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: any; // Firestore Timestamp or Date
+  updatedAt?: any; // Firestore Timestamp or Date
 }
 
 export interface ShippingMethod {
   id: string;
-  name: string;
+  name: string; // e.g., "Standard Delivery", "Express Delivery"
   description: string;
-  duration: string;
-  basePrice: number;
+  duration: string; // e.g., "1-2 business days", "Same-day (within 3 hours)"
+  basePrice: number; // Default price if no specific region rate
   active: boolean;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: any; // Firestore Timestamp or Date
+  updatedAt?: any; // Firestore Timestamp or Date
 }
 
+// This defines a specific rate for a method in a particular region
 export interface ShippingRate {
   id: string;
-  regionId: string;
-  methodId: string;
-  customPrice: number;
-  notes?: string;
+  regionId: string; // Foreign key to ShippingRegion
+  methodId: string; // Foreign key to ShippingMethod
+  customPrice: number; // The price for this method in this region
+  notes?: string; // Optional notes for this specific rate
   active: boolean;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: any; // Firestore Timestamp or Date
+  updatedAt?: any; // Firestore Timestamp or Date
 }
+
