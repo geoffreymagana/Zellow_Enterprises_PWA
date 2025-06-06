@@ -87,12 +87,14 @@ export default function ReviewOrderPage() {
         recipientName: giftRecipientName,
         recipientContactMethod: giftRecipientContactMethod,
         recipientContactValue: giftRecipientContactValue,
-        giftMessage: giftMessage || undefined, // Make sure optional fields are undefined if empty
+        giftMessage: giftMessage || undefined, 
         notifyRecipient: notifyRecipient,
-        showPricesToRecipient: notifyRecipient ? showPricesToRecipient : false, // Only relevant if notifying
-        recipientCanViewAndTrack: notifyRecipient ? giftRecipientCanViewAndTrack : false, // Only relevant if notifying
+        showPricesToRecipient: notifyRecipient ? showPricesToRecipient : false, 
+        recipientCanViewAndTrack: notifyRecipient ? giftRecipientCanViewAndTrack : false,
       };
     }
+
+    const currentPaymentStatus = (paymentMethod === 'mpesa' || paymentMethod === 'card') ? 'paid' : 'pending';
 
     const newOrder: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> = {
       customerId: user.uid,
@@ -106,7 +108,7 @@ export default function ReviewOrderPage() {
       status: 'pending' as OrderStatus, 
       shippingAddress: shippingAddress,
       paymentMethod: paymentMethod,
-      paymentStatus: 'pending',
+      paymentStatus: currentPaymentStatus,
       shippingMethodId: selectedShippingMethodInfo.id,
       shippingMethodName: selectedShippingMethodInfo.name,
       deliveryHistory: [initialDeliveryHistoryEntry],
@@ -181,20 +183,20 @@ export default function ReviewOrderPage() {
             </Card>
           </section>
 
-          {isGiftOrder && (
+          {isGiftOrder && giftDetailsToSave && (
             <section>
               <h3 className="text-lg font-semibold mb-3 flex items-center"><Gift className="mr-2 h-5 w-5 text-primary"/>Gift Details:</h3>
               <Card className="bg-muted/50 p-4 text-sm">
-                <p>This order is a gift for: <strong>{giftRecipientName}</strong></p>
-                {notifyRecipient && giftRecipientContactValue && (
+                <p>This order is a gift for: <strong>{giftDetailsToSave.recipientName}</strong></p>
+                {giftDetailsToSave.notifyRecipient && giftDetailsToSave.recipientContactValue && (
                   <>
-                    <p>Recipient will be notified via {giftRecipientContactMethod}: {giftRecipientContactValue}</p>
-                    {giftMessage && <p>Message: <em>"{giftMessage}"</em></p>}
-                    <p>Prices {showPricesToRecipient ? "will" : "will NOT"} be shown in the notification.</p>
-                    <p>Recipient {giftRecipientCanViewAndTrack ? "CAN" : "CANNOT"} view order details & track the gift.</p>
+                    <p>Recipient will be notified via {giftDetailsToSave.recipientContactMethod}: {giftDetailsToSave.recipientContactValue}</p>
+                    {giftDetailsToSave.giftMessage && <p>Message: <em>"{giftDetailsToSave.giftMessage}"</em></p>}
+                    <p>Prices {giftDetailsToSave.showPricesToRecipient ? "will" : "will NOT"} be shown in the notification.</p>
+                    <p>Recipient {giftDetailsToSave.recipientCanViewAndTrack ? "CAN" : "CANNOT"} view order details & track the gift.</p>
                   </>
                 )}
-                {!notifyRecipient && <p>Recipient will not be notified directly by us.</p>}
+                {!giftDetailsToSave.notifyRecipient && <p>Recipient will not be notified directly by us.</p>}
                 <Link href="/checkout/shipping" className="text-sm text-primary hover:underline mt-2 inline-block">Edit Gift Details</Link>
               </Card>
             </section>
@@ -282,3 +284,4 @@ export default function ReviewOrderPage() {
     </div>
   );
 }
+
