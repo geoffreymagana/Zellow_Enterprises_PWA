@@ -9,7 +9,7 @@ import type { Order, OrderStatus } from "@/types";
 import { MapPin, Navigation, CheckCircle, PackageSearch, UserPlus, Filter, Loader2, AlertTriangle, Edit, Truck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, Unsubscribe } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, Unsubscribe, Timestamp } from 'firebase/firestore'; // Added Timestamp
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -87,18 +87,20 @@ export default function DeliveriesPage() {
       const orderRef = doc(db, 'orders', deliveryId);
       const newHistoryEntry = {
         status: newStatus,
-        timestamp: serverTimestamp(),
+        timestamp: Timestamp.now(), // Changed from serverTimestamp()
         notes: notes || `Status updated to ${newStatus} by ${role}`,
         actorId: user.uid,
       };
       
       // Firestore update with new status and history
       const currentOrder = deliveries.find(d => d.id === deliveryId);
+      // Create a new history array. Firestore's arrayUnion is an alternative if newHistoryEntry contains no serverTimestamps.
+      // Since we are using Timestamp.now(), constructing the array manually is fine.
       const updatedHistory = [...(currentOrder?.deliveryHistory || []), newHistoryEntry];
 
       await updateDoc(orderRef, { 
         status: newStatus,
-        updatedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(), // This top-level serverTimestamp is fine
         deliveryHistory: updatedHistory,
         ...(newStatus === 'delivered' && { actualDeliveryTime: serverTimestamp() })
       });
