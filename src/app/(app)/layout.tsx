@@ -1,6 +1,6 @@
 
 "use client";
-import { ReactNode, FC } from 'react'; 
+import { ReactNode, FC } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarHeader as AdminSidebarHeader, 
+  SidebarHeader as AdminSidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
@@ -19,11 +19,12 @@ import {
 } from "@/components/ui/sidebar";
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation'; 
+import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Users, Package, ShoppingCart, Layers, DollarSign,
   Truck, Settings as SettingsIcon, UserCircle, LogOutIcon, Menu, Bell,
-  FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIconLucide, ListChecks
+  FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIconLucide, ListChecks,
+  Aperture // Import Aperture for the brand mark
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
@@ -36,7 +37,7 @@ interface LayoutProps {
 const AdminLayout: FC<LayoutProps> = ({ children }) => {
   const { logout } = useAuth();
   const sidebarContext = useSidebar();
-  const pathname = usePathname(); 
+  const pathname = usePathname();
 
   if (!sidebarContext) {
     return <div className="flex items-center justify-center min-h-screen">Error: Sidebar context not found.</div>;
@@ -96,10 +97,10 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                       return (
                       <SidebarMenuItem key={item.label}>
                         <Link href={item.href} passHref legacyBehavior>
-                          <SidebarMenuButton 
-                            asChild 
-                            className="w-full justify-start" 
-                            variant="ghost" 
+                          <SidebarMenuButton
+                            asChild
+                            className="w-full justify-start"
+                            variant="ghost"
                             onClick={() => setOpenMobile(false)}
                             isActive={isActive}
                            >
@@ -115,10 +116,10 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                     {footerAdminNavItems.map((item) => (
                       <SidebarMenuItem key={item.label}>
                         <Link href={item.href} passHref legacyBehavior>
-                          <SidebarMenuButton 
-                            asChild 
-                            className="w-full justify-start" 
-                            variant="ghost" 
+                          <SidebarMenuButton
+                            asChild
+                            className="w-full justify-start"
+                            variant="ghost"
                             onClick={() => setOpenMobile(false)}
                             isActive={item.href === pathname}
                           >
@@ -138,10 +139,11 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
               </SheetContent>
             </Sheet>
             <Link href="/dashboard" className="hidden md:flex items-center gap-2" aria-label="Admin Dashboard Home">
+               <Aperture className="h-6 w-6 text-primary" /> {/* Added Brand Mark Icon */}
                <h1 className="text-xl font-semibold font-headline">Admin Panel</h1>
             </Link>
           </div>
-          <div className="flex items-center gap-2 sm:gap-4"> 
+          <div className="flex items-center gap-2 sm:gap-4">
             <div className="relative w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96">
                <SearchIconLucide className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -158,14 +160,14 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
           </div>
         </div>
       </header>
-      
+
       <div className="flex flex-1">
         <Sidebar
           side="left"
-          className="border-r border-sidebar w-[var(--sidebar-width)] sticky top-[var(--header-height)] hidden md:flex flex-col" 
+          className="border-r border-sidebar w-[var(--sidebar-width)] sticky top-[var(--header-height)] hidden md:flex flex-col"
           style={{ height: 'calc(100vh - var(--header-height))' }}
         >
-          <AdminSidebarHeader className="h-[var(--header-height)] border-b border-sidebar flex-shrink-0" /> 
+          <AdminSidebarHeader className="h-[var(--header-height)] border-b border-sidebar flex-shrink-0" />
           <SidebarContent className="flex-1 overflow-y-auto">
             <ScrollArea className="h-full">
               {filteredMainAdminNavItems.length > 0 ? (
@@ -229,7 +231,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
             </div>
           </SidebarFooter>
         </Sidebar>
-        
+
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:px-8 lg:py-6">
           {children}
         </main>
@@ -241,26 +243,22 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
 const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   const { user, role, logout } = useAuth();
   const { cartTotalItems } = useCart();
-  // const [searchTerm, setSearchTerm] = useState(""); // Search term state for non-admin
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-[var(--header-height)]">
         <div className="container mx-auto h-full flex items-center justify-between px-4 gap-4">
-          {/* Search Bar for Non-Admin - Styled like Admin's */}
-          <div className="relative flex-1 max-w-md sm:max-w-lg md:max-w-xl"> 
+          <div className="relative flex-1 max-w-md sm:max-w-lg md:max-w-xl">
              <SearchIconLucide className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
               placeholder={role === 'Customer' ? "Search products, gift boxes..." : "Search..."}
-              className="h-9 w-full pl-10" // Adjusted height and padding
-              // value={searchTerm}
-              // onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-9 w-full pl-10"
             />
           </div>
 
           <div className="flex items-center gap-2">
-            {role !== 'Customer' && <ThemeToggle />} 
+            {role !== 'Customer' && <ThemeToggle />}
             {user && role === 'Customer' && (
               <Link href="/orders/cart" passHref>
                 <Button variant="ghost" size="icon" aria-label="Cart" className="relative">
@@ -287,7 +285,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
                     </SheetTrigger>
                     <SheetContent side="left" className="w-[280px] p-0 bg-card text-card-foreground flex flex-col">
                         <SheetHeader className="p-4 border-b h-[var(--header-height)]">
-                            <SheetTitle>Menu</SheetTitle> 
+                            <SheetTitle>Menu</SheetTitle>
                         </SheetHeader>
                         <nav className="py-4 px-2 flex-1">
                             <Link href="/dashboard" className="flex items-center p-2 rounded-md hover:bg-muted"><Home className="mr-2 h-4 w-4" />Dashboard</Link>
@@ -320,13 +318,15 @@ export default function AppGroupLayout({ children }: LayoutProps) {
   }
 
   if (!user) {
+    // This case should ideally be handled by redirects in individual pages or a root page.
+    // For now, showing loader, but a proper "redirecting to login" or similar might be better.
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
-  
+
   if (role === 'Admin') {
     return <SidebarProvider><AdminLayout>{children}</AdminLayout></SidebarProvider>;
   }
-  
+
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
     
