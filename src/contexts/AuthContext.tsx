@@ -79,26 +79,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(appUser);
           setRole(userRole);
         } else {
-          // User exists in Firebase Auth but not in Firestore (e.g., mid-creation or error)
-          // Treat as effectively logged out for app purposes if Firestore doc is required.
-          // Or, if admin created user, this state might be transient.
-          // For now, if an admin is creating a user, this path might be hit when the *new user* is authed.
-          // If the admin is already logged in, their session should ideally be restored.
-          // This part needs careful handling based on app flow.
-          // If the current FirebaseUser is the newly created one, it won't have a role yet unless handleCreateUser is very fast.
-          // This could lead to the new user being temporarily treated as role:null.
-          
-          // If an admin is performing an action (like creating a user), their own auth state shouldn't be nullified here
-          // unless they themselves are the firebaseUser and their doc is missing.
-          // This primarily affects the *newly authenticated* user.
           if (auth.currentUser && auth.currentUser.uid === firebaseUser.uid) {
-            // Only nullify if the *current* firebase auth user is the one missing the doc
-             setUser(null); // Or a user object with role:null
+             setUser(null); 
              setRole(null);
           }
           console.warn(`User document for ${firebaseUser.uid} not found or role is missing. Current auth state might be affected.`);
         }
-      } else { // firebaseUser is null (logged out)
+      } else { 
         setUser(null);
         setRole(null);
       }
@@ -106,7 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [router, toast]); // db object is stable, auth is stable.
+  }, [router, toast]); 
 
   const login = async (email: string, pass: string) => {
     if (!auth) {
@@ -117,35 +104,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, pass);
-      // onAuthStateChanged will handle setting user and role, including disabled check
       toast({ title: "Login Successful", description: "Welcome back!"});
-    } catch (error: any)
-{
+    } catch (error: any) {
       console.error("Login failed:", error);
-      toast({ title: "Login Failed", description: error.message || "Invalid credentials", variant: "destructive" });
+      let errorMessage = "An unexpected error occurred. Please try again.";
+      switch (error.code) {
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+        case 'auth/invalid-credential':
+          errorMessage = "Invalid email or password. Please check your credentials and try again.";
+          break;
+        case 'auth/user-disabled':
+          errorMessage = "This account has been disabled. Please contact support.";
+          break;
+        case 'auth/too-many-requests':
+            errorMessage = "Access to this account has been temporarily disabled due to many failed login attempts. You can immediately restore it by resetting your password or you can try again later.";
+            break;
+        default:
+          errorMessage = error.message || "Failed to login. Please try again.";
+      }
+      toast({ title: "Login Failed", description: errorMessage, variant: "destructive" });
       setLoading(false); 
-      throw error; 
+      // Do not re-throw common auth errors to prevent Next.js overlay for these cases.
+      // If it's an unexpected error, you might still choose to throw it or handle differently.
+      // For now, all login errors will just result in a toast.
     }
-    // setLoading(false) will be handled by onAuthStateChanged
   };
 
   const logout = async () => {
     if (!auth) {
       toast({ title: "Logout Failed", description: "Firebase Auth service not available.", variant: "destructive" });
-      setLoading(false); // Ensure loading is false if auth isn't available
+      setLoading(false); 
       throw new Error("Firebase Auth service not available.");
     }
     setLoading(true);
     try {
       await firebaseSignOut(auth);
-      // onAuthStateChanged will set user and role to null
-      router.push('/login'); // Explicitly redirect
+      router.push('/login'); 
       toast({ title: "Logged Out", description: "You have been successfully logged out."});
     } catch (error: any) {
       console.error("Logout failed:", error);
       toast({ title: "Logout Failed", description: error.message || "An error occurred.", variant: "destructive" });
-    } finally {
-      // setLoading(false) will be handled by onAuthStateChanged
     }
   };
 
@@ -176,3 +175,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
+
