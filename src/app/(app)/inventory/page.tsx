@@ -165,9 +165,11 @@ export default function InventoryPage() {
     }
   };
   
-  const formatDate = (timestamp: any) => {
+  const formatDate = (timestamp: any, includeTime: boolean = false) => {
     if (!timestamp) return 'N/A';
-    return timestamp.toDate ? format(timestamp.toDate(), 'PPp') : 'Invalid Date';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    return includeTime ? format(date, 'PPp') : format(date, 'PP');
   };
 
   if (authLoading || (!user && !authLoading)) {
@@ -235,7 +237,6 @@ export default function InventoryPage() {
                   </div>
                   <div className="flex-grow min-w-0">
                     <h3 className="text-sm font-semibold line-clamp-3 mb-1">{item.name}</h3>
-                    {/* Categories subtitle removed as per request */}
                   </div>
                 </div>
                 
@@ -268,26 +269,32 @@ export default function InventoryPage() {
                 <CardTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5"/>My Stock Requests</CardTitle>
                 <CardDescription>Track the status of your pending and past stock requests.</CardDescription>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent>
                 {isLoadingRequests && stockRequests.length === 0 ? (
                     <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
                 ) : stockRequests.length === 0 ? (
                     <p className="p-6 text-center text-muted-foreground">You haven't made any stock requests yet.</p>
                 ) : (
-                <Table>
-                    <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Qty Req.</TableHead><TableHead>Status</TableHead><TableHead>Date</TableHead><TableHead>Notes</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                        {stockRequests.map(req => (
-                            <TableRow key={req.id}>
-                                <TableCell className="font-medium">{req.productName}</TableCell>
-                                <TableCell>{req.requestedQuantity}</TableCell>
-                                <TableCell><Badge variant={getStockRequestStatusVariant(req.status)} className="capitalize text-xs">{req.status.replace(/_/g, ' ')}</Badge></TableCell>
-                                <TableCell className="text-xs">{formatDate(req.createdAt)}</TableCell>
-                                <TableCell className="text-xs max-w-xs truncate">{req.notes || '-'}</TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {stockRequests.map(req => (
+                        <Card key={req.id} className="shadow-md">
+                            <CardHeader className="pb-3">
+                                <div className="flex justify-between items-start">
+                                    <CardTitle className="text-base font-semibold">{req.productName}</CardTitle>
+                                    <Badge variant={getStockRequestStatusVariant(req.status)} className="capitalize text-xs whitespace-nowrap">{req.status.replace(/_/g, ' ')}</Badge>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="text-xs space-y-1.5 pt-0 pb-3">
+                                <p><strong>Qty Requested:</strong> {req.requestedQuantity}</p>
+                                <p><strong>Date:</strong> {formatDate(req.createdAt)}</p>
+                                {req.notes && <p className="truncate" title={req.notes}><strong>Your Notes:</strong> {req.notes}</p>}
+                                {req.financeNotes && <p className="truncate" title={req.financeNotes}><strong>Finance Notes:</strong> {req.financeNotes}</p>}
+                                {req.supplierNotes && <p className="truncate" title={req.supplierNotes}><strong>Supplier Notes:</strong> {req.supplierNotes}</p>}
+                                {req.fulfilledQuantity !== undefined && <p><strong>Qty Fulfilled:</strong> {req.fulfilledQuantity}</p>}
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
                 )}
             </CardContent>
             {stockRequests.length > 0 && <CardFooter className="pt-4"><p className="text-xs text-muted-foreground">Showing {stockRequests.length} requests.</p></CardFooter>}
@@ -324,3 +331,4 @@ export default function InventoryPage() {
     </div>
   );
 }
+
