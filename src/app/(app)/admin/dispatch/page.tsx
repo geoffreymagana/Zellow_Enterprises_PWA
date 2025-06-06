@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea"; // Added Textarea
-import { Badge } from '@/components/ui/badge';
+import { Badge, BadgeProps } from '@/components/ui/badge';
 import type { Order, User as AppUser, OrderStatus, DeliveryHistoryEntry, ShippingAddress } from '@/types';
 import { collection, query as firestoreQuery, where, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -33,6 +33,22 @@ const constructDisplayAddress = (shippingAddr: ShippingAddress): string => {
   if (shippingAddr.county) addressParts.push(shippingAddr.county);
   return addressParts.join(', ') || 'Address not specified';
 };
+
+const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] => {
+  switch (status) {
+    case 'pending': return 'statusYellow';
+    case 'processing': return 'statusAmber';
+    case 'awaiting_assignment': return 'statusOrange';
+    case 'assigned': return 'statusOrderAssigned'; // Specific light blue for order assigned
+    case 'out_for_delivery': return 'statusBlue';
+    case 'shipped': return 'statusIndigo';
+    case 'delivered': return 'statusGreen';
+    case 'delivery_attempted': return 'statusPurple';
+    case 'cancelled': return 'statusRed';
+    default: return 'outline';
+  }
+};
+
 
 export default function DispatchCenterPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -350,6 +366,7 @@ export default function DispatchCenterPage() {
                 <SelectItem value="all">All Active (Non-Delivered/Cancelled)</SelectItem>
                 <SelectItem value="awaiting_assignment">Awaiting Assignment</SelectItem>
                 <SelectItem value="pending">Pending Confirmation</SelectItem>
+                <SelectItem value="processing">Processing</SelectItem>
                 <SelectItem value="assigned">Assigned</SelectItem>
                 <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
                 <SelectItem value="delivery_attempted">Delivery Attempted</SelectItem>
@@ -372,7 +389,7 @@ export default function DispatchCenterPage() {
                    }}>
                 <p className="font-semibold text-sm">ID: {order.id.substring(0,8)}...</p>
                 <p className="text-xs text-muted-foreground truncate" title={displayAddress}>{displayAddress}</p>
-                <Badge variant={order.status === 'delivered' ? 'default' : (order.status === 'cancelled' ? 'destructive' : 'secondary')} className="capitalize text-xs mt-1">{order.status.replace(/_/g, " ")}</Badge>
+                <Badge variant={getOrderStatusBadgeVariant(order.status)} className="capitalize text-xs mt-1">{order.status.replace(/_/g, " ")}</Badge>
                 {order.riderName && <p className="text-xs mt-1">Rider: {order.riderName}</p>}
               </div>
             )})}
@@ -409,7 +426,7 @@ export default function DispatchCenterPage() {
             <div className="flex justify-between items-start">
               <div>
                 <CardTitle className="font-headline">Order: {selectedOrder.id.substring(0,12)}...</CardTitle>
-                <CardDescription>Status: <Badge variant={selectedOrder.status === 'delivered' ? 'default' : (selectedOrder.status === 'cancelled' ? 'destructive' : 'secondary')} className="capitalize">{selectedOrder.status.replace(/_/g, ' ')}</Badge></CardDescription>
+                <CardDescription>Status: <Badge variant={getOrderStatusBadgeVariant(selectedOrder.status)} className="capitalize">{selectedOrder.status.replace(/_/g, ' ')}</Badge></CardDescription>
               </div>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" onClick={() => setOrderColorToEdit({orderId: selectedOrder.id, currentColor: selectedOrder.color || null})} aria-label="Set order color"><Palette className="h-4 w-4" /></Button>
@@ -425,7 +442,7 @@ export default function DispatchCenterPage() {
             {selectedOrder.customerPhone && <p className="flex items-center text-sm"><Phone className="h-4 w-4 mr-2 text-muted-foreground" /> Phone: <a href={`tel:${selectedOrder.customerPhone}`} className="text-primary hover:underline">{selectedOrder.customerPhone}</a></p>}
             {selectedOrder.deliveryNotes && <p className="flex items-center text-sm"><Info className="h-4 w-4 mr-2 text-muted-foreground" /> Order Notes: {selectedOrder.deliveryNotes}</p>}
             
-            {(selectedOrder.status === 'awaiting_assignment' || selectedOrder.status === 'pending') && (
+            {(selectedOrder.status === 'awaiting_assignment' || selectedOrder.status === 'pending' || selectedOrder.status === 'processing') && (
               <div className="pt-2 border-t mt-2 space-y-2">
                 <p className="font-medium text-sm mb-1">Assign Rider:</p>
                 <Select onValueChange={setSelectedRiderForAssignment} value={selectedRiderForAssignment || undefined}>
@@ -505,3 +522,4 @@ export default function DispatchCenterPage() {
     
 
     
+

@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Search, Edit, Filter, DollarSign, CheckCircle, PackageOpen, AlertTriangle, RefreshCw, CreditCard, Banknote, Truck } from 'lucide-react';
 import type { Order, OrderStatus, PaymentStatus } from '@/types';
-import { Badge } from "@/components/ui/badge";
+import { Badge, BadgeProps } from "@/components/ui/badge";
 import Link from 'next/link';
 import { collection, getDocs, query, orderBy, where, doc, updateDoc, serverTimestamp, Timestamp, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -29,6 +29,16 @@ const formatPrice = (price: number): string => {
 const formatDate = (timestamp: any) => {
   if (!timestamp) return 'N/A';
   return timestamp.toDate ? format(timestamp.toDate(), 'PPp') : 'Invalid Date';
+};
+
+const getPaymentStatusBadgeVariant = (status: PaymentStatus): BadgeProps['variant'] => {
+  switch (status) {
+    case 'pending': return 'statusAmber';
+    case 'paid': return 'statusGreen';
+    case 'failed': return 'statusRed';
+    case 'refunded': return 'statusGrey';
+    default: return 'outline';
+  }
 };
 
 export default function AdminPaymentsPage() {
@@ -110,15 +120,6 @@ export default function AdminPaymentsPage() {
     });
   }, [orders, searchTerm, statusFilter]);
   
-  const getPaymentStatusBadgeVariant = (status: PaymentStatus) => {
-    switch (status) {
-      case 'pending': return 'secondary';
-      case 'paid': return 'default';
-      case 'failed': return 'destructive';
-      case 'refunded': return 'outline';
-      default: return 'outline';
-    }
-  };
 
   const handleMarkAsPaid = async () => {
     if (!orderToUpdatePayment || !db || !user) return;

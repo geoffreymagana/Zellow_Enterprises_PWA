@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, getDoc, onSnapshot, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order, DeliveryHistoryEntry } from '@/types';
+import type { Order, DeliveryHistoryEntry, OrderStatus } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, AlertTriangle, Package, ShoppingBag, Truck, CheckCircle, MapPin, Clock, Star, MessageSquare } from 'lucide-react';
@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth'; // For checking logged-in user
+import { Badge, BadgeProps } from '@/components/ui/badge';
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -25,6 +26,23 @@ const formatDate = (timestamp: any, includeTime: boolean = true) => {
   if (isNaN(date.getTime())) return 'Invalid Date';
   return includeTime ? format(date, 'PPp') : format(date, 'PP');
 };
+
+const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] => {
+  // This function should ideally be centralized if used in multiple places
+  switch (status) {
+    case 'pending': return 'statusYellow';
+    case 'processing': return 'statusAmber';
+    case 'awaiting_assignment': return 'statusOrange';
+    case 'assigned': return 'statusOrderAssigned';
+    case 'out_for_delivery': return 'statusBlue';
+    case 'shipped': return 'statusIndigo';
+    case 'delivered': return 'statusGreen';
+    case 'delivery_attempted': return 'statusPurple';
+    case 'cancelled': return 'statusRed';
+    default: return 'outline';
+  }
+};
+
 
 export default function TrackOrderPage() {
   const params = useParams();
@@ -167,7 +185,9 @@ export default function TrackOrderPage() {
         <CardContent className="space-y-6">
           <div className="text-center p-4 bg-muted rounded-md">
             <p className="text-sm text-muted-foreground">Current Status:</p>
-            <p className="text-xl font-semibold capitalize">{currentStatusEntry.status.replace(/_/g, ' ')}</p>
+             <Badge variant={getOrderStatusBadgeVariant(currentStatusEntry.status as OrderStatus)} className="text-xl capitalize font-semibold my-1">
+                {currentStatusEntry.status.replace(/_/g, ' ')}
+            </Badge>
             <p className="text-xs text-muted-foreground">As of: {formatDate(currentStatusEntry.timestamp)}</p>
             {currentStatusEntry.notes && <p className="text-xs text-muted-foreground mt-1">Note: {currentStatusEntry.notes}</p>}
           </div>

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Badge } from "@/components/ui/badge";
+import { Badge, BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,6 +13,22 @@ import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, 
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
+
+const getDeliveryStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] => {
+  // Delivery Status uses the same mapping as Order Status for these colors
+  switch (status) {
+    case 'pending': return 'statusYellow'; // Though 'pending' might not be a typical *delivery* status
+    case 'processing': return 'statusAmber'; // Similarly, processing is pre-dispatch
+    case 'awaiting_assignment': return 'statusAmber'; // User table specific
+    case 'assigned': return 'statusLightBlue';
+    case 'out_for_delivery': return 'statusBlue';
+    case 'shipped': return 'statusIndigo'; // If 'shipped' is used for deliveries
+    case 'delivered': return 'statusGreen';
+    case 'delivery_attempted': return 'statusPurple';
+    case 'cancelled': return 'statusRed';
+    default: return 'outline';
+  }
+};
 
 export default function DeliveriesPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -112,19 +128,6 @@ export default function DeliveriesPage() {
     }
   };
   
-  const getStatusBadgeVariant = (status: OrderStatus) => {
-    switch (status) {
-      case 'pending': return 'default';
-      case 'awaiting_assignment': return 'secondary';
-      case 'assigned': return 'default';
-      case 'out_for_delivery': return 'secondary';
-      case 'delivered': return 'default'; // Consider success variant
-      case 'delivery_attempted': return 'outline'; // Consider warning variant
-      case 'cancelled': return 'destructive';
-      case 'shipped': return 'outline';
-      default: return 'outline';
-    }
-  };
 
   if (authLoading || isLoading) {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -162,7 +165,7 @@ export default function DeliveriesPage() {
               <CardHeader>
                 <div className="flex justify-between items-start">
                     <CardTitle className="font-headline text-lg">Order ID: {delivery.id}</CardTitle>
-                    <Badge variant={getStatusBadgeVariant(delivery.status)} className="capitalize">{delivery.status.replace(/_/g, ' ')}</Badge>
+                    <Badge variant={getDeliveryStatusBadgeVariant(delivery.status)} className="capitalize">{delivery.status.replace(/_/g, ' ')}</Badge>
                 </div>
                 <CardDescription>
                   Customer: {delivery.customerName || delivery.customerId} <br />

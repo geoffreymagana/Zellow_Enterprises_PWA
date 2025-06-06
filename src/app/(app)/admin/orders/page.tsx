@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Search, Edit, Filter, PackageOpen } from 'lucide-react';
 import type { Order, OrderStatus } from '@/types';
-import { Badge } from "@/components/ui/badge";
+import { Badge, BadgeProps } from "@/components/ui/badge";
 import Link from 'next/link';
 import { collection, getDocs, query, orderBy, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -27,6 +27,21 @@ const ALL_STATUSES_SENTINEL = "__ALL_STATUSES__";
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
+};
+
+const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] => {
+  switch (status) {
+    case 'pending': return 'statusYellow';
+    case 'processing': return 'statusAmber';
+    case 'awaiting_assignment': return 'statusOrange';
+    case 'assigned': return 'statusOrderAssigned';
+    case 'out_for_delivery': return 'statusBlue';
+    case 'shipped': return 'statusIndigo';
+    case 'delivered': return 'statusGreen';
+    case 'delivery_attempted': return 'statusPurple';
+    case 'cancelled': return 'statusRed';
+    default: return 'outline';
+  }
 };
 
 export default function AdminOrdersPage() {
@@ -88,21 +103,6 @@ export default function AdminOrdersPage() {
       return (idMatch || nameMatch || emailMatch);
     });
   }, [orders, searchTerm]);
-
-  const getStatusBadgeVariant = (status: Order['status']) => {
-    switch (status) {
-      case 'pending': return 'default';
-      case 'processing': return 'secondary';
-      case 'awaiting_assignment': return 'secondary';
-      case 'assigned': return 'default';
-      case 'out_for_delivery': return 'secondary';
-      case 'shipped': return 'outline';
-      case 'delivered': return 'default'; // Consider success variant
-      case 'delivery_attempted': return 'outline';
-      case 'cancelled': return 'destructive';
-      default: return 'outline';
-    }
-  };
   
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'N/A';
@@ -198,7 +198,7 @@ export default function AdminOrdersPage() {
                     </TableCell>
                     <TableCell>{formatDate(order.createdAt)}</TableCell>
                     <TableCell>
-                      <Badge variant={getStatusBadgeVariant(order.status)} className="capitalize">
+                      <Badge variant={getOrderStatusBadgeVariant(order.status)} className="capitalize">
                         {order.status.replace(/_/g, " ")}
                       </Badge>
                     </TableCell>

@@ -14,8 +14,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft, Save, AlertTriangle, Package, User, Settings2, Truck, CreditCard, GiftIcon, PlusCircle, Edit, Users } from 'lucide-react';
-import type { Order, OrderStatus, Task, User as AppUser, DeliveryHistoryEntry, OrderItem as OrderItemType } from '@/types';
-import { Badge } from "@/components/ui/badge";
+import type { Order, OrderStatus, Task, User as AppUser, DeliveryHistoryEntry, OrderItem as OrderItemType, PaymentStatus } from '@/types';
+import { Badge, BadgeProps } from "@/components/ui/badge";
 import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -45,6 +45,30 @@ const formatPrice = (price: number): string => {
 const predefinedTaskTypes = ["Engraving", "Printing", "Assembly", "Quality Check", "Packaging"];
 const allOrderStatuses: OrderStatus[] = ['pending', 'processing', 'awaiting_assignment', 'assigned', 'out_for_delivery', 'shipped', 'delivered', 'delivery_attempted', 'cancelled'];
 
+const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] => {
+  switch (status) {
+    case 'pending': return 'statusYellow';
+    case 'processing': return 'statusAmber';
+    case 'awaiting_assignment': return 'statusOrange';
+    case 'assigned': return 'statusOrderAssigned';
+    case 'out_for_delivery': return 'statusBlue';
+    case 'shipped': return 'statusIndigo';
+    case 'delivered': return 'statusGreen';
+    case 'delivery_attempted': return 'statusPurple';
+    case 'cancelled': return 'statusRed';
+    default: return 'outline';
+  }
+};
+
+const getPaymentStatusBadgeVariant = (status: PaymentStatus): BadgeProps['variant'] => {
+  switch (status) {
+    case 'pending': return 'statusAmber';
+    case 'paid': return 'statusGreen';
+    case 'failed': return 'statusRed';
+    case 'refunded': return 'statusGrey';
+    default: return 'outline';
+  }
+};
 
 function OrderTaskItem({ task }: { task: Task }) {
   const formatDateTaskItem = (timestamp: any) => {
@@ -63,7 +87,7 @@ function OrderTaskItem({ task }: { task: Task }) {
       <CardHeader className="pb-2 pt-3 px-4">
         <div className="flex justify-between items-center">
           <CardTitle className="text-sm font-semibold">Task: {task.taskType}</CardTitle>
-          <Badge variant={task.status === 'completed' ? 'default' : 'secondary'} className="capitalize text-xs">{task.status.replace(/_/g, ' ')}</Badge>
+          <Badge variant={task.status === 'completed' ? 'statusGreen' : 'secondary'} className="capitalize text-xs">{task.status.replace(/_/g, ' ')}</Badge>
         </div>
         <CardDescription className="text-xs">Assigned to: {task.assigneeName || 'N/A'}</CardDescription>
       </CardHeader>
@@ -269,7 +293,7 @@ export default function AdminOrderDetailPage() {
                   <CardTitle className="font-headline text-xl md:text-2xl">Order ID: {order.id}</CardTitle>
                   <CardDescription>Placed on: {formatDate(order.createdAt)} | Last Updated: {formatDate(order.updatedAt)}</CardDescription>
                 </div>
-                <Badge variant={order.status === 'delivered' ? 'default' : (order.status === 'cancelled' ? 'destructive' : 'secondary')} className="text-sm capitalize">
+                <Badge variant={getOrderStatusBadgeVariant(order.status)} className="text-sm capitalize">
                   {order.status.replace(/_/g, ' ')}
                 </Badge>
               </div>
@@ -382,7 +406,7 @@ export default function AdminOrderDetailPage() {
               <div><strong>Payment Method:</strong> <span className="capitalize">{order.paymentMethod?.replace(/_/g, ' ') || 'N/A'}</span></div>
               <div className="flex items-center">
                 <strong className="mr-2">Payment Status:</strong> 
-                <Badge variant={order.paymentStatus === 'paid' ? 'default' : 'secondary'} className="capitalize">{order.paymentStatus?.replace(/_/g, ' ') || 'N/A'}</Badge>
+                <Badge variant={getPaymentStatusBadgeVariant(order.paymentStatus)} className="capitalize">{order.paymentStatus?.replace(/_/g, ' ') || 'N/A'}</Badge>
               </div>
               {order.transactionId && <div><strong>Transaction ID:</strong> {order.transactionId}</div>}
               <Separator className="my-2"/>
