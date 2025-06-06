@@ -14,9 +14,6 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  // SidebarMenuSub, // Removed if not used
-  // SidebarMenuSubItem, // Removed if not used
-  // SidebarMenuSubButton, // Removed if not used
   SidebarProvider,
   useSidebar,
 } from "@/components/ui/sidebar";
@@ -68,7 +65,6 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     .map(item => {
       if (!searchTerm) return { ...item, isVisible: true };
       const labelMatches = item.label.toLowerCase().includes(searchTerm.toLowerCase());
-      // Assuming subItems structure if it exists; for now, main items only
       return { ...item, isVisible: labelMatches };
     })
     .filter(item => item.isVisible);
@@ -78,7 +74,6 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   );
 
   return (
-    // AdminLayout root is now flex flex-col and takes w-full from SidebarProvider (which is also flex-col)
     <div className="flex flex-col w-full min-h-screen bg-background">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-[var(--header-height)]">
         <div className="w-full h-full flex items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -97,9 +92,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                 <ScrollArea className="flex-1">
                   <SidebarMenu className="p-2">
                     {mainAdminNavItems.map((item) => {
-                       const directMatch = item.href === pathname;
-                       // const subItemMatch = (item as any).subItems?.some((sub: any) => sub.href === pathname); // If sub-items are introduced
-                       const isActive = directMatch; // Simplified for now
+                       const isActive = item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
                       return (
                       <SidebarMenuItem key={item.label}>
                         <Link href={item.href} passHref legacyBehavior>
@@ -166,11 +159,11 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
         </div>
       </header>
       
-      <div className="flex flex-1"> {/* This container holds sidebar and main content side-by-side */}
+      <div className="flex flex-1">
         <Sidebar
           side="left"
           className="border-r border-sidebar w-[var(--sidebar-width)] sticky top-[var(--header-height)] hidden md:flex flex-col" 
-          style={{ height: 'calc(100vh - var(--header-height))' }} // Corrected height
+          style={{ height: 'calc(100vh - var(--header-height))' }}
         >
           <AdminSidebarHeader className="h-[var(--header-height)] border-b border-sidebar flex-shrink-0" /> 
           <SidebarContent className="flex-1 overflow-y-auto">
@@ -178,11 +171,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
               {filteredMainAdminNavItems.length > 0 ? (
                 <SidebarMenu className="p-2">
                   {filteredMainAdminNavItems.map((item) => {
-                    const directMatch = item.href === pathname;
-                    // const childMatch = (item as any).subItems?.some((sub: any) => sub.href === pathname); // If subitems
-                    const isActive = directMatch; // Simplified
-
-                    // Basic item rendering, sub-menu logic can be re-added if needed
+                    const isActive = item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
                     return (
                     <SidebarMenuItem key={item.label}>
                       <Link href={item.href!} passHref legacyBehavior>
@@ -252,25 +241,26 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
 const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   const { user, role, logout } = useAuth();
   const { cartTotalItems } = useCart();
-  // const [searchTerm, setSearchTerm] = useState(""); 
+  // const [searchTerm, setSearchTerm] = useState(""); // Search term state for non-admin
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-[var(--header-height)]">
         <div className="container mx-auto h-full flex items-center justify-between px-4 gap-4">
-          <div className="relative flex-1 max-w-2xl"> 
-            <SearchIconLucide className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          {/* Search Bar for Non-Admin - Styled like Admin's */}
+          <div className="relative flex-1 max-w-md sm:max-w-lg md:max-w-xl"> 
+             <SearchIconLucide className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
               placeholder={role === 'Customer' ? "Search products, gift boxes..." : "Search..."}
-              className="h-10 w-full pl-10 rounded-full bg-muted border-transparent focus:border-primary focus:bg-background"
+              className="h-9 w-full pl-10" // Adjusted height and padding
               // value={searchTerm}
               // onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
           <div className="flex items-center gap-2">
-            <ThemeToggle />
+            {role !== 'Customer' && <ThemeToggle />} 
             {user && role === 'Customer' && (
               <Link href="/orders/cart" passHref>
                 <Button variant="ghost" size="icon" aria-label="Cart" className="relative">
@@ -330,13 +320,10 @@ export default function AppGroupLayout({ children }: LayoutProps) {
   }
 
   if (!user) {
-    // This check might be redundant if page-level checks redirect to /login,
-    // but it's a good failsafe for the layout itself.
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
   
   if (role === 'Admin') {
-    // SidebarProvider needs to wrap AdminLayout for its context to be available
     return <SidebarProvider><AdminLayout>{children}</AdminLayout></SidebarProvider>;
   }
   
