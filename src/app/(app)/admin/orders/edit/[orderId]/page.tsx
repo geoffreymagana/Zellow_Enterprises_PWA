@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from '@/hooks/useAuth';
@@ -46,7 +47,7 @@ const allOrderStatuses: OrderStatus[] = ['pending', 'processing', 'awaiting_assi
 
 
 function OrderTaskItem({ task }: { task: Task }) {
-  const formatDate = (timestamp: any) => {
+  const formatDateTaskItem = (timestamp: any) => {
     if (!timestamp) return 'N/A';
     if (timestamp && typeof timestamp.toDate === 'function') {
       return format(timestamp.toDate(), 'PPp');
@@ -68,7 +69,7 @@ function OrderTaskItem({ task }: { task: Task }) {
       <CardContent className="px-4 pb-3 text-xs">
         <p className="truncate">{task.description}</p>
         <p className="text-muted-foreground mt-1">Item: {task.itemName}</p>
-        <p className="text-muted-foreground">Created: {formatDate(task.createdAt)}</p>
+        <p className="text-muted-foreground">Created: {formatDateTaskItem(task.createdAt)}</p>
       </CardContent>
     </Card>
   );
@@ -116,7 +117,7 @@ export default function AdminOrderDetailPage() {
         const tasksQuery = query(collection(db, 'tasks'), where("orderId", "==", orderId));
         const tasksSnapshot = await getDocs(tasksQuery);
         const fetchedTasks: Task[] = [];
-        tasksSnapshot.forEach(doc => fetchedTasks.push({ id: doc.id, ...doc.data() } as Task));
+        tasksSnapshot.forEach(taskDoc => fetchedTasks.push({ id: taskDoc.id, ...taskDoc.data() } as Task));
         setOrderTasks(fetchedTasks);
       } else {
         toast({ title: "Error", description: "Order not found.", variant: "destructive" });
@@ -136,7 +137,7 @@ export default function AdminOrderDetailPage() {
       const techQuery = query(collection(db, 'users'), where("role", "==", "Technician"), where("disabled", "!=", true));
       const techSnapshot = await getDocs(techQuery);
       const fetchedTechs: AppUser[] = [];
-      techSnapshot.forEach(doc => fetchedTechs.push({ uid: doc.id, ...doc.data() } as AppUser));
+      techSnapshot.forEach(docUser => fetchedTechs.push({ uid: docUser.id, ...docUser.data() } as AppUser));
       setTechnicians(fetchedTechs);
     } catch (error) {
       console.error("Error fetching technicians:", error);
@@ -259,7 +260,6 @@ export default function AdminOrderDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          {/* Order Overview & Status */}
           <Card>
             <CardHeader>
               <div className="flex justify-between items-start">
@@ -297,7 +297,6 @@ export default function AdminOrderDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Order Items and Task Creation */}
           <Card>
             <CardHeader><CardTitle className="font-headline text-lg flex items-center"><Package className="mr-2 h-5 w-5"/>Order Items</CardTitle></CardHeader>
             <CardContent>
@@ -332,13 +331,13 @@ export default function AdminOrderDetailPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </TableContent>
+              </Table>
+            </CardContent>
             <CardFooter className="justify-end font-bold text-lg border-t pt-4">
               Order Total: {formatPrice(order.totalAmount)}
             </CardFooter>
           </Card>
 
-           {/* Delivery History */}
            <Card>
             <CardHeader><CardTitle className="font-headline text-lg">Delivery History</CardTitle></CardHeader>
             <CardContent>
@@ -359,7 +358,6 @@ export default function AdminOrderDetailPage() {
         </div>
 
         <div className="lg:col-span-1 space-y-6">
-          {/* Customer & Shipping Details */}
           <Card>
             <CardHeader><CardTitle className="font-headline text-lg flex items-center"><User className="mr-2 h-5 w-5"/>Customer & Shipping</CardTitle></CardHeader>
             <CardContent className="space-y-1 text-sm">
@@ -376,7 +374,6 @@ export default function AdminOrderDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Payment & Shipping Method */}
           <Card>
             <CardHeader><CardTitle className="font-headline text-lg flex items-center"><CreditCard className="mr-2 h-5 w-5"/>Payment & Method</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">
@@ -392,7 +389,6 @@ export default function AdminOrderDetailPage() {
             </CardContent>
           </Card>
           
-          {/* Gift Details */}
           {order.isGift && order.giftDetails && (
             <Card>
                 <CardHeader><CardTitle className="font-headline text-lg flex items-center"><GiftIcon className="mr-2 h-5 w-5"/>Gift Details</CardTitle></CardHeader>
@@ -405,7 +401,6 @@ export default function AdminOrderDetailPage() {
             </Card>
           )}
 
-          {/* Linked Tasks */}
           <Card>
             <CardHeader><CardTitle className="font-headline text-lg flex items-center"><Settings2 className="mr-2 h-5 w-5"/>Linked Tasks ({orderTasks.length})</CardTitle></CardHeader>
             <CardContent className="max-h-80 overflow-y-auto pr-1">
@@ -416,7 +411,6 @@ export default function AdminOrderDetailPage() {
         </div>
       </div>
 
-      {/* Task Creation Dialog */}
       <Dialog open={isTaskDialogOpen} onOpenChange={(open) => { setIsTaskDialogOpen(open); if (!open) setCurrentItemForTask(null);}}>
         <DialogContent>
           <DialogHeader>
