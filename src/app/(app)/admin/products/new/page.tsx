@@ -103,7 +103,7 @@ export default function CreateProductPage() {
       categories: values.categories,
       imageUrl: values.imageUrl,
       supplier: values.supplier,
-      customizationGroupId: values.customizationGroupId, // This will be null if "None" was selected
+      customizationGroupId: values.customizationGroupId === NONE_GROUP_SENTINEL_VALUE ? null : values.customizationGroupId, 
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -203,19 +203,17 @@ export default function CreateProductPage() {
                         <FormLabel>Assign Customization Group (Optional)</FormLabel>
                         <Select 
                           onValueChange={(valueFromSelectItem) => {
-                            if (valueFromSelectItem === NONE_GROUP_SENTINEL_VALUE) {
-                              field.onChange(null);
-                            } else {
-                              field.onChange(valueFromSelectItem);
-                            }
+                            field.onChange(valueFromSelectItem === NONE_GROUP_SENTINEL_VALUE ? null : valueFromSelectItem);
                           }} 
-                          value={field.value === null ? NONE_GROUP_SENTINEL_VALUE : (field.value || "")}
+                          value={field.value === null ? NONE_GROUP_SENTINEL_VALUE : (field.value || undefined)}
                         >
                           <FormControl><SelectTrigger><SelectValue placeholder="Select a group" /></SelectTrigger></FormControl>
                           <SelectContent>
                             <SelectItem value={NONE_GROUP_SENTINEL_VALUE}>None</SelectItem>
-                            {customizationGroups.map(group => (
-                              <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
+                            {customizationGroups
+                              .filter(group => group && typeof group.id === 'string' && group.id.trim() !== '') // Filter out groups with invalid IDs
+                              .map(group => (
+                                <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -241,3 +239,4 @@ export default function CreateProductPage() {
   );
 }
 
+    
