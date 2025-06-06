@@ -6,12 +6,13 @@ import { useRouter } from 'next/navigation';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Loader2, AlertTriangle, Package, UsersRound, Route, Palette, XCircle, CheckCircle, Edit2, MapPin, Phone, Info, SlidersHorizontal, User } from 'lucide-react';
+import { Loader2, AlertTriangle, Package, UsersRound, Route, Palette, XCircle, CheckCircle, Edit2, MapPin, Phone, Info, SlidersHorizontal, User, MessageSquare } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea"; // Added Textarea
 import { Badge } from '@/components/ui/badge';
 import type { Order, User as AppUser, OrderStatus, DeliveryHistoryEntry, ShippingAddress } from '@/types';
 import { collection, query as firestoreQuery, where, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion, getDocs, Timestamp } from 'firebase/firestore';
@@ -48,6 +49,7 @@ export default function DispatchCenterPage() {
   const [riders, setRiders] = useState<AppUser[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedRiderForAssignment, setSelectedRiderForAssignment] = useState<string | null>(null);
+  const [assignmentNotes, setAssignmentNotes] = useState<string>(""); // New state for assignment notes
   const [orderColorToEdit, setOrderColorToEdit] = useState<{orderId: string, currentColor: string | null} | null>(null);
   const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
   
@@ -126,7 +128,6 @@ export default function DispatchCenterPage() {
       setMapError(error.message || "Failed to init map.");
       setMapLoading(false);
     }
-     // Cleanup map instance and markers on component unmount
     return () => { 
         mapRef.current?.remove(); 
         mapRef.current = null; 
@@ -135,14 +136,13 @@ export default function DispatchCenterPage() {
         riderMarkersRef.current.forEach(marker => marker.remove());
         riderMarkersRef.current.clear();
     };
-  }, [authLoading, role]); // Only depends on authLoading and role for initial setup
+  }, [authLoading, role]);
 
   // Update Map Markers (Orders & Riders)
   useEffect(() => {
     if (!mapRef.current || !mapRef.current.isStyleLoaded() || mapLoading) return;
     const map = mapRef.current;
 
-    // Manage Order Markers
     const currentOrderIdsOnMap = new Set(allOrders.map(o => o.id));
     
     allOrders.forEach(order => {
@@ -151,12 +151,12 @@ export default function DispatchCenterPage() {
         const markerColor = order.color || 
                             (order.status === 'delivered' ? 'hsl(120, 60%, 50%)' : // green
                             (order.status === 'cancelled' ? 'hsl(0, 0%, 50%)' : // grey
-                            'hsl(var(--primary))')); // blue/theme primary
+                            'hsl(var(--primary))'));
         
         if (existingMarker) {
           existingMarker.setLngLat([order.deliveryCoordinates.lng, order.deliveryCoordinates.lat]);
           const el = existingMarker.getElement();
-          if (el instanceof HTMLElement) { // Type guard
+          if (el instanceof HTMLElement) { 
             el.style.backgroundColor = markerColor;
           }
         } else {
@@ -176,11 +176,12 @@ export default function DispatchCenterPage() {
           newMarker.getElement().addEventListener('click', (e) => {
             e.stopPropagation();
             setSelectedOrder(order);
+            setAssignmentNotes(""); // Clear notes when a new order is selected
             if(order.deliveryCoordinates) map.flyTo({center: [order.deliveryCoordinates.lng, order.deliveryCoordinates.lat], zoom: 14});
           });
           orderMarkersRef.current.set(order.id, newMarker);
         }
-      } else { // If order has no coordinates, remove its marker if it exists
+      } else { 
         const existingMarker = orderMarkersRef.current.get(order.id);
         if (existingMarker) {
             existingMarker.remove();
@@ -189,7 +190,6 @@ export default function DispatchCenterPage() {
       }
     });
 
-    // Remove markers for orders that are no longer in `allOrders`
     orderMarkersRef.current.forEach((marker, orderId) => {
       if (!currentOrderIdsOnMap.has(orderId)) {
         marker.remove();
@@ -197,7 +197,6 @@ export default function DispatchCenterPage() {
       }
     });
 
-    // Manage Rider Markers
     const currentRiderUidsOnMap = new Set(riders.map(r => r.uid));
 
     riders.forEach(rider => {
@@ -225,10 +224,9 @@ export default function DispatchCenterPage() {
           const newMarker = new mapboxgl.Marker(el)
             .setLngLat([rider.currentLocation.lng, rider.currentLocation.lat])
             .addTo(map);
-          // newMarker.getElement().addEventListener('click', () => { /* Show rider details */ });
           riderMarkersRef.current.set(rider.uid, newMarker);
         }
-      } else { // If rider has no location, remove their marker
+      } else { 
          const existingMarker = riderMarkersRef.current.get(rider.uid);
         if (existingMarker) {
             existingMarker.remove();
@@ -260,10 +258,11 @@ export default function DispatchCenterPage() {
 
     try {
       const orderRef = doc(db, 'orders', selectedOrder.id);
+      const assignmentMessage = `Assigned to ${riderToAssign.displayName || riderToAssign.email} by dispatcher ${user.displayName || user.email}. Notes: ${assignmentNotes || 'N/A'}`;
       const historyEntry: DeliveryHistoryEntry = {
         status: 'assigned',
-        timestamp: Timestamp.now(), // Changed from serverTimestamp()
-        notes: `Assigned to ${riderToAssign.displayName || riderToAssign.email} by dispatcher ${user.displayName || user.email}`,
+        timestamp: Timestamp.now(),
+        notes: assignmentMessage,
         actorId: user.uid,
       };
       await updateDoc(orderRef, {
@@ -276,6 +275,7 @@ export default function DispatchCenterPage() {
       toast({ title: "Success", description: `Order ${selectedOrder.id} assigned to ${riderToAssign.displayName || riderToAssign.email}.` });
       setSelectedOrder(null);
       setSelectedRiderForAssignment(null);
+      setAssignmentNotes(""); // Clear notes
     } catch (error) {
       console.error("Error assigning rider:", error);
       toast({ title: "Error", description: "Failed to assign rider.", variant: "destructive" });
@@ -305,7 +305,7 @@ export default function DispatchCenterPage() {
       const orderRef = doc(db, 'orders', orderToCancel.id);
       const historyEntry: DeliveryHistoryEntry = {
         status: 'cancelled',
-        timestamp: Timestamp.now(), // Changed from serverTimestamp()
+        timestamp: Timestamp.now(),
         notes: `Order cancelled by dispatcher ${user.displayName || user.email}`,
         actorId: user.uid,
       };
@@ -335,14 +335,13 @@ export default function DispatchCenterPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-var(--header-height,4rem)-2rem)] p-4 gap-4">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center mb-0"> {/* Removed mb-4 */}
          <h1 className="text-3xl font-headline font-semibold">Dispatch Center</h1>
       </div>
       
-      <div className="flex flex-col flex-grow gap-4 overflow-auto"> {/* Changed layout to flex-col and overflow-auto */}
-        
-        {/* Orders Card */}
-        <Card>
+      {/* Top row for Orders and Riders cards */}
+      <div className="flex flex-col md:flex-row gap-4">
+        <Card className="md:w-1/2 lg:w-1/2"> {/* Adjusted width */}
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" /> Orders</CardTitle>
             <Select value={orderFilterStatus} onValueChange={(value) => setOrderFilterStatus(value as OrderStatus | "all")}>
@@ -359,7 +358,7 @@ export default function DispatchCenterPage() {
               </SelectContent>
             </Select>
           </CardHeader>
-          <CardContent className="space-y-2 max-h-[25vh] sm:max-h-[20vh] overflow-y-auto"> {/* Adjusted max-h */}
+          <CardContent className="space-y-2 max-h-[25vh] sm:max-h-[20vh] md:max-h-[30vh] overflow-y-auto">
             {filteredOrders.length === 0 && <p className="text-muted-foreground text-sm">No orders match filter.</p>}
             {filteredOrders.map(order => {
               const displayAddress = constructDisplayAddress(order.shippingAddress);
@@ -368,6 +367,7 @@ export default function DispatchCenterPage() {
                    className={`p-2 rounded-md border cursor-pointer hover:bg-muted ${selectedOrder?.id === order.id ? 'ring-2 ring-primary bg-muted' : ''}`}
                    onClick={() => {
                       setSelectedOrder(order);
+                      setAssignmentNotes(""); // Clear notes on new selection
                       if(order.deliveryCoordinates && mapRef.current) mapRef.current.flyTo({center: [order.deliveryCoordinates.lng, order.deliveryCoordinates.lat], zoom: 14});
                    }}>
                 <p className="font-semibold text-sm">ID: {order.id.substring(0,8)}...</p>
@@ -379,10 +379,9 @@ export default function DispatchCenterPage() {
           </CardContent>
         </Card>
 
-        {/* Riders Card */}
-        <Card>
+        <Card className="md:w-1/2 lg:w-1/2"> {/* Adjusted width */}
           <CardHeader><CardTitle className="flex items-center gap-2"><UsersRound className="h-5 w-5" /> Riders ({riders.length})</CardTitle></CardHeader>
-          <CardContent className="space-y-2 max-h-[20vh] sm:max-h-[15vh] overflow-y-auto"> {/* Adjusted max-h */}
+          <CardContent className="space-y-2 max-h-[20vh] sm:max-h-[15vh] md:max-h-[30vh] overflow-y-auto">
             {riders.length === 0 && <p className="text-muted-foreground text-sm">No active riders.</p>}
             {riders.map(rider => (
               <div key={rider.uid} className="p-2 rounded-md border">
@@ -392,59 +391,74 @@ export default function DispatchCenterPage() {
             ))}
           </CardContent>
         </Card>
+      </div>
 
-        {/* Map Card */}
-        <Card className="flex-grow relative min-h-[300px]"> {/* Map takes remaining space */}
-          <CardContent className="p-0 h-full">
-            {mapError && <Alert variant="destructive" className="m-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Map Error</AlertTitle><AlertDescription>{mapError}</AlertDescription></Alert>}
-            {mapLoading && !mapError && <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10"><Loader2 className="h-10 w-10 animate-spin text-primary" /><p className="ml-2">Loading map...</p></div>}
-            <div ref={mapContainerRef} className="w-full h-full rounded-md" />
+      {/* Map Card - takes remaining space */}
+      <Card className="flex-grow relative min-h-[300px]">
+        <CardContent className="p-0 h-full">
+          {mapError && <Alert variant="destructive" className="m-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Map Error</AlertTitle><AlertDescription>{mapError}</AlertDescription></Alert>}
+          {mapLoading && !mapError && <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10"><Loader2 className="h-10 w-10 animate-spin text-primary" /><p className="ml-2">Loading map...</p></div>}
+          <div ref={mapContainerRef} className="w-full h-full rounded-md" />
+        </CardContent>
+      </Card>
+
+      {/* Selected Order Details Card (if an order is selected) */}
+      {selectedOrder && (
+        <Card className="overflow-y-auto max-h-[40vh] shrink-0"> {/* Adjusted max-h and added shrink-0 */}
+          <CardHeader>
+            <div className="flex justify-between items-start">
+              <div>
+                <CardTitle className="font-headline">Order: {selectedOrder.id.substring(0,12)}...</CardTitle>
+                <CardDescription>Status: <Badge variant={selectedOrder.status === 'delivered' ? 'default' : (selectedOrder.status === 'cancelled' ? 'destructive' : 'secondary')} className="capitalize">{selectedOrder.status.replace(/_/g, ' ')}</Badge></CardDescription>
+              </div>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="icon" onClick={() => setOrderColorToEdit({orderId: selectedOrder.id, currentColor: selectedOrder.color || null})} aria-label="Set order color"><Palette className="h-4 w-4" /></Button>
+                {selectedOrder.status !== 'delivered' && selectedOrder.status !== 'cancelled' && (
+                    <Button variant="ghost" size="icon" onClick={() => setOrderToCancel(selectedOrder)} aria-label="Cancel order"><XCircle className="h-4 w-4 text-destructive" /></Button>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="flex items-center text-sm"><User className="h-4 w-4 mr-2 text-muted-foreground" /> Cust: {selectedOrder.customerName || selectedOrder.customerId}</p>
+            <p className="flex items-center text-sm"><MapPin className="h-4 w-4 mr-2 text-muted-foreground" /> Addr: {constructDisplayAddress(selectedOrder.shippingAddress)}</p>
+            {selectedOrder.customerPhone && <p className="flex items-center text-sm"><Phone className="h-4 w-4 mr-2 text-muted-foreground" /> Phone: <a href={`tel:${selectedOrder.customerPhone}`} className="text-primary hover:underline">{selectedOrder.customerPhone}</a></p>}
+            {selectedOrder.deliveryNotes && <p className="flex items-center text-sm"><Info className="h-4 w-4 mr-2 text-muted-foreground" /> Order Notes: {selectedOrder.deliveryNotes}</p>}
+            
+            {(selectedOrder.status === 'awaiting_assignment' || selectedOrder.status === 'pending') && (
+              <div className="pt-2 border-t mt-2 space-y-2">
+                <p className="font-medium text-sm mb-1">Assign Rider:</p>
+                <Select onValueChange={setSelectedRiderForAssignment} value={selectedRiderForAssignment || undefined}>
+                  <SelectTrigger><SelectValue placeholder="Select Rider" /></SelectTrigger>
+                  <SelectContent>
+                    {riders.length === 0 && <SelectItem value="no-riders" disabled>No riders available</SelectItem>}
+                    {riders.map(r => <SelectItem key={r.uid} value={r.uid}>{r.displayName || r.email}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                
+                <div className="space-y-1">
+                    <label htmlFor="assignmentNotes" className="text-sm font-medium">Assignment Notes (Optional)</label>
+                    <Textarea 
+                        id="assignmentNotes"
+                        value={assignmentNotes}
+                        onChange={(e) => setAssignmentNotes(e.target.value)}
+                        placeholder="e.g., Contact customer upon arrival, fragile item..."
+                        rows={2}
+                    />
+                </div>
+                <Button onClick={handleAssignRider} disabled={!selectedRiderForAssignment} className="w-full sm:w-auto">Assign</Button>
+              </div>
+            )}
+            {selectedOrder.riderName && <p className="text-sm pt-2 border-t mt-2">Assigned Rider: <span className="font-semibold">{selectedOrder.riderName}</span></p>}
+            {/* Display assignment notes from history if available */}
+            {selectedOrder.deliveryHistory?.find(h => h.status === 'assigned' && h.notes?.includes("Notes:")) && (
+                <p className="text-xs text-muted-foreground pt-1 border-t mt-1">
+                    Assignment Notes: {selectedOrder.deliveryHistory.find(h => h.status === 'assigned')?.notes?.split("Notes:")[1]?.trim()}
+                </p>
+            )}
           </CardContent>
         </Card>
-
-        {/* Selected Order Details Card (if an order is selected) */}
-        {selectedOrder && (
-          <Card className="overflow-y-auto max-h-[30vh] shrink-0"> {/* Adjusted max-h and added shrink-0 */}
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="font-headline">Order: {selectedOrder.id.substring(0,12)}...</CardTitle>
-                  <CardDescription>Status: <Badge variant={selectedOrder.status === 'delivered' ? 'default' : (selectedOrder.status === 'cancelled' ? 'destructive' : 'secondary')} className="capitalize">{selectedOrder.status.replace(/_/g, ' ')}</Badge></CardDescription>
-                </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => setOrderColorToEdit({orderId: selectedOrder.id, currentColor: selectedOrder.color || null})} aria-label="Set order color"><Palette className="h-4 w-4" /></Button>
-                  {selectedOrder.status !== 'delivered' && selectedOrder.status !== 'cancelled' && (
-                      <Button variant="ghost" size="icon" onClick={() => setOrderToCancel(selectedOrder)} aria-label="Cancel order"><XCircle className="h-4 w-4 text-destructive" /></Button>
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="flex items-center text-sm"><User className="h-4 w-4 mr-2 text-muted-foreground" /> Cust: {selectedOrder.customerName || selectedOrder.customerId}</p>
-              <p className="flex items-center text-sm"><MapPin className="h-4 w-4 mr-2 text-muted-foreground" /> Addr: {constructDisplayAddress(selectedOrder.shippingAddress)}</p>
-              {selectedOrder.customerPhone && <p className="flex items-center text-sm"><Phone className="h-4 w-4 mr-2 text-muted-foreground" /> Phone: <a href={`tel:${selectedOrder.customerPhone}`} className="text-primary hover:underline">{selectedOrder.customerPhone}</a></p>}
-              {selectedOrder.deliveryNotes && <p className="flex items-center text-sm"><Info className="h-4 w-4 mr-2 text-muted-foreground" /> Notes: {selectedOrder.deliveryNotes}</p>}
-              
-              {(selectedOrder.status === 'awaiting_assignment' || selectedOrder.status === 'pending') && (
-                <div className="pt-2 border-t mt-2">
-                  <p className="font-medium text-sm mb-1">Assign Rider:</p>
-                  <div className="flex gap-2 items-center">
-                    <Select onValueChange={setSelectedRiderForAssignment} value={selectedRiderForAssignment || undefined}>
-                      <SelectTrigger className="flex-grow"><SelectValue placeholder="Select Rider" /></SelectTrigger>
-                      <SelectContent>
-                        {riders.length === 0 && <SelectItem value="no-riders" disabled>No riders available</SelectItem>}
-                        {riders.map(r => <SelectItem key={r.uid} value={r.uid}>{r.displayName || r.email}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <Button onClick={handleAssignRider} disabled={!selectedRiderForAssignment}>Assign</Button>
-                  </div>
-                </div>
-              )}
-              {selectedOrder.riderName && <p className="text-sm pt-2 border-t mt-2">Assigned Rider: <span className="font-semibold">{selectedOrder.riderName}</span></p>}
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      )}
 
       {/* Dialogs */}
       {orderColorToEdit && (
