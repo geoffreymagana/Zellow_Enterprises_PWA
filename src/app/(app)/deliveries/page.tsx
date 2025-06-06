@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import type { Order, OrderStatus } from "@/types";
-import { MapPin, Navigation, CheckCircle, PackageSearch, UserPlus, Filter, Loader2, AlertTriangle, Edit } from "lucide-react";
+import { MapPin, Navigation, CheckCircle, PackageSearch, UserPlus, Filter, Loader2, AlertTriangle, Edit, Truck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, Unsubscribe } from 'firebase/firestore';
@@ -164,11 +164,11 @@ export default function DeliveriesPage() {
                 </div>
                 <CardDescription>
                   Customer: {delivery.customerName || delivery.customerId} <br />
-                  Address: {delivery.deliveryAddress || "Not specified"}
+                  Address: {delivery.shippingAddress?.addressLine1 || "Not specified"}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-2">
-                <p className="text-sm flex items-center"><MapPin className="h-4 w-4 mr-2 text-muted-foreground" /> {delivery.deliveryAddress}</p>
+                <p className="text-sm flex items-center"><MapPin className="h-4 w-4 mr-2 text-muted-foreground" /> {delivery.shippingAddress?.addressLine1}, {delivery.shippingAddress?.city}</p>
                 {delivery.deliveryNotes && <p className="text-sm text-muted-foreground">Notes: {delivery.deliveryNotes}</p>}
                  {delivery.estimatedDeliveryTime && <p className="text-sm">ETA: {new Date(delivery.estimatedDeliveryTime.seconds * 1000).toLocaleString()}</p>}
               </CardContent>
