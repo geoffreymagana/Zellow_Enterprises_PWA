@@ -16,19 +16,18 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
-        // Status specific variants
+        // Status specific variants - all with text-white
         statusAmber: "border-transparent bg-[#FF9800] text-white",
-        statusYellow: "border-transparent bg-[#FFC107] text-black",
-        statusLightBlue: "border-transparent bg-[#03A9F4] text-white", // For Delivery: Assigned
-        statusBlue: "border-transparent bg-[#2196F3] text-white",    // For Delivery: Out for Delivery
+        statusYellow: "border-transparent bg-[#FFC107] text-white", // Note: White on yellow might have low contrast
+        statusLightBlue: "border-transparent bg-[#03A9F4] text-white",
+        statusBlue: "border-transparent bg-[#2196F3] text-white",
         statusPurple: "border-transparent bg-[#9C27B0] text-white",
         statusGreen: "border-transparent bg-[#4CAF50] text-white",
         statusRed: "border-transparent bg-[#F44336] text-white",
         statusIndigo: "border-transparent bg-[#3F51B5] text-white",
-        statusOrange: "border-transparent bg-[#FFB74D] text-black", // For Order: Awaiting Assignment
-        statusGrey: "border-transparent bg-[#9E9E9E] text-white",   // For Payment: Refunded
-        statusOrderAssigned: "border-transparent bg-[#29B6F6] text-white", // Specific for Order: Assigned
-
+        statusOrange: "border-transparent bg-[#FFB74D] text-white", // Note: White on orange might have low contrast
+        statusGrey: "border-transparent bg-[#9E9E9E] text-white",
+        statusOrderAssigned: "border-transparent bg-[#29B6F6] text-white",
       },
     },
     defaultVariants: {
