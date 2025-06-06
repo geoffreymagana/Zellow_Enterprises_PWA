@@ -59,7 +59,7 @@ export default function CreateProductPage() {
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
-      name: "", description: "", price: undefined, stock: undefined, categories: [], imageUrl: "", supplier: "", customizationGroupId: null
+      name: "", description: "", price: "", stock: "", categories: [], imageUrl: "", supplier: "", customizationGroupId: null
     },
   });
 
@@ -98,8 +98,8 @@ export default function CreateProductPage() {
     const dataToSave: Omit<ProductType, 'id' | 'customizationOptions'> & { createdAt: any, updatedAt: any } = {
       name: values.name,
       description: values.description,
-      price: values.price,
-      stock: values.stock,
+      price: values.price, // Zod already coerced this to number
+      stock: values.stock, // Zod already coerced this to number
       categories: values.categories,
       imageUrl: values.imageUrl,
       supplier: values.supplier,
@@ -211,7 +211,7 @@ export default function CreateProductPage() {
                           <SelectContent>
                             <SelectItem value={NONE_GROUP_SENTINEL_VALUE}>None</SelectItem>
                             {customizationGroups
-                              .filter(group => group && typeof group.id === 'string' && group.id.trim() !== '') // Filter out groups with invalid IDs
+                              .filter(group => group && typeof group.id === 'string' && group.id.trim() !== '') 
                               .map(group => (
                                 <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
                             ))}
