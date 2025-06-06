@@ -8,12 +8,12 @@ import type { Product } from "@/types";
 import { ShoppingCart, Loader2, AlertTriangle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation"; // Added useSearchParams
-import { useEffect, useState, useCallback, useMemo } from "react"; // Added useMemo
+import { useRouter, useSearchParams, usePathname } from "next/navigation"; // Added usePathname
+import { useEffect, useState, useCallback, useMemo } from "react"; 
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
-import { useCart } from "@/contexts/CartContext"; // Import useCart
+import { useCart } from "@/contexts/CartContext"; 
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -22,9 +22,10 @@ const formatPrice = (price: number): string => {
 export default function ProductsPage() { 
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams(); // For local search
+  const searchParams = useSearchParams(); 
+  const pathname = usePathname(); // Initialize pathname
   const { toast } = useToast();
-  const { cartTotalItems } = useCart(); // Get cart count
+  const { cartTotalItems } = useCart(); 
 
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
@@ -63,11 +64,14 @@ export default function ProductsPage() {
       router.replace('/login');
       return;
     }
-    if (role === 'Customer' && pathname === '/dashboard') { // Assuming pathname is available or use a different trigger
-      router.replace('/products'); // Redirect customers from dashboard to products
+    // This redirect logic might be better placed in the dashboard page or a higher-level layout
+    // to avoid potential infinite loops if '/products' is the intended customer landing page.
+    // For now, keeping the logic as previously implemented, but with pathname defined.
+    if (role === 'Customer' && pathname === '/dashboard') { 
+      router.replace('/products'); 
     }
     fetchProducts();
-  }, [authLoading, user, role, router, fetchProducts]);
+  }, [authLoading, user, role, router, fetchProducts, pathname]); // Added pathname to dependency array
 
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return products;
