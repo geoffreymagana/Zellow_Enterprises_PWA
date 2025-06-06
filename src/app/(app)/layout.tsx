@@ -42,12 +42,12 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   if (!sidebarContext) {
     return <div className="flex items-center justify-center min-h-screen">Error: Sidebar context not found.</div>;
   }
-  const { searchTerm, setSearchTerm, setOpenMobile } = sidebarContext;
+  const { searchTerm, setSearchTerm, setOpenMobile, isMobile } = sidebarContext;
 
   const baseAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager'] },
     { href: '/admin/users', label: 'Users', icon: Users, roles: ['Admin'] },
-    { href: '/admin/products', label: 'Products', icon: Package, roles: ['Admin', 'InventoryManager'] },
+    { href: '/admin/products', label: 'Products', icon: Package, roles: ['Admin'] }, // InventoryManager uses /inventory
     { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, roles: ['Admin', 'ServiceManager'] },
     { href: '/admin/customizations', label: 'Customizations', icon: Layers, roles: ['Admin'] },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'] },
@@ -238,10 +238,14 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
           </SidebarFooter>
         </Sidebar>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:px-8 lg:py-6">
+        <main 
+          className="flex-1 overflow-y-auto p-4 md:p-6 lg:px-8 lg:py-6"
+          style={isMobile ? { paddingBottom: 'calc(var(--bottom-nav-height) + 1rem)' } : {}}
+        >
           {children}
         </main>
       </div>
+      {isMobile && <BottomNav />}
     </div>
   );
 }
@@ -313,7 +317,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
           </div>
         </div>
       </header>
-      <main className="flex-1 container mx-auto px-4 py-6" style={{paddingBottom: user && role !== 'Admin' ? 'calc(var(--bottom-nav-height, 4rem) + 1rem)' : '1rem'}}>
+      <main className="flex-1 container mx-auto px-4 py-6" style={{paddingBottom: user && role !== 'Admin' ? 'calc(var(--bottom-nav-height) + 1rem)' : '1rem'}}>
         {children}
       </main>
       {user && role !== 'Admin' && <BottomNav />}

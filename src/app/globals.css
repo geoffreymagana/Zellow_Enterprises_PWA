@@ -93,9 +93,10 @@
   }
 }
 
-/* Custom header height variable */
+/* Custom global CSS variables */
 :root {
   --header-height: 4rem; /* Default header height */
+  --bottom-nav-height: 4rem; /* Default bottom navigation height */
 }
 /* Adjust based on breakpoints if necessary */
 /* @media (min-width: 768px) {
@@ -103,3 +104,4 @@
     --header-height: 4.5rem; 
   }
 } */
+
