@@ -45,6 +45,7 @@ const productFormSchema = z.object({
 type ProductFormValues = z.infer<typeof productFormSchema>;
 
 const CLOUDINARY_COLLECTION_URL = "https://collection.cloudinary.com/dwqwwb2fh/6376c18334415e9e66450df7af51e5a0";
+const NONE_GROUP_SENTINEL_VALUE = "__NONE_GROUP_SENTINEL__";
 
 export default function CreateProductPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -102,8 +103,7 @@ export default function CreateProductPage() {
       categories: values.categories,
       imageUrl: values.imageUrl,
       supplier: values.supplier,
-      customizationGroupId: values.customizationGroupId || null,
-      // customizationOptions will be derived from the group if needed on product display, or handled by a different process.
+      customizationGroupId: values.customizationGroupId, // This will be null if "None" was selected
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -111,7 +111,7 @@ export default function CreateProductPage() {
     try {
       await addDoc(collection(db, 'products'), dataToSave);
       toast({ title: "Product Created", description: `"${values.name}" has been added successfully.` });
-      router.push('/admin/products'); // Redirect to product list
+      router.push('/admin/products'); 
     } catch (error: any) {
       console.error("Failed to create product:", error);
       toast({ title: "Creation Failed", description: error.message || "Could not create product.", variant: "destructive" });
@@ -158,7 +158,7 @@ export default function CreateProductPage() {
                     <FormDescription>Open the Cloudinary collection, copy the desired image URL, and paste it below.</FormDescription>
                   </div>
                   <FormField control={form.control} name="imageUrl" render={({ field }) => (<FormItem><FormLabel>Image URL</FormLabel><div className="flex items-center gap-2"><FormControl><Input {...field} placeholder="https://res.cloudinary.com/..." /></FormControl>{field.value && (<a href={field.value} target="_blank" rel="noopener noreferrer" title="Open image in new tab"><Button type="button" variant="outline" size="icon"><ExternalLink className="h-4 w-4"/></Button></a>)}</div><FormMessage /></FormItem>)} />
-                  {form.watch("imageUrl") && (<div className="my-2 p-2 border rounded-md flex justify-center items-center bg-muted aspect-video max-h-48 relative"><Image src={form.watch("imageUrl")!} alt="Image Preview" fill className="object-contain" onError={(e) => { const target = e.target as HTMLImageElement; target.style.display = 'none'; const errorPlaceholder = target.parentElement?.querySelector('.error-placeholder'); if (errorPlaceholder) errorPlaceholder.classList.remove('hidden');}} data-ai-hint={"product image"}/><div className="error-placeholder hidden text-muted-foreground text-xs flex flex-col items-center"><ImageOff className="h-8 w-8 mb-1"/><span>Invalid URL or image</span></div></div>)}
+                  {form.watch("imageUrl") && (<div className="my-2 p-2 border rounded-md flex justify-center items-center bg-muted aspect-video max-h-48 relative"><Image src={form.watch("imageUrl")!} alt="Image Preview" fill className="object-contain" onError={(e) => { const target = e.target as HTMLImageElement; target.style.display = 'none'; const errorPlaceholder = target.parentElement?.querySelector('.error-placeholder'); if (errorPlaceholder) errorPlaceholder.classList.remove('hidden');}} data-ai-hint={"product image"} /><div className="error-placeholder hidden text-muted-foreground text-xs flex flex-col items-center"><ImageOff className="h-8 w-8 mb-1"/><span>Invalid URL or image</span></div></div>)}
                 </CardContent>
               </Card>
 
@@ -201,10 +201,19 @@ export default function CreateProductPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Assign Customization Group (Optional)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value || ""} defaultValue={field.value || ""}>
+                        <Select 
+                          onValueChange={(valueFromSelectItem) => {
+                            if (valueFromSelectItem === NONE_GROUP_SENTINEL_VALUE) {
+                              field.onChange(null);
+                            } else {
+                              field.onChange(valueFromSelectItem);
+                            }
+                          }} 
+                          value={field.value === null ? NONE_GROUP_SENTINEL_VALUE : (field.value || "")}
+                        >
                           <FormControl><SelectTrigger><SelectValue placeholder="Select a group" /></SelectTrigger></FormControl>
                           <SelectContent>
-                            <SelectItem value="">None</SelectItem>
+                            <SelectItem value={NONE_GROUP_SENTINEL_VALUE}>None</SelectItem>
                             {customizationGroups.map(group => (
                               <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
                             ))}
@@ -231,3 +240,4 @@ export default function CreateProductPage() {
     </div>
   );
 }
+
