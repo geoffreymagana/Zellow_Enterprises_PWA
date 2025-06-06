@@ -4,7 +4,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon, BadgeHelp, MailWarning, Banknote } from 'lucide-react';
+import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon, BadgeHelp, MailWarning, Banknote, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState, useCallback } from 'react';
@@ -64,6 +64,12 @@ export default function DashboardPage() {
   const [ongoingDeliveries, setOngoingDeliveries] = useState<number | string>("...");
   const [isLoadingOngoingDeliveries, setIsLoadingOngoingDeliveries] = useState(true);
 
+  // Rider specific state
+  const [riderActiveDeliveriesCount, setRiderActiveDeliveriesCount] = useState<number | string>("...");
+  const [isLoadingRiderActiveDeliveries, setIsLoadingRiderActiveDeliveries] = useState(true);
+  const [riderCompletedTodayCount, setRiderCompletedTodayCount] = useState<number | string>("...");
+  const [isLoadingRiderCompletedToday, setIsLoadingRiderCompletedToday] = useState(true);
+
 
   useEffect(() => {
     if (!authLoading && role === 'Customer') {
@@ -72,7 +78,7 @@ export default function DashboardPage() {
     }
 
     let unsubscribers: Unsubscribe[] = [];
-    if (!authLoading && db && role !== 'Customer') { // Ensure role is not Customer before fetching
+    if (!authLoading && db && user && role !== 'Customer') { // Ensure user and role are available
       
       const ordersCol = collection(db, 'orders');
 
@@ -83,9 +89,6 @@ export default function DashboardPage() {
         const startOfDay = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0));
         const endOfDay = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999));
         
-        // Count orders marked as 'paid' AND updated/created 'today'
-        // Using updatedAt as a proxy for when it was marked paid.
-        // A dedicated paymentConfirmedAt field would be more accurate.
         const qPaymentsToday = query(ordersCol, 
             where("paymentStatus", "==", "paid"),
             where("updatedAt", ">=", startOfDay),
@@ -130,7 +133,7 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubProducts);
         
-        const unsubOrders = onSnapshot(ordersCol, (snapshot) => { // Re-use ordersCol
+        const unsubOrders = onSnapshot(ordersCol, (snapshot) => { 
             setTotalOrderCount(snapshot.size);
             setIsLoadingOrderCount(false);
         }, (error) => {
@@ -139,7 +142,7 @@ export default function DashboardPage() {
         unsubscribers.push(unsubOrders);
         
         const activeDeliveryStatusesAdmin: OrderStatus[] = ['assigned', 'out_for_delivery', 'delivery_attempted'];
-        const qActiveDeliveriesAdmin = query(ordersCol, where("status", "in", activeDeliveryStatusesAdmin)); // Re-use ordersCol
+        const qActiveDeliveriesAdmin = query(ordersCol, where("status", "in", activeDeliveryStatusesAdmin)); 
         const unsubActiveDeliveriesAdmin = onSnapshot(qActiveDeliveriesAdmin, (snapshot) => {
             setActiveDeliveriesCountAdmin(snapshot.size);
             setIsLoadingActiveDeliveriesAdmin(false);
@@ -148,7 +151,7 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubActiveDeliveriesAdmin);
 
-        const approvalsCol = collection(db, 'approvalRequests'); // Assuming 'approvalRequests' collection
+        const approvalsCol = collection(db, 'approvalRequests'); 
         const qPendingApprovals = query(approvalsCol, where("status", "==", "pending"));
         const unsubPendingApprovals = onSnapshot(qPendingApprovals, (snapshot) => {
             setPendingApprovalsCount(snapshot.size);
@@ -158,7 +161,7 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubPendingApprovals);
         
-        const notificationsCol = collection(db, 'notifications'); // Assuming 'notifications' collection
+        const notificationsCol = collection(db, 'notifications'); 
         const qUnreadNotifications = query(notificationsCol, where("isRead", "==", false));
         const unsubUnreadNotifications = onSnapshot(qUnreadNotifications, (snapshot) => {
             setUnreadNotificationsCount(snapshot.size);
@@ -168,12 +171,12 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubUnreadNotifications);
 
-      } else { // If not Admin, set non-Admin-specific loading states to false
+      } else { 
         setIsLoadingUserCount(false); setIsLoadingProductCount(false); setIsLoadingOrderCount(false); setIsLoadingActiveDeliveriesAdmin(false);
         setIsLoadingPendingApprovals(false); setIsLoadingUnreadNotifications(false);
       }
 
-      if (role === 'DispatchManager' || role === 'Admin') { // Admin can also see dispatch manager stats
+      if (role === 'DispatchManager' || role === 'Admin') { 
         setIsLoadingActiveRiders(true); setIsLoadingOrdersAwaiting(true); setIsLoadingOngoingDeliveries(true);
 
         const ridersCol = collection(db, 'users');
@@ -185,7 +188,7 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubRiders);
 
-        const qAwaiting = query(ordersCol, where("status", "==", "awaiting_assignment")); // Re-use ordersCol
+        const qAwaiting = query(ordersCol, where("status", "==", "awaiting_assignment")); 
         const unsubAwaiting = onSnapshot(qAwaiting, (snapshot) => {
           setOrdersAwaitingDispatch(snapshot.size); setIsLoadingOrdersAwaiting(false);
         }, (error) => {
@@ -194,7 +197,7 @@ export default function DashboardPage() {
         unsubscribers.push(unsubAwaiting);
         
         const qOngoingStatuses: OrderStatus[] = ['assigned', 'out_for_delivery'];
-        const qOngoingDeliveries = query(ordersCol, where("status", "in", qOngoingStatuses)); // Re-use ordersCol
+        const qOngoingDeliveries = query(ordersCol, where("status", "in", qOngoingStatuses)); 
         const unsubOngoing = onSnapshot(qOngoingDeliveries, (snapshot) => {
             setOngoingDeliveries(snapshot.size); setIsLoadingOngoingDeliveries(false);
         }, (error) => {
@@ -202,12 +205,56 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubOngoing);
 
-      } else { // If not DispatchManager (and not Admin), set these loading states to false
+      } else { 
         setIsLoadingActiveRiders(false); setIsLoadingOrdersAwaiting(false); setIsLoadingOngoingDeliveries(false);
       }
+
+      if (role === 'Rider') {
+        setIsLoadingRiderActiveDeliveries(true);
+        setIsLoadingRiderCompletedToday(true);
+
+        const riderActiveStatuses: OrderStatus[] = ['assigned', 'out_for_delivery', 'delivery_attempted'];
+        const qRiderActive = query(ordersCol, 
+          where('riderId', '==', user.uid), 
+          where('status', 'in', riderActiveStatuses)
+        );
+        const unsubRiderActive = onSnapshot(qRiderActive, (snapshot) => {
+          setRiderActiveDeliveriesCount(snapshot.size);
+          setIsLoadingRiderActiveDeliveries(false);
+        }, (error) => {
+          console.error("Error fetching rider active deliveries:", error); setRiderActiveDeliveriesCount("Error"); setIsLoadingRiderActiveDeliveries(false);
+        });
+        unsubscribers.push(unsubRiderActive);
+
+        const today = new Date();
+        const startOfDay = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0));
+        const endOfDay = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999));
+        
+        const qRiderCompletedToday = query(ordersCol, 
+          where('riderId', '==', user.uid),
+          where('status', '==', 'delivered'),
+          // Prioritize actualDeliveryTime, fall back to updatedAt if actualDeliveryTime is often null.
+          // Firestore doesn't support OR queries on different fields, so if actualDeliveryTime might be null,
+          // it's better to query on updatedAt or fetch and filter client-side.
+          // Assuming actualDeliveryTime is reliably set upon delivery completion:
+          where('actualDeliveryTime', '>=', startOfDay),
+          where('actualDeliveryTime', '<=', endOfDay)
+        );
+        const unsubRiderCompletedToday = onSnapshot(qRiderCompletedToday, (snapshot) => {
+          setRiderCompletedTodayCount(snapshot.size);
+          setIsLoadingRiderCompletedToday(false);
+        }, (error) => {
+          console.error("Error fetching rider completed today:", error); setRiderCompletedTodayCount("Error"); setIsLoadingRiderCompletedToday(false);
+        });
+        unsubscribers.push(unsubRiderCompletedToday);
+      } else {
+        setIsLoadingRiderActiveDeliveries(false);
+        setIsLoadingRiderCompletedToday(false);
+      }
+
     }
     return () => unsubscribers.forEach(unsub => unsub());
-  }, [authLoading, role, db, router]);
+  }, [authLoading, role, db, router, user]);
 
 
   if (authLoading || !user || role === 'Customer') { // Also show loader if customer before redirect happens
@@ -217,7 +264,6 @@ export default function DashboardPage() {
   const getRoleSpecificGreeting = () => {
     switch (role) {
       case 'Admin': return "Admin Control Panel";
-      // Customer case removed as they are redirected
       case 'Technician': return "Technician Dashboard";
       case 'Rider': return "Rider Dashboard";
       case 'Supplier': return "Supplier Portal";
@@ -254,7 +300,6 @@ export default function DashboardPage() {
             <DashboardItem title="Payments Today" value={paymentsTodayCount} icon={Banknote} link="/admin/payments" description="Orders marked paid today." isLoadingValue={isLoadingPaymentsToday}/>
             <DashboardItem title="All Payments" icon={DollarSign} link="/admin/payments" />
             <DashboardItem title="Invoice Management" icon={FileArchive} link="/invoices" /> 
-            {/* Placeholder, Invoices page not fully implemented for Finance Mgr */}
           </>
         );
       case 'DispatchManager':
@@ -277,8 +322,8 @@ export default function DashboardPage() {
        case 'Rider':
         return (
           <>
-            <DashboardItem title="Active Deliveries" value={0} icon={Truck} link="/deliveries" isLoadingValue={false} description="Your current deliveries."/>
-            <DashboardItem title="Completed Today" value={0} icon={Truck} isLoadingValue={false} description="Deliveries made today."/>
+            <DashboardItem title="Active Deliveries" value={riderActiveDeliveriesCount} icon={Truck} link="/deliveries" isLoadingValue={isLoadingRiderActiveDeliveries} description="Your current deliveries."/>
+            <DashboardItem title="Completed Today" value={riderCompletedTodayCount} icon={CheckCircle2} isLoadingValue={isLoadingRiderCompletedToday} description="Deliveries made today."/>
             <DashboardItem title="View Route Map" value={"Open"} icon={MapIcon} link="/rider/map" description="See your route."/>
           </>
         );
@@ -330,6 +375,15 @@ export default function DashboardPage() {
           </AlertDescription>
         </Alert>
       )}
+      {role === 'Rider' && (
+        <Alert variant="default" className="border-accent/50 bg-accent/5 text-accent-foreground-muted">
+          <Truck className="h-4 w-4 mr-2 text-accent" />
+          <AlertTitle className="text-accent">Rider Dashboard</AlertTitle>
+          <AlertDescription className="text-accent/90">
+            View your assigned deliveries, track routes, and manage your delivery tasks. Metrics are updated in real-time.
+          </AlertDescription>
+        </Alert>
+      )}
 
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -353,5 +407,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
