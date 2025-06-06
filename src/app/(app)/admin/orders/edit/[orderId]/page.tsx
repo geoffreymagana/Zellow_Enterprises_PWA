@@ -9,21 +9,22 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label"; // Added Label import
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft, Save, AlertTriangle, Package, User, Settings2, Truck, CreditCard, GiftIcon, PlusCircle, Edit, Users } from 'lucide-react';
 import type { Order, OrderStatus, Task, User as AppUser, ProductCustomizationOption, DeliveryHistoryEntry, OrderItem as OrderItemType } from '@/types';
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator';
+import { Separator } from '@/components/ui/separator'; // Corrected import, ensuring quotes are standard
 import Image from 'next/image';
 import Link from 'next/link';
-import { doc, getDoc, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, Timestamp, arrayUnion } from 'firebase/firestore'; // Added arrayUnion
 import { db } from '@/lib/firebase';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns'; // Removed formatDistanceToNow as it's not used
 
 const taskFormSchema = z.object({
   taskType: z.string().min(1, "Task type is required"),
@@ -48,7 +49,14 @@ const allOrderStatuses: OrderStatus[] = ['pending', 'processing', 'awaiting_assi
 function OrderTaskItem({ task }: { task: Task }) {
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'N/A';
-    return timestamp.toDate ? format(timestamp.toDate(), 'PPp') : 'Invalid Date';
+    // Check if it's a Firebase Timestamp
+    if (timestamp && typeof timestamp.toDate === 'function') {
+      return format(timestamp.toDate(), 'PPp');
+    }
+    // If it's already a Date object or a string that can be parsed
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    return format(date, 'PPp');
   };
 
   return (
@@ -91,9 +99,9 @@ export default function AdminOrderDetailPage() {
 
   const formatDate = (timestamp: any, includeTime: boolean = true) => {
     if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
     if (isNaN(date.getTime())) return 'Invalid Date';
-    return includeTime ? format(date, 'PPp') : format(date, 'PP'); // PPp: 'Sep 21, 2023, 10:30:00 AM', PP: 'Sep 21, 2023'
+    return includeTime ? format(date, 'PPp') : format(date, 'PP');
   };
 
   const fetchOrderAndTasks = useCallback(async () => {
@@ -161,16 +169,23 @@ export default function AdminOrderDetailPage() {
       const orderRef = doc(db, 'orders', orderId);
       const newHistoryEntry: DeliveryHistoryEntry = {
         status: data.status as OrderStatus,
-        timestamp: serverTimestamp(),
+        timestamp: serverTimestamp(), // This is fine for a top-level field or when adding to an array with arrayUnion
         notes: `Status updated to ${data.status} by ${user.displayName || user.email}`,
         actorId: user.uid,
       };
       await updateDoc(orderRef, { 
         status: data.status, 
         updatedAt: serverTimestamp(),
-        deliveryHistory: arrayUnion(newHistoryEntry)
+        deliveryHistory: arrayUnion(newHistoryEntry) // Using arrayUnion to add to the array
       });
-      setOrder(prev => prev ? { ...prev, status: data.status as OrderStatus, deliveryHistory: [...(prev.deliveryHistory || []), newHistoryEntry] } : null);
+      // To reflect immediately, we update local state. Firestore listener would be more robust.
+      setOrder(prev => prev ? { 
+          ...prev, 
+          status: data.status as OrderStatus, 
+          // Manually create a client-side timestamp for immediate UI update of history
+          deliveryHistory: [...(prev.deliveryHistory || []), {...newHistoryEntry, timestamp: new Date() }] 
+      } : null);
+      statusForm.reset({ status: data.status as OrderStatus }); // Reset form to new status
       toast({ title: "Order Status Updated", description: `Order marked as ${data.status}.` });
     } catch (error) {
       console.error("Error updating order status:", error);
@@ -198,27 +213,30 @@ export default function AdminOrderDetailPage() {
       return;
     }
 
-    const newTask: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> = {
+    const newTaskData = { // Explicitly type to match Task structure, excluding fields Firestore generates
       orderId: orderId,
       itemName: currentItemForTask.name,
       taskType: data.taskType,
       description: data.description,
       assigneeId: data.assigneeId,
       assigneeName: selectedTechnician.displayName || selectedTechnician.email || 'N/A',
-      status: 'pending',
-      // createdBy: user.uid, // Optionally track who created the task
+      status: 'pending' as Task['status'],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     };
     try {
-      const docRef = await addDoc(collection(db, 'tasks'), {
-        ...newTask,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      const createdTask = { ...newTask, id: docRef.id, createdAt: new Date(), updatedAt: new Date() } as Task; // Approximate client-side
+      const docRef = await addDoc(collection(db, 'tasks'), newTaskData);
+      const createdTask: Task = { 
+        ...newTaskData, 
+        id: docRef.id, 
+        createdAt: new Date(), // Client-side approx for immediate UI
+        updatedAt: new Date()  // Client-side approx for immediate UI
+      };
       setOrderTasks(prev => [...prev, createdTask]);
-      toast({ title: "Task Created", description: `Task for ${currentItemForTask.name} assigned to ${selectedTechnician.displayName}.` });
+      toast({ title: "Task Created", description: `Task for ${currentItemForTask.name} assigned to ${selectedTechnician.displayName || selectedTechnician.email}.` });
       setIsTaskDialogOpen(false);
       setCurrentItemForTask(null);
+      taskForm.reset();
     } catch (error) {
       console.error("Error creating task:", error);
       toast({ title: "Error", description: "Failed to create task.", variant: "destructive" });
@@ -253,7 +271,7 @@ export default function AdminOrderDetailPage() {
                   <CardTitle className="font-headline text-xl md:text-2xl">Order ID: {order.id}</CardTitle>
                   <CardDescription>Placed on: {formatDate(order.createdAt)} | Last Updated: {formatDate(order.updatedAt)}</CardDescription>
                 </div>
-                <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'} className="text-sm capitalize">
+                <Badge variant={order.status === 'delivered' ? 'default' : (order.status === 'cancelled' ? 'destructive' : 'secondary')} className="text-sm capitalize">
                   {order.status.replace(/_/g, ' ')}
                 </Badge>
               </div>
@@ -311,6 +329,9 @@ export default function AdminOrderDetailPage() {
                             <Settings2 className="mr-1 h-3 w-3"/> Create Task
                           </Button>
                         )}
+                         {itemHasExistingTask(item.name) && (
+                            <Badge variant="outline" className="text-xs">Task Exists</Badge>
+                         )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -410,7 +431,7 @@ export default function AdminOrderDetailPage() {
               <Controller
                 name="taskType" control={taskForm.control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value || undefined}>
                     <SelectTrigger id="taskType"><SelectValue placeholder="Select task type" /></SelectTrigger>
                     <SelectContent>{predefinedTaskTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
                   </Select>
@@ -428,7 +449,7 @@ export default function AdminOrderDetailPage() {
               <Controller
                 name="assigneeId" control={taskForm.control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value || undefined}>
                     <SelectTrigger id="assigneeId"><SelectValue placeholder="Select technician" /></SelectTrigger>
                     <SelectContent>
                       {technicians.length === 0 && <SelectItem value="" disabled>No technicians found</SelectItem>}
@@ -452,3 +473,4 @@ export default function AdminOrderDetailPage() {
   );
 }
 
+        
