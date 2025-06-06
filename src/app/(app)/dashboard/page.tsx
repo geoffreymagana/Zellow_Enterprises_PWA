@@ -4,24 +4,28 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon, BadgeHelp, MailWarning, Banknote, CheckCircle2, Warehouse } from 'lucide-react';
+import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon, BadgeHelp, MailWarning, Banknote, CheckCircle2, Warehouse, ListChecks } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState, useCallback } from 'react';
 import { collection, getDocs, query, where, onSnapshot, Unsubscribe, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { User, Order, OrderStatus } from '@/types';
+import type { User, Order, OrderStatus, Product, StockRequest } from '@/types';
 import { useRouter } from 'next/navigation'; 
 
+const formatPrice = (price: number): string => {
+  return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
+};
+
 // Helper component for dashboard items
-const DashboardItem = ({ title, value, icon: Icon, link, description, isLoadingValue }: { title: string; value?: string | number; icon: React.ElementType; link?: string; description?: string, isLoadingValue?: boolean }) => (
+const DashboardItem = ({ title, value, icon: Icon, link, description, isLoadingValue, isPrice }: { title: string; value?: string | number; icon: React.ElementType; link?: string; description?: string, isLoadingValue?: boolean, isPrice?: boolean }) => (
   <Card className="hover:shadow-md transition-shadow">
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-sm font-medium">{title}</CardTitle>
       <Icon className="h-5 w-5 text-muted-foreground" />
     </CardHeader>
     <CardContent>
-      {isLoadingValue ? <Loader2 className="h-6 w-6 animate-spin text-primary" /> : ( value !== undefined && <div className="text-2xl font-bold">{value}</div>)}
+      {isLoadingValue ? <Loader2 className="h-6 w-6 animate-spin text-primary" /> : ( value !== undefined && <div className="text-2xl font-bold">{isPrice ? formatPrice(Number(value)) : value}</div>)}
       {description && !isLoadingValue && value !== undefined && <p className="text-xs text-muted-foreground">{description}</p>}
       {link && !isLoadingValue && (
         <Link href={link} passHref>
@@ -42,19 +46,31 @@ export default function DashboardPage() {
   // General Admin stats
   const [activeUserCount, setActiveUserCount] = useState<number | string>("...");
   const [isLoadingUserCount, setIsLoadingUserCount] = useState(true);
+  
+  // Stats for Admin & InventoryManager
+  const [allProductsForStats, setAllProductsForStats] = useState<Product[]>([]);
+  const [isLoadingAllProductsForStats, setIsLoadingAllProductsForStats] = useState(true);
   const [totalProductCount, setTotalProductCount] = useState<number | string>("...");
-  const [isLoadingProductCount, setIsLoadingProductCount] = useState(true);
-  const [totalOrderCount, setTotalOrderCount] = useState<number | string>("...");
+  const [lowStockItemsCount, setLowStockItemsCount] = useState<number | string>("...");
+  const [outOfStockItemsCount, setOutOfStockItemsCount] = useState<number | string>("...");
+  const [totalInventoryValue, setTotalInventoryValue] = useState<number | string>("...");
+
+  const [totalOrderCount, setTotalOrderCount] = useState<number | string>("..."); // Admin only
   const [isLoadingOrderCount, setIsLoadingOrderCount] = useState(true);
-  const [activeDeliveriesCountAdmin, setActiveDeliveriesCountAdmin] = useState<number | string>("...");
+  const [activeDeliveriesCountAdmin, setActiveDeliveriesCountAdmin] = useState<number | string>("..."); // Admin only
   const [isLoadingActiveDeliveriesAdmin, setIsLoadingActiveDeliveriesAdmin] = useState(true);
-  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number | string>("...");
+  
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number | string>("..."); // Admin only
   const [isLoadingPendingApprovals, setIsLoadingPendingApprovals] = useState(true);
-  const [paymentsTodayCount, setPaymentsTodayCount] = useState<number | string>("..."); // For Admin & Finance Manager
+  
+  const [paymentsTodayCount, setPaymentsTodayCount] = useState<number | string>("..."); // Admin & Finance Manager
   const [isLoadingPaymentsToday, setIsLoadingPaymentsToday] = useState(true);
-  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number | string>("...");
+  
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number | string>("..."); // Admin only
   const [isLoadingUnreadNotifications, setIsLoadingUnreadNotifications] = useState(true);
 
+  const [pendingStockRequestsCount, setPendingStockRequestsCount] = useState<number | string>("..."); // Admin & InventoryManager
+  const [isLoadingPendingStockRequests, setIsLoadingPendingStockRequests] = useState(true);
 
   // Dispatch Manager specific state
   const [activeRidersCount, setActiveRidersCount] = useState<number | string>("...");
@@ -70,12 +86,6 @@ export default function DashboardPage() {
   const [riderCompletedTodayCount, setRiderCompletedTodayCount] = useState<number | string>("...");
   const [isLoadingRiderCompletedToday, setIsLoadingRiderCompletedToday] = useState(true);
 
-  // Inventory Manager specific state
-  const [lowStockItemsCount, setLowStockItemsCount] = useState<number | string>("...");
-  const [isLoadingLowStockItems, setIsLoadingLowStockItems] = useState(true);
-  const [pendingStockRequestsCount, setPendingStockRequestsCount] = useState<number | string>("...");
-  const [isLoadingPendingStockRequests, setIsLoadingPendingStockRequests] = useState(true);
-
 
   useEffect(() => {
     if (!authLoading && role === 'Customer') {
@@ -87,6 +97,60 @@ export default function DashboardPage() {
     if (!authLoading && db && user && role !== 'Customer') { 
       
       const ordersCol = collection(db, 'orders');
+      const productsCol = collection(db, 'products');
+
+      // Fetch all products for Admin and InventoryManager for detailed stats
+      if (role === 'Admin' || role === 'InventoryManager') {
+        setIsLoadingAllProductsForStats(true);
+        const unsubAllProducts = onSnapshot(productsCol, (snapshot) => {
+          const fetchedProducts: Product[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+          setAllProductsForStats(fetchedProducts);
+
+          setTotalProductCount(fetchedProducts.length);
+          setLowStockItemsCount(fetchedProducts.filter(p => p.stock > 0 && p.stock < 10).length);
+          setOutOfStockItemsCount(fetchedProducts.filter(p => p.stock === 0).length);
+          setTotalInventoryValue(fetchedProducts.reduce((acc, p) => acc + (p.price * p.stock), 0));
+          
+          setIsLoadingAllProductsForStats(false);
+          if (role === 'InventoryManager') setIsLoadingPendingStockRequests(true); // Trigger stock requests fetch next
+        }, (error) => {
+          console.error("Error fetching all products for stats:", error);
+          setTotalProductCount("Error"); setLowStockItemsCount("Error"); setOutOfStockItemsCount("Error"); setTotalInventoryValue("Error");
+          setIsLoadingAllProductsForStats(false);
+        });
+        unsubscribers.push(unsubAllProducts);
+      } else {
+        setIsLoadingAllProductsForStats(false);
+      }
+      
+      // Fetch pending stock requests for Admin and Inventory Manager
+      if (role === 'Admin' || role === 'InventoryManager') {
+        setIsLoadingPendingStockRequests(true);
+        const stockRequestsCol = collection(db, 'stockRequests');
+        // Admins see all pending, InventoryManagers see requests that might need their attention or are from them.
+        // For dashboard stat, let's show Inventory Manager ones they initiated that are pending ANY approval, Admins see ALL pending any approval.
+        let qPendingStockRequests;
+        if (role === 'InventoryManager') {
+            qPendingStockRequests = query(stockRequestsCol, 
+                where("requesterId", "==", user.uid), 
+                where("status", "in", ["pending_finance_approval", "pending_supplier_fulfillment"])
+            );
+        } else { // Admin
+             qPendingStockRequests = query(stockRequestsCol, 
+                where("status", "in", ["pending_finance_approval", "pending_supplier_fulfillment"])
+            );
+        }
+        const unsubPendingStockRequests = onSnapshot(qPendingStockRequests, (snapshot) => {
+            setPendingStockRequestsCount(snapshot.size);
+            setIsLoadingPendingStockRequests(false);
+        }, (error) => {
+            console.error("Error fetching pending stock requests count:", error); setPendingStockRequestsCount("Error"); setIsLoadingPendingStockRequests(false);
+        });
+        unsubscribers.push(unsubPendingStockRequests);
+      } else {
+        setIsLoadingPendingStockRequests(false);
+      }
+
 
       if (role === 'Admin' || role === 'FinanceManager') {
         setIsLoadingPaymentsToday(true);
@@ -113,7 +177,6 @@ export default function DashboardPage() {
 
       if (role === 'Admin') {
         setIsLoadingUserCount(true);
-        setIsLoadingProductCount(true);
         setIsLoadingOrderCount(true);
         setIsLoadingActiveDeliveriesAdmin(true);
         setIsLoadingPendingApprovals(true);
@@ -128,15 +191,6 @@ export default function DashboardPage() {
           console.error("Error fetching active user count:", error); setActiveUserCount("Error"); setIsLoadingUserCount(false);
         });
         unsubscribers.push(unsubAdminUsers);
-
-        const productsCol = collection(db, 'products');
-        const unsubProducts = onSnapshot(productsCol, (snapshot) => {
-            setTotalProductCount(snapshot.size);
-            setIsLoadingProductCount(false);
-        }, (error) => {
-            console.error("Error fetching product count:", error); setTotalProductCount("Error"); setIsLoadingProductCount(false);
-        });
-        unsubscribers.push(unsubProducts);
         
         const unsubOrders = onSnapshot(ordersCol, (snapshot) => { 
             setTotalOrderCount(snapshot.size);
@@ -156,6 +210,7 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubActiveDeliveriesAdmin);
 
+        // This is for general approvals, not stock request approvals (which are handled above)
         const approvalsCol = collection(db, 'approvalRequests'); 
         const qPendingApprovals = query(approvalsCol, where("status", "==", "pending"));
         const unsubPendingApprovals = onSnapshot(qPendingApprovals, (snapshot) => {
@@ -177,7 +232,7 @@ export default function DashboardPage() {
         unsubscribers.push(unsubUnreadNotifications);
 
       } else { 
-        setIsLoadingUserCount(false); setIsLoadingProductCount(false); setIsLoadingOrderCount(false); setIsLoadingActiveDeliveriesAdmin(false);
+        setIsLoadingUserCount(false); setIsLoadingOrderCount(false); setIsLoadingActiveDeliveriesAdmin(false);
         setIsLoadingPendingApprovals(false); setIsLoadingUnreadNotifications(false);
       }
 
@@ -252,35 +307,6 @@ export default function DashboardPage() {
         setIsLoadingRiderActiveDeliveries(false);
         setIsLoadingRiderCompletedToday(false);
       }
-      
-      if (role === 'InventoryManager' || role === 'Admin') {
-        setIsLoadingLowStockItems(true);
-        setIsLoadingPendingStockRequests(true);
-        const productsCol = collection(db, 'products');
-        const qLowStock = query(productsCol, where("stock", "<", 10)); // Low stock threshold
-        const unsubLowStock = onSnapshot(qLowStock, (snapshot) => {
-            setLowStockItemsCount(snapshot.size);
-            setIsLoadingLowStockItems(false);
-        }, (error) => {
-            console.error("Error fetching low stock items:", error); setLowStockItemsCount("Error"); setIsLoadingLowStockItems(false);
-        });
-        unsubscribers.push(unsubLowStock);
-
-        const stockRequestsCol = collection(db, 'stockRequests');
-        const qPendingStockRequests = query(stockRequestsCol, where("status", "in", ["pending_finance_approval", "pending_supplier_fulfillment"]));
-        const unsubPendingStockRequests = onSnapshot(qPendingStockRequests, (snapshot) => {
-            setPendingStockRequestsCount(snapshot.size);
-            setIsLoadingPendingStockRequests(false);
-        }, (error) => {
-            console.error("Error fetching pending stock requests:", error); setPendingStockRequestsCount("Error"); setIsLoadingPendingStockRequests(false);
-        });
-        unsubscribers.push(unsubPendingStockRequests);
-      } else {
-        setIsLoadingLowStockItems(false);
-        setIsLoadingPendingStockRequests(false);
-      }
-
-
     }
     return () => unsubscribers.forEach(unsub => unsub());
   }, [authLoading, role, db, router, user]);
@@ -310,11 +336,15 @@ export default function DashboardPage() {
         return (
           <>
             <DashboardItem title="Active Users" value={activeUserCount} icon={UserCog} link="/admin/users" description="Total active users." isLoadingValue={isLoadingUserCount} />
-            <DashboardItem title="Total Products" value={totalProductCount} icon={Package} link="/admin/products" description="Products in catalog." isLoadingValue={isLoadingProductCount} />
+            <DashboardItem title="Total Products" value={totalProductCount} icon={Package} link="/admin/products" description="Products in catalog." isLoadingValue={isLoadingAllProductsForStats} />
+            <DashboardItem title="Low Stock Items" value={lowStockItemsCount} icon={AlertTriangle} link="/inventory?filter=lowstock" description="Items with <10 stock." isLoadingValue={isLoadingAllProductsForStats} />
+            <DashboardItem title="Out of Stock Items" value={outOfStockItemsCount} icon={PackageX} link="/inventory?filter=outofstock" description="Items with 0 stock." isLoadingValue={isLoadingAllProductsForStats} />
+            <DashboardItem title="Inventory Value" value={totalInventoryValue} icon={DollarSign} link="/inventory" description="Total value of stock." isLoadingValue={isLoadingAllProductsForStats} isPrice />
+            <DashboardItem title="Pending Stock Requests" value={pendingStockRequestsCount} icon={ListChecks} link="/finance/approvals" description="Stock requests needing action." isLoadingValue={isLoadingPendingStockRequests} />
             <DashboardItem title="Total Orders" value={totalOrderCount} icon={ShoppingCart} link="/admin/orders" description="All customer orders." isLoadingValue={isLoadingOrderCount} />
             <DashboardItem title="Active Deliveries" value={activeDeliveriesCountAdmin} icon={Truck} link="/admin/deliveries" description="Ongoing deliveries." isLoadingValue={isLoadingActiveDeliveriesAdmin} />
             <DashboardItem title="Payments Today" value={paymentsTodayCount} icon={Banknote} link="/admin/payments" description="Orders marked paid today." isLoadingValue={isLoadingPaymentsToday}/>
-            <DashboardItem title="Pending Approvals" value={pendingApprovalsCount} icon={BadgeHelp} link="/admin/approvals" isLoadingValue={isLoadingPendingApprovals}/>
+            <DashboardItem title="General Approvals" value={pendingApprovalsCount} icon={BadgeHelp} link="/admin/approvals" isLoadingValue={isLoadingPendingApprovals}/>
             <DashboardItem title="Unread Notifications" value={unreadNotificationsCount} icon={MailWarning} link="/admin/notifications" isLoadingValue={isLoadingUnreadNotifications}/>
             <DashboardItem title="System Reports" icon={FileArchive} link="/admin/reports" />
             <DashboardItem title="Customization Hub" icon={Layers} link="/admin/customizations" />
@@ -328,7 +358,7 @@ export default function DashboardPage() {
             <DashboardItem title="Payments Today" value={paymentsTodayCount} icon={Banknote} link="/admin/payments" description="Orders marked paid today." isLoadingValue={isLoadingPaymentsToday}/>
             <DashboardItem title="All Payments" icon={DollarSign} link="/admin/payments" />
             <DashboardItem title="Invoice Management" icon={FileArchive} link="/invoices" /> 
-            <DashboardItem title="Stock Request Approvals" icon={Coins} link="/finance/approvals" description="Approve/reject stock requests." isLoadingValue={isLoadingPendingStockRequests} />
+            <DashboardItem title="Stock Request Approvals" icon={ListChecks} link="/finance/approvals" description="Approve/reject stock requests." isLoadingValue={isLoadingPendingStockRequests} />
           </>
         );
       case 'DispatchManager':
@@ -343,9 +373,12 @@ export default function DashboardPage() {
       case 'InventoryManager':
         return (
           <>
+            <DashboardItem title="Total Products" value={totalProductCount} icon={Package} link="/inventory" description="Products in catalog." isLoadingValue={isLoadingAllProductsForStats} />
+            <DashboardItem title="Low Stock Items" value={lowStockItemsCount} icon={AlertTriangle} link="/inventory?filter=lowstock" description="Items with <10 stock." isLoadingValue={isLoadingAllProductsForStats} />
+            <DashboardItem title="Out of Stock Items" value={outOfStockItemsCount} icon={PackageX} link="/inventory?filter=outofstock" description="Items with 0 stock." isLoadingValue={isLoadingAllProductsForStats} />
+            <DashboardItem title="Total Inventory Value" value={totalInventoryValue} icon={DollarSign} link="/inventory" description="Estimated value of current stock." isLoadingValue={isLoadingAllProductsForStats} isPrice />
+            <DashboardItem title="My Pending Stock Requests" value={pendingStockRequestsCount} icon={ShoppingCart} link="/inventory#requests" description="Track your requests." isLoadingValue={isLoadingPendingStockRequests} />
             <DashboardItem title="All Inventory" value={"View"} icon={Warehouse} link="/inventory" description="Manage stock levels." />
-            <DashboardItem title="Low Stock Items" value={lowStockItemsCount} icon={AlertTriangle} link="/inventory?filter=lowstock" description="Items needing reorder." isLoadingValue={isLoadingLowStockItems} />
-            <DashboardItem title="Pending Stock Requests" value={pendingStockRequestsCount} icon={ShoppingCart} link="/inventory#requests" description="Track your requests." isLoadingValue={isLoadingPendingStockRequests} />
           </>
         );
       case 'Technician':
@@ -454,4 +487,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

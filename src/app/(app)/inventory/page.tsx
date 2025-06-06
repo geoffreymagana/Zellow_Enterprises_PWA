@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import type { Product, StockRequest, StockRequestStatus } from "@/types";
-import { PlusCircle, Search, Edit, AlertTriangle, PackageCheck, PackageX, RefreshCw, Boxes, ShoppingBasket, ClipboardList, ImageOff } from "lucide-react"; // Added Boxes
+import { PlusCircle, Search, Edit, AlertTriangle, PackageCheck, PackageX, RefreshCw, Boxes, ShoppingBasket, ClipboardList, ImageOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
@@ -23,8 +23,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Loader2 } from "lucide-react";
 import { format } from 'date-fns';
-import Image from "next/image"; // Added Image
-import { cn } from "@/lib/utils"; // Added cn
+import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 const requestStockFormSchema = z.object({
   requestedQuantity: z.coerce.number().min(1, "Quantity must be at least 1"),
@@ -194,80 +194,76 @@ export default function InventoryPage() {
         {role === 'InventoryManager' && " Request new stock from suppliers."}
       </p>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Boxes className="h-5 w-5" /> Current Stock Levels</CardTitle>
-          <div className="flex items-center gap-2 mt-2">
-            <Search className="h-5 w-5 text-muted-foreground" />
+      <div className="mb-6">
+        <div className="relative w-full max-w-md">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search products (ID, Name, Category)..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="max-w-sm h-9"
+                placeholder="Search products (ID, Name, Category)..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8 w-full h-10"
             />
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoadingProducts && products.length === 0 ? (
-            <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
-          ) : filteredProducts.length === 0 ? (
-            <p className="p-6 text-center text-muted-foreground">{products.length === 0 ? "No products found." : "No products match search."}</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
-              {filteredProducts.map((item) => (
-                <Card key={item.id} className="flex overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                  <div className={cn("w-2 flex-shrink-0", getStockLevelColor(item.stock))}></div>
-                  <div className="flex-grow p-3 flex flex-col">
-                    <div className="flex items-start gap-3 mb-2">
-                      <div className="relative w-20 h-20 bg-muted rounded-md overflow-hidden flex-shrink-0">
-                        {item.imageUrl ? (
-                          <Image 
-                            src={item.imageUrl} 
-                            alt={item.name} 
-                            fill
-                            sizes="80px"
-                            className="object-cover"
-                            data-ai-hint={item.categories?.[0]?.toLowerCase() || "inventory item"}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <ImageOff className="h-8 w-8 text-muted-foreground" />
-                          </div>
-                        )}
+        </div>
+      </div>
+
+      {isLoadingProducts && products.length === 0 ? (
+        <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
+      ) : filteredProducts.length === 0 ? (
+        <Card><CardContent className="pt-6 text-center text-muted-foreground">{products.length === 0 ? "No products found." : "No products match search."}</CardContent></Card>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {filteredProducts.map((item) => (
+            <Card key={item.id} className="flex overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+              <div className={cn("w-2 flex-shrink-0", getStockLevelColor(item.stock))}></div>
+              <div className="flex-grow p-3 flex flex-col">
+                <div className="flex items-start gap-3 mb-2">
+                  <div className="relative w-20 h-20 bg-muted rounded-md overflow-hidden flex-shrink-0">
+                    {item.imageUrl ? (
+                      <Image 
+                        src={item.imageUrl} 
+                        alt={item.name} 
+                        fill
+                        sizes="80px"
+                        className="object-cover"
+                        data-ai-hint={item.categories?.[0]?.toLowerCase() || "inventory item"}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ImageOff className="h-8 w-8 text-muted-foreground" />
                       </div>
-                      <div className="flex-grow min-w-0">
-                        <h3 className="text-sm font-semibold line-clamp-2 mb-1">{item.name}</h3>
-                        <p className="text-xs text-muted-foreground line-clamp-1">{item.categories?.join(', ') || 'N/A'}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-auto flex justify-between items-end">
-                      <div className="text-left">
-                         <p className="text-xs text-muted-foreground">Stock</p>
-                         <p className="text-xl font-bold">{item.stock}</p>
-                      </div>
-                      {role === 'InventoryManager' && (
-                        <Button variant="outline" size="sm" onClick={() => handleOpenRequestDialog(item)} disabled={isRequestDialogOpen}>
-                          <ShoppingBasket className="mr-1 h-3 w-3"/> Request
-                        </Button>
-                      )}
-                      {role === 'Admin' && (
-                         <Link href={`/admin/products/edit/${item.id}`} passHref>
-                           <Button variant="ghost" size="icon" aria-label="Edit Product Details"><Edit className="h-4 w-4"/></Button>
-                         </Link>
-                      )}
-                    </div>
+                    )}
                   </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </CardContent>
-        {filteredProducts.length > 0 && <CardFooter className="pt-4"><p className="text-xs text-muted-foreground">Showing {filteredProducts.length} of {products.length} products.</p></CardFooter>}
-      </Card>
+                  <div className="flex-grow min-w-0">
+                    <h3 className="text-sm font-semibold line-clamp-3 mb-1">{item.name}</h3>
+                    {/* Categories subtitle removed as per request */}
+                  </div>
+                </div>
+                
+                <div className="mt-auto flex justify-between items-end">
+                  <div className="text-left">
+                      <p className="text-xs text-muted-foreground">Stock</p>
+                      <p className="text-xl font-bold">{item.stock}</p>
+                  </div>
+                  {role === 'InventoryManager' && (
+                    <Button variant="outline" size="sm" onClick={() => handleOpenRequestDialog(item)} disabled={isRequestDialogOpen}>
+                      <ShoppingBasket className="mr-1 h-3 w-3"/> Request
+                    </Button>
+                  )}
+                  {role === 'Admin' && (
+                      <Link href={`/admin/products/edit/${item.id}`} passHref>
+                        <Button variant="ghost" size="icon" aria-label="Edit Product Details"><Edit className="h-4 w-4"/></Button>
+                      </Link>
+                  )}
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+      {filteredProducts.length > 0 && !isLoadingProducts && <p className="text-xs text-muted-foreground mt-4">Showing {filteredProducts.length} of {products.length} products.</p>}
       
       {role === 'InventoryManager' && (
-        <Card>
+        <Card className="mt-8">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5"/>My Stock Requests</CardTitle>
                 <CardDescription>Track the status of your pending and past stock requests.</CardDescription>
@@ -328,4 +324,3 @@ export default function InventoryPage() {
     </div>
   );
 }
-
