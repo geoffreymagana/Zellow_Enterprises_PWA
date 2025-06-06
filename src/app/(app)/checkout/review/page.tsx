@@ -46,13 +46,13 @@ export default function ReviewOrderPage() {
     const orderItems: OrderItem[] = cartItems.map(item => ({
       productId: item.productId,
       name: item.name,
-      price: item.currentPrice, // This is price per unit including customizations
+      price: item.currentPrice,
       quantity: item.quantity,
-      imageUrl: item.imageUrl,
-      customizations: item.customizations,
+      imageUrl: item.imageUrl || null, // Ensure undefined becomes null
+      customizations: item.customizations || null, // Ensure undefined becomes null
     }));
 
-    const newOrder: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> = { // id, createdAt, updatedAt will be set by Firestore
+    const newOrder: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> = {
       customerId: user.uid,
       customerName: shippingAddress.fullName,
       customerEmail: shippingAddress.email || user.email || "",
@@ -61,11 +61,23 @@ export default function ReviewOrderPage() {
       subTotal: cartSubtotal,
       shippingCost: shippingCost,
       totalAmount: orderTotal,
-      status: 'pending' as OrderStatus, // Initial status
+      status: 'pending' as OrderStatus, 
       shippingAddress: shippingAddress,
       paymentMethod: paymentMethod,
-      paymentStatus: 'pending', // Default payment status
-      // Other fields like deliveryId, riderId will be updated later
+      paymentStatus: 'pending',
+      // Optional fields not explicitly set here will be omitted from the document,
+      // which is fine for Firestore (unlike 'undefined' values).
+      // If a field should always exist, it should be explicitly set to null or a default.
+      deliveryHistory: [], // Default to empty array
+      deliveryId: null,
+      riderId: null,
+      riderName: null,
+      deliveryCoordinates: null,
+      deliveryNotes: null,
+      color: null,
+      estimatedDeliveryTime: null,
+      actualDeliveryTime: null,
+      transactionId: null,
     };
 
     try {
@@ -76,11 +88,12 @@ export default function ReviewOrderPage() {
         updatedAt: serverTimestamp(),
       });
 
-      // Optional: Update product stock (decrement)
       const batch = writeBatch(db);
       cartItems.forEach(item => {
-        const productRef = doc(db, 'products', item.productId);
-        batch.update(productRef, { stock: item.stock - item.quantity });
+        if (item.stock !== undefined && item.quantity !== undefined) { // Check if stock and quantity are defined
+          const productRef = doc(db, 'products', item.productId);
+          batch.update(productRef, { stock: item.stock - item.quantity });
+        }
       });
       await batch.commit();
 
