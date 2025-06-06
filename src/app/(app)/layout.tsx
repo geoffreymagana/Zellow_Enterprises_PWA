@@ -3,7 +3,6 @@
 import { ReactNode, FC } from 'react'; 
 import { useAuth } from '@/hooks/useAuth';
 import { BottomNav } from '@/components/navigation/BottomNav';
-// Logo removed from here as it's no longer directly used in NonAdminLayout header
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
@@ -15,9 +14,9 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
-  SidebarMenuSubButton,
+  // SidebarMenuSub, // Removed if not used
+  // SidebarMenuSubItem, // Removed if not used
+  // SidebarMenuSubButton, // Removed if not used
   SidebarProvider,
   useSidebar,
 } from "@/components/ui/sidebar";
@@ -27,7 +26,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Users, Package, ShoppingCart, Layers, DollarSign,
   Truck, Settings as SettingsIcon, UserCircle, LogOutIcon, Menu, Bell,
-  FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIcon, ListChecks
+  FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIconLucide, ListChecks
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
@@ -45,7 +44,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   if (!sidebarContext) {
     return <div className="flex items-center justify-center min-h-screen">Error: Sidebar context not found.</div>;
   }
-  const { searchTerm, setSearchTerm } = sidebarContext;
+  const { searchTerm, setSearchTerm, setOpenMobile } = sidebarContext;
 
   const mainAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -69,14 +68,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     .map(item => {
       if (!searchTerm) return { ...item, isVisible: true };
       const labelMatches = item.label.toLowerCase().includes(searchTerm.toLowerCase());
-      const subItems = (item as any).subItems;
-      if (subItems && subItems.length > 0) {
-        const filteredSubItems = subItems.filter((subItem: any) =>
-          subItem.label.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        const isVisible = labelMatches || filteredSubItems.length > 0;
-        return { ...item, subItems: isVisible ? (labelMatches ? subItems : filteredSubItems) : [], isVisible };
-      }
+      // Assuming subItems structure if it exists; for now, main items only
       return { ...item, isVisible: labelMatches };
     })
     .filter(item => item.isVisible);
@@ -86,9 +78,10 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   );
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="w-full h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
+    // AdminLayout root is now flex flex-col and takes w-full from SidebarProvider (which is also flex-col)
+    <div className="flex flex-col w-full min-h-screen bg-background">
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-[var(--header-height)]">
+        <div className="w-full h-full flex items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">
             <Sheet>
               <SheetTrigger asChild>
@@ -98,15 +91,15 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-[var(--sidebar-width-mobile,280px)] p-0 bg-sidebar text-sidebar-foreground flex flex-col">
-                <SheetHeader className="p-4 border-b border-sidebar h-16 flex items-center">
+                <SheetHeader className="p-4 border-b border-sidebar h-[var(--header-height)] flex items-center">
                    <SheetTitle className="text-lg font-semibold">Admin Menu</SheetTitle>
                 </SheetHeader>
                 <ScrollArea className="flex-1">
                   <SidebarMenu className="p-2">
                     {mainAdminNavItems.map((item) => {
                        const directMatch = item.href === pathname;
-                       const subItemMatch = (item as any).subItems?.some((sub: any) => sub.href === pathname);
-                       const isActive = directMatch || subItemMatch;
+                       // const subItemMatch = (item as any).subItems?.some((sub: any) => sub.href === pathname); // If sub-items are introduced
+                       const isActive = directMatch; // Simplified for now
                       return (
                       <SidebarMenuItem key={item.label}>
                         <Link href={item.href} passHref legacyBehavior>
@@ -114,7 +107,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                             asChild 
                             className="w-full justify-start" 
                             variant="ghost" 
-                            onClick={() => sidebarContext.setOpenMobile(false)}
+                            onClick={() => setOpenMobile(false)}
                             isActive={isActive}
                            >
                             <a><item.icon className="mr-2 h-4 w-4" /><span>{item.label}</span></a>
@@ -133,7 +126,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                             asChild 
                             className="w-full justify-start" 
                             variant="ghost" 
-                            onClick={() => sidebarContext.setOpenMobile(false)}
+                            onClick={() => setOpenMobile(false)}
                             isActive={item.href === pathname}
                           >
                             <a><item.icon className="mr-2 h-4 w-4" /><span>{item.label}</span></a>
@@ -144,7 +137,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                   </SidebarMenu>
                   <div className="p-2 mt-1"><ThemeToggle /></div>
                   <div className="mt-1 p-2">
-                    <Button variant="outline" onClick={() => { logout(); sidebarContext.setOpenMobile(false); }} className="w-full justify-start">
+                    <Button variant="outline" onClick={() => { logout(); setOpenMobile(false); }} className="w-full justify-start">
                       <LogOutIcon className="mr-2 h-4 w-4" /><span>Logout</span>
                     </Button>
                   </div>
@@ -152,14 +145,12 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
               </SheetContent>
             </Sheet>
             <Link href="/dashboard" className="hidden md:flex items-center gap-2" aria-label="Admin Dashboard Home">
-               {/* Logo removed from Admin Header as per previous request, can be uncommented if needed */}
-               {/* <Aperture className="text-primary h-6 w-6" /> */}
                <h1 className="text-xl font-semibold font-headline">Admin Panel</h1>
             </Link>
           </div>
           <div className="flex items-center gap-2 sm:gap-4"> 
             <div className="relative w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96">
-               <SearchIcon className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+               <SearchIconLucide className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
                 placeholder="Search sections..."
@@ -175,60 +166,36 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
         </div>
       </header>
       
-      <div className="flex flex-1" style={{ height: 'calc(100vh - var(--header-height))' }}>
+      <div className="flex flex-1"> {/* This container holds sidebar and main content side-by-side */}
         <Sidebar
           side="left"
           className="border-r border-sidebar w-[var(--sidebar-width)] sticky top-[var(--header-height)] hidden md:flex flex-col" 
-          style={{ height: 'calc(100vh - var(--header-height))' }}
+          style={{ height: 'calc(100vh - var(--header-height))' }} // Corrected height
         >
-          <AdminSidebarHeader className="h-16 border-b border-sidebar flex-shrink-0" /> {/* Simplified header */}
+          <AdminSidebarHeader className="h-[var(--header-height)] border-b border-sidebar flex-shrink-0" /> 
           <SidebarContent className="flex-1 overflow-y-auto">
             <ScrollArea className="h-full">
               {filteredMainAdminNavItems.length > 0 ? (
                 <SidebarMenu className="p-2">
                   {filteredMainAdminNavItems.map((item) => {
-                    const typedItem = item as any; 
-                    const directMatch = typedItem.href === pathname;
-                    const childMatch = typedItem.subItems?.some((sub: any) => sub.href === pathname);
-                    const isActive = directMatch || childMatch;
+                    const directMatch = item.href === pathname;
+                    // const childMatch = (item as any).subItems?.some((sub: any) => sub.href === pathname); // If subitems
+                    const isActive = directMatch; // Simplified
 
-                    return typedItem.subItems && typedItem.subItems.length > 0 ? (
-                      <SidebarMenuItem key={typedItem.label}>
-                         <SidebarMenuButton
-                          isCollapsible={true}
-                          className="w-full justify-start"
-                          variant="ghost"
-                          isActive={isActive} 
-                        >
-                          <typedItem.icon className="mr-2 h-4 w-4" />
-                          <span>{typedItem.label}</span>
-                        </SidebarMenuButton>
-                        <SidebarMenuSub>
-                          {typedItem.subItems.map((subItem: any) => (
-                             <SidebarMenuSubItem key={subItem.label}>
-                              <Link href={subItem.href} passHref legacyBehavior>
-                                <SidebarMenuSubButton isActive={subItem.href === pathname}>
-                                  {subItem.icon && <subItem.icon className="mr-2 h-4 w-4" />}
-                                  <span>{subItem.label}</span>
-                                </SidebarMenuSubButton>
-                              </Link>
-                            </SidebarMenuSubItem>
-                          ))}
-                        </SidebarMenuSub>
-                      </SidebarMenuItem>
-                    ) : (
-                    <SidebarMenuItem key={typedItem.label}>
-                      <Link href={typedItem.href!} passHref legacyBehavior>
+                    // Basic item rendering, sub-menu logic can be re-added if needed
+                    return (
+                    <SidebarMenuItem key={item.label}>
+                      <Link href={item.href!} passHref legacyBehavior>
                         <SidebarMenuButton
                           asChild
-                          tooltip={typedItem.label}
+                          tooltip={item.label}
                           className="w-full justify-start"
                           variant="ghost"
                           isActive={isActive}
                         >
                           <a>
-                            <typedItem.icon className="mr-2 h-4 w-4" />
-                            <span>{typedItem.label}</span>
+                            <item.icon className="mr-2 h-4 w-4" />
+                            <span>{item.label}</span>
                           </a>
                         </SidebarMenuButton>
                       </Link>
@@ -285,16 +252,14 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
 const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   const { user, role, logout } = useAuth();
   const { cartTotalItems } = useCart();
-  // For now, search bar in NonAdminLayout is visual only. State can be added later.
   // const [searchTerm, setSearchTerm] = useState(""); 
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto h-16 flex items-center justify-between px-4 gap-4">
-          {/* Logo removed from here */}
-          <div className="relative flex-1 max-w-2xl"> {/* Search bar takes up space */}
-            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-[var(--header-height)]">
+        <div className="container mx-auto h-full flex items-center justify-between px-4 gap-4">
+          <div className="relative flex-1 max-w-2xl"> 
+            <SearchIconLucide className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
               placeholder={role === 'Customer' ? "Search products, gift boxes..." : "Search..."}
@@ -331,8 +296,8 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
                         </Button>
                     </SheetTrigger>
                     <SheetContent side="left" className="w-[280px] p-0 bg-card text-card-foreground flex flex-col">
-                        <SheetHeader className="p-4 border-b">
-                            <SheetTitle>Menu</SheetTitle> {/* Logo removed from SheetHeader */}
+                        <SheetHeader className="p-4 border-b h-[var(--header-height)]">
+                            <SheetTitle>Menu</SheetTitle> 
                         </SheetHeader>
                         <nav className="py-4 px-2 flex-1">
                             <Link href="/dashboard" className="flex items-center p-2 rounded-md hover:bg-muted"><Home className="mr-2 h-4 w-4" />Dashboard</Link>
@@ -371,6 +336,7 @@ export default function AppGroupLayout({ children }: LayoutProps) {
   }
   
   if (role === 'Admin') {
+    // SidebarProvider needs to wrap AdminLayout for its context to be available
     return <SidebarProvider><AdminLayout>{children}</AdminLayout></SidebarProvider>;
   }
   

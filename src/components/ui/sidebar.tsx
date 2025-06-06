@@ -153,7 +153,7 @@ const SidebarProvider = React.forwardRef<
               } as React.CSSProperties
             }
             className={cn(
-              "group/sidebar-wrapper flex min-h-svh w-full has-[[data-variant=inset]]:bg-sidebar",
+              "group/sidebar-wrapper flex flex-col min-h-svh w-full has-[[data-variant=inset]]:bg-sidebar", // Changed to flex-col
               className
             )}
             data-sidebar-provider-state={state}
@@ -780,4 +780,3 @@ export {
   SidebarSeparator,
   SidebarTrigger,
 }
-
