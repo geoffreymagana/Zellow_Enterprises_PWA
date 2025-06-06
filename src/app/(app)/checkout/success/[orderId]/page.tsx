@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, ShoppingBag, Gift } from 'lucide-react';
+import { CheckCircle, ShoppingBag, Gift, TruckIcon } from 'lucide-react';
 import Link from 'next/link';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -119,11 +119,14 @@ export default function OrderSuccessPage() {
           </div>
 
           <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
+            <Link href={`/track/order/${order.id}`} passHref>
+              <Button variant="default" className="w-full sm:w-auto"><TruckIcon className="mr-2 h-4 w-4"/>Track This Order</Button>
+            </Link>
             <Link href="/orders" passHref>
-              <Button variant="outline" className="w-full sm:w-auto">View My Orders</Button>
+              <Button variant="outline" className="w-full sm:w-auto">View All My Orders</Button>
             </Link>
             <Link href="/products" passHref>
-              <Button className="w-full sm:w-auto"><ShoppingBag className="mr-2 h-4 w-4"/>Continue Shopping</Button>
+              <Button variant="outline" className="w-full sm:w-auto"><ShoppingBag className="mr-2 h-4 w-4"/>Continue Shopping</Button>
             </Link>
           </div>
         </CardContent>

@@ -109,6 +109,12 @@ export interface GiftDetails {
   recipientCanViewAndTrack: boolean; // New field
 }
 
+export interface OrderRating {
+  value: number; // e.g., 1-5
+  comment?: string;
+  ratedAt: any; // Firestore Timestamp
+}
+
 export interface Order {
   id: string; // Firestore document ID
   customerId: string | null; // Null if guest checkout
@@ -139,6 +145,7 @@ export interface Order {
   transactionId?: string | null; // ID from payment gateway
   isGift?: boolean;
   giftDetails?: GiftDetails | null;
+  rating?: OrderRating | null; // New field for order rating
 }
 
 export interface CartItem {

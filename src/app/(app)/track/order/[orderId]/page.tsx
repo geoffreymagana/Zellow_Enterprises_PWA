@@ -3,14 +3,17 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, DeliveryHistoryEntry } from '@/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertTriangle, Package, ShoppingBag, Truck, CheckCircle, MapPin, Clock } from 'lucide-react';
+import { Loader2, AlertTriangle, Package, ShoppingBag, Truck, CheckCircle, MapPin, Clock, Star, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
-import { format } from 'date-fns'; // For formatting timestamps
+import { format } from 'date-fns';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth'; // For checking logged-in user
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -26,11 +29,17 @@ const formatDate = (timestamp: any, includeTime: boolean = true) => {
 export default function TrackOrderPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuth(); // Get current user for feedback submission
+  const { toast } = useToast();
   const orderId = typeof params.orderId === 'string' ? params.orderId : null;
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [selectedRating, setSelectedRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
 
   useEffect(() => {
     if (!orderId || !db) {
@@ -46,12 +55,15 @@ export default function TrackOrderPage() {
       if (docSnapshot.exists()) {
         const orderData = { id: docSnapshot.id, ...docSnapshot.data() } as Order;
         
-        // Check if this is a gift and if the recipient is allowed to view details
         if (orderData.isGift && orderData.giftDetails && !orderData.giftDetails.recipientCanViewAndTrack) {
-          setOrder(null); // Clear order to show generic message
+          setOrder(null); 
           setError("Access to detailed tracking for this gift is restricted by the sender.");
         } else {
           setOrder(orderData);
+          if (orderData.rating) {
+            setSelectedRating(orderData.rating.value);
+            setComment(orderData.rating.comment || "");
+          }
           setError(null);
         }
       } else {
@@ -66,8 +78,36 @@ export default function TrackOrderPage() {
       setLoading(false);
     });
 
-    return () => unsubscribe(); // Cleanup listener on unmount
+    return () => unsubscribe();
   }, [orderId]);
+
+  const handleFeedbackSubmit = async () => {
+    if (!orderId || !db || !user || selectedRating === 0) {
+      toast({ title: "Feedback Error", description: "Please select a rating.", variant: "destructive"});
+      return;
+    }
+    setIsSubmittingFeedback(true);
+    try {
+      const orderRef = doc(db, 'orders', orderId);
+      await updateDoc(orderRef, {
+        rating: {
+          value: selectedRating,
+          comment: comment,
+          ratedAt: serverTimestamp(),
+          userId: user.uid, // Store who rated
+        },
+        updatedAt: serverTimestamp(),
+      });
+      toast({ title: "Feedback Submitted", description: "Thank you for your feedback!"});
+      // Order state will update via onSnapshot
+    } catch (e: any) {
+      console.error("Error submitting feedback:", e);
+      toast({ title: "Error", description: "Could not submit feedback.", variant: "destructive"});
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -78,7 +118,7 @@ export default function TrackOrderPage() {
     );
   }
 
-  if (error && !order) { // Show error only if order is also null (e.g. for restricted access)
+  if (error && !order) { 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
         <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
@@ -91,7 +131,7 @@ export default function TrackOrderPage() {
     );
   }
   
-  if (!order) { // Fallback if order is null without a specific error message from above
+  if (!order) { 
      return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
         <Package className="h-12 w-12 text-muted-foreground mb-4" />
@@ -104,6 +144,9 @@ export default function TrackOrderPage() {
   const currentStatusEntry = order.deliveryHistory && order.deliveryHistory.length > 0 
     ? order.deliveryHistory[order.deliveryHistory.length - 1] 
     : { status: order.status, timestamp: order.updatedAt || order.createdAt, notes: 'Order status updated.' };
+
+  const canRateOrder = order.status === 'delivered' && !order.rating;
+  const hasBeenRated = !!order.rating;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
@@ -183,6 +226,56 @@ export default function TrackOrderPage() {
             </div>
           )}
 
+          {/* Feedback Section */}
+          {(canRateOrder || hasBeenRated) && (
+            <Card className="mt-6 bg-muted/50">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center">
+                  <MessageSquare className="mr-2 h-5 w-5 text-primary"/>
+                  {hasBeenRated ? "Your Feedback" : "Rate Your Order"}
+                </CardTitle>
+                {!hasBeenRated && <CardDescription>Let us know how we did with order {order.id.substring(0,8)}...</CardDescription>}
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center space-x-1 mb-3">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Button
+                      key={star}
+                      variant={selectedRating >= star ? "default" : "outline"}
+                      size="icon"
+                      onClick={() => !hasBeenRated && setSelectedRating(star)}
+                      disabled={hasBeenRated || isSubmittingFeedback}
+                      className="rounded-full"
+                    >
+                      <Star className={`h-5 w-5 ${selectedRating >= star ? "text-yellow-400 fill-yellow-400" : "text-muted-foreground"}`} />
+                      <span className="sr-only">{star} star</span>
+                    </Button>
+                  ))}
+                </div>
+                <Textarea
+                  value={comment}
+                  onChange={(e) => !hasBeenRated && setComment(e.target.value)}
+                  placeholder="Optional: Tell us more about your experience..."
+                  rows={3}
+                  disabled={hasBeenRated || isSubmittingFeedback}
+                />
+              </CardContent>
+              {!hasBeenRated && (
+                <CardFooter>
+                  <Button onClick={handleFeedbackSubmit} disabled={isSubmittingFeedback || selectedRating === 0}>
+                    {isSubmittingFeedback && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Submit Feedback
+                  </Button>
+                </CardFooter>
+              )}
+              {hasBeenRated && order.rating?.ratedAt && (
+                <CardFooter className="text-xs text-muted-foreground">
+                   Thank you for your feedback submitted on {formatDate(order.rating.ratedAt)}.
+                </CardFooter>
+              )}
+            </Card>
+          )}
+
           <div className="mt-6 text-center">
             <Link href="/products" passHref>
               <Button variant="outline"><ShoppingBag className="mr-2 h-4 w-4"/> Continue Shopping</Button>
@@ -193,3 +286,4 @@ export default function TrackOrderPage() {
     </div>
   );
 }
+
