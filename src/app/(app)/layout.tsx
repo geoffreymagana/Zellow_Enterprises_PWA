@@ -2,7 +2,6 @@
 "use client";
 import { ReactNode, FC } from 'react'; // Added FC
 import { useAuth } from '@/hooks/useAuth';
-// Removed unused useRouter and useEffect from this file
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { Logo } from '@/components/common/Logo';
 import { Button } from '@/components/ui/button';
@@ -12,26 +11,27 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarHeader,
+  SidebarHeader as AdminSidebarHeader, // Renamed to avoid conflict with SheetHeader
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarProvider,
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
+  SidebarProvider,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation'; // Added usePathname
 import {
-  Aperture, LayoutDashboard, Users, Package, ShoppingCart, Layers, DollarSign,
+  LayoutDashboard, Users, Package, ShoppingCart, Layers, DollarSign,
   Truck, Settings as SettingsIcon, UserCircle, LogOutIcon, Menu, Bell,
-  FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIcon, ListChecks // Renamed Search to SearchIcon, Added ListChecks
+  FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIcon, ListChecks, Aperture // Aperture still needed for main header
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
-import { useCart } from '@/contexts/CartContext'; // Added useCart for NonAdminLayout
+import { useCart } from '@/contexts/CartContext';
 
 interface LayoutProps {
   children: ReactNode;
@@ -40,7 +40,8 @@ interface LayoutProps {
 const AdminLayout: FC<LayoutProps> = ({ children }) => {
   const { logout } = useAuth();
   const sidebarContext = useSidebar();
-  
+  const pathname = usePathname(); // Get current pathname
+
   if (!sidebarContext) {
     return <div className="flex items-center justify-center min-h-screen">Error: Sidebar context not found.</div>;
   }
@@ -53,7 +54,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
     { href: '/admin/customizations', label: 'Customizations', icon: Layers },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign },
-    { href: '/admin/dispatch', label: 'Dispatch Center', icon: Aperture },
+    // { href: '/admin/dispatch', label: 'Dispatch Center', icon: Aperture }, // Removed Dispatch Center
     { href: '/admin/shipping', label: 'Shipping', icon: Ship },
     { href: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck },
     { href: '/admin/notifications', label: 'Notifications', icon: Bell },
@@ -98,22 +99,30 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-[var(--sidebar-width-mobile,280px)] p-0 bg-sidebar text-sidebar-foreground flex flex-col">
-                <SidebarHeader className="p-4 border-b border-sidebar flex justify-start items-center h-16">
-                  <Link href="/dashboard" aria-label="Zellow Enterprises Home">
-                    <Aperture className="text-primary" size={24} />
-                  </Link>
-                </SidebarHeader>
+                <SheetHeader className="p-4 border-b border-sidebar h-16 flex items-center">
+                   <SheetTitle className="text-lg font-semibold">Admin Menu</SheetTitle>
+                </SheetHeader>
                 <ScrollArea className="flex-1">
                   <SidebarMenu className="p-2">
-                    {mainAdminNavItems.map((item) => ( // Use unfiltered for mobile for simplicity or filter too
+                    {mainAdminNavItems.map((item) => {
+                       const directMatch = item.href === pathname;
+                       const subItemMatch = (item as any).subItems?.some((sub: any) => sub.href === pathname);
+                       const isActive = directMatch || subItemMatch;
+                      return (
                       <SidebarMenuItem key={item.label}>
                         <Link href={item.href} passHref legacyBehavior>
-                          <SidebarMenuButton asChild className="w-full justify-start" variant="ghost" onClick={() => sidebarContext.setOpenMobile(false)}>
+                          <SidebarMenuButton 
+                            asChild 
+                            className="w-full justify-start" 
+                            variant="ghost" 
+                            onClick={() => sidebarContext.setOpenMobile(false)}
+                            isActive={isActive}
+                           >
                             <a><item.icon className="mr-2 h-4 w-4" /><span>{item.label}</span></a>
                           </SidebarMenuButton>
                         </Link>
                       </SidebarMenuItem>
-                    ))}
+                    )})}
                   </SidebarMenu>
                 </ScrollArea>
                 <SidebarFooter className="p-2 border-t border-sidebar">
@@ -121,7 +130,13 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                     {footerAdminNavItems.map((item) => (
                       <SidebarMenuItem key={item.label}>
                         <Link href={item.href} passHref legacyBehavior>
-                          <SidebarMenuButton asChild className="w-full justify-start" variant="ghost" onClick={() => sidebarContext.setOpenMobile(false)}>
+                          <SidebarMenuButton 
+                            asChild 
+                            className="w-full justify-start" 
+                            variant="ghost" 
+                            onClick={() => sidebarContext.setOpenMobile(false)}
+                            isActive={item.href === pathname}
+                          >
                             <a><item.icon className="mr-2 h-4 w-4" /><span>{item.label}</span></a>
                           </SidebarMenuButton>
                         </Link>
@@ -142,8 +157,8 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                <h1 className="text-xl font-semibold font-headline">Admin Panel</h1>
             </Link>
           </div>
-          <div className="flex items-center gap-2 sm:gap-4 justify-end">
-            <div className="relative w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96">
+          <div className="flex items-center gap-2 sm:gap-4"> {/* Removed flex-1 from here */}
+            <div className="relative w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96"> {/* Removed flex-grow */}
                <SearchIcon className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
@@ -160,30 +175,30 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
         </div>
       </header>
       
-      <div className="flex flex-1" style={{ height: 'calc(100vh - var(--header-height))' }}> {/* Ensure parent flex container for sidebar + main takes full remaining height */}
+      <div className="flex flex-1" style={{ height: 'calc(100vh - var(--header-height))' }}>
         <Sidebar
           side="left"
           className="border-r border-sidebar w-[var(--sidebar-width)] sticky top-[var(--header-height)] hidden md:flex flex-col" 
-          style={{ height: 'calc(100vh - var(--header-height))' }} // Explicit height for desktop sidebar
+          style={{ height: 'calc(100vh - var(--header-height))' }}
         >
-          {/* Desktop Sidebar Content */}
-          <SidebarHeader className="p-4 border-b border-sidebar flex justify-start items-center h-16 flex-shrink-0">
-            <Link href="/dashboard" aria-label="Zellow Enterprises Home">
-              <Aperture className="text-primary" size={24} />
-            </Link>
-          </SidebarHeader>
+          <AdminSidebarHeader className="h-16 border-b border-sidebar flex-shrink-0" /> {/* Simplified header */}
           <SidebarContent className="flex-1 overflow-y-auto">
             <ScrollArea className="h-full">
               {filteredMainAdminNavItems.length > 0 ? (
                 <SidebarMenu className="p-2">
                   {filteredMainAdminNavItems.map((item) => {
-                    const typedItem = item as any;
+                    const typedItem = item as any; // To access subItems
+                    const directMatch = typedItem.href === pathname;
+                    const childMatch = typedItem.subItems?.some((sub: any) => sub.href === pathname);
+                    const isActive = directMatch || childMatch;
+
                     return typedItem.subItems && typedItem.subItems.length > 0 ? (
                       <SidebarMenuItem key={typedItem.label}>
                          <SidebarMenuButton
                           isCollapsible={true}
                           className="w-full justify-start"
                           variant="ghost"
+                          isActive={isActive} // Apply active state to parent
                         >
                           <typedItem.icon className="mr-2 h-4 w-4" />
                           <span>{typedItem.label}</span>
@@ -192,7 +207,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                           {typedItem.subItems.map((subItem: any) => (
                              <SidebarMenuSubItem key={subItem.label}>
                               <Link href={subItem.href} passHref legacyBehavior>
-                                <SidebarMenuSubButton>
+                                <SidebarMenuSubButton isActive={subItem.href === pathname}>
                                   {subItem.icon && <subItem.icon className="mr-2 h-4 w-4" />}
                                   <span>{subItem.label}</span>
                                 </SidebarMenuSubButton>
@@ -209,6 +224,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                           tooltip={typedItem.label}
                           className="w-full justify-start"
                           variant="ghost"
+                          isActive={isActive}
                         >
                           <a>
                             <typedItem.icon className="mr-2 h-4 w-4" />
@@ -237,6 +253,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                         tooltip={item.label}
                         className="w-full justify-start"
                         variant="ghost"
+                        isActive={item.href === pathname}
                       >
                         <a>
                           <item.icon className="mr-2 h-4 w-4" />
@@ -248,8 +265,6 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                 ))}
               </SidebarMenu>
             )}
-            {/* ThemeToggle in footer only needed if not in header for desktop */}
-            {/* <div className="mt-1 p-2 hidden md:block"><ThemeToggle /></div> */}
             <div className="mt-1 p-2">
               <Button variant="outline" onClick={logout} className="w-full justify-start">
                 <LogOutIcon className="mr-2 h-4 w-4" />
@@ -269,7 +284,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
 
 const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   const { user, role, logout } = useAuth();
-  const { cartTotalItems } = useCart(); // Get cart count
+  const { cartTotalItems } = useCart();
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -290,12 +305,11 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
                 </Button>
               </Link>
             )}
-            {user && role && !['Customer', 'Admin'].includes(role) && ( // Staff Logout
+             {user && role && !['Customer', 'Admin'].includes(role) && (
                  <Button variant="ghost" size="icon" onClick={logout} aria-label="Logout">
                     <LogOutIcon className="h-5 w-5" />
                  </Button>
             )}
-            {/* Mobile Menu for Staff (if needed beyond BottomNav) */}
             {user && role && !['Customer', 'Admin'].includes(role) && (
                 <Sheet>
                     <SheetTrigger asChild>
@@ -311,7 +325,6 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
                             <Link href="/dashboard" className="flex items-center p-2 rounded-md hover:bg-muted"><Home className="mr-2 h-4 w-4" />Dashboard</Link>
                             {role === 'Technician' && <Link href="/tasks" className="flex items-center p-2 rounded-md hover:bg-muted"><ListChecks className="mr-2 h-4 w-4" />Tasks</Link>}
                             {role === 'Rider' && <Link href="/deliveries" className="flex items-center p-2 rounded-md hover:bg-muted"><Truck className="mr-2 h-4 w-4" />Deliveries</Link>}
-                            {/* Add other role-specific links here */}
                             <Link href="/profile" className="flex items-center p-2 rounded-md hover:bg-muted"><UserCircle className="mr-2 h-4 w-4" />Profile</Link>
                         </nav>
                         <div className="p-4 border-t">
@@ -339,8 +352,6 @@ export default function AppGroupLayout({ children }: LayoutProps) {
   }
 
   if (!user) {
-    // If user is not logged in, AuthProvider should handle redirection to /login.
-    // Returning a loader here prevents rendering layouts for unauthenticated users.
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
   
@@ -350,5 +361,4 @@ export default function AppGroupLayout({ children }: LayoutProps) {
   
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
-
     
