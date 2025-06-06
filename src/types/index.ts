@@ -1,5 +1,4 @@
 
-
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -99,11 +98,21 @@ export interface OrderItem {
   customizations?: Record<string, any> | null; // { optionId: selectedValue, ... }
 }
 
+export interface GiftDetails {
+  recipientName: string;
+  recipientContactMethod: 'email' | 'phone' | '';
+  recipientContactValue: string;
+  giftMessage?: string;
+  notifyRecipient: boolean;
+  showPricesToRecipient: boolean;
+  recipientCanViewAndTrack: boolean; // New field
+}
+
 export interface Order {
   id: string; // Firestore document ID
   customerId: string | null; // Null if guest checkout
-  customerName: string; 
-  customerEmail: string; 
+  customerName: string;
+  customerEmail: string;
   customerPhone: string;
   items: OrderItem[];
   totalAmount: number;
@@ -127,6 +136,8 @@ export interface Order {
   paymentMethod?: string | null; // e.g., 'cod', 'mpesa', 'card'
   paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
   transactionId?: string | null; // ID from payment gateway
+  isGift?: boolean;
+  giftDetails?: GiftDetails | null;
 }
 
 export interface CartItem {
@@ -143,17 +154,18 @@ export interface CartItem {
 
 
 export interface Task {
-  id:string;
-  assigneeId: string; // UID of the staff member
-  type: 'engraving' | 'printing' | 'assembly' | 'quality_check' | string; // Task category
-  description: string;
-  orderId?: string; // Associated order, if any
+  id: string;
+  orderId: string;
+  itemName: string; // Denormalized product name
+  taskType: string; // e.g., Engraving, Printing
+  description: string; // Specific instructions for the task
+  assigneeId: string; // UID of the technician
+  assigneeName?: string; // Denormalized technician name
   status: 'pending' | 'in-progress' | 'completed' | 'needs_approval' | 'blocked';
-  createdAt: any; // Firestore Timestamp or Date
-  updatedAt: any; // Firestore Timestamp or Date
-  dueDate?: any; // Firestore Timestamp or Date
+  createdAt: any; // Firestore Timestamp
+  updatedAt: any; // Firestore Timestamp
+  dueDate?: any; // Optional Firestore Timestamp
   notes?: string;
-  attachments?: { name: string; url: string }[]; // e.g., proof of work images
 }
 
 export interface ShippingRegion {
@@ -188,4 +200,3 @@ export interface ShippingRate {
   createdAt?: any; // Firestore Timestamp or Date
   updatedAt?: any; // Firestore Timestamp or Date
 }
-

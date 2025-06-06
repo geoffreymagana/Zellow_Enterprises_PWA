@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, ShoppingBag } from 'lucide-react';
+import { CheckCircle, ShoppingBag, Gift } from 'lucide-react';
 import Link from 'next/link';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -73,7 +73,6 @@ export default function OrderSuccessPage() {
   }
   
   if (!order) {
-    // Fallback if error state wasn't set but order is null after loading
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,8rem)-10rem)] text-center p-4">
          <p className="text-muted-foreground mb-6">Order details could not be loaded.</p>
@@ -101,10 +100,21 @@ export default function OrderSuccessPage() {
           <p>Your order ID is: <strong className="text-primary">{order.id.substring(0,12)}...</strong></p>
           <p>An email confirmation with your order details has been sent to <strong className="text-primary">{order.customerEmail}</strong>.</p>
           
+          {order.isGift && order.giftDetails?.notifyRecipient && (
+            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-md text-blue-700 dark:text-blue-300 text-sm">
+              <p className="flex items-center justify-center"><Gift className="h-4 w-4 mr-2"/> This is a gift for <strong>{order.giftDetails.recipientName}</strong>.</p>
+              <p>
+                They will be notified shortly
+                {order.giftDetails.recipientCanViewAndTrack ? " with details to view and track their gift" : ""}
+                {order.giftDetails.recipientContactValue ? ` via ${order.giftDetails.recipientContactMethod}` : " (if contact details were provided)"}.
+              </p>
+            </div>
+          )}
+
           <div className="text-left border-t pt-4 mt-4">
             <h4 className="font-semibold mb-2">Order Summary:</h4>
             <p><strong>Total Amount:</strong> {formatPrice(order.totalAmount)}</p>
-            <p><strong>Payment Method:</strong> <span className="capitalize">{order.paymentMethod}</span></p>
+            <p><strong>Payment Method:</strong> <span className="capitalize">{order.paymentMethod?.replace(/_/g, ' ')}</span></p>
             <p><strong>Shipping to:</strong> {order.shippingAddress.addressLine1}, {order.shippingAddress.city}</p>
           </div>
 

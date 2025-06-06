@@ -11,9 +11,9 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { collection, addDoc, serverTimestamp, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order, OrderItem, OrderStatus, DeliveryHistoryEntry } from '@/types';
+import type { Order, OrderItem, OrderStatus, DeliveryHistoryEntry, GiftDetails } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PackageCheck } from 'lucide-react';
+import { Loader2, PackageCheck, Gift } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 const formatPrice = (price: number): string => {
@@ -28,7 +28,15 @@ export default function ReviewOrderPage() {
     paymentMethod, 
     cartSubtotal, 
     clearCart,
-    selectedShippingMethodInfo 
+    selectedShippingMethodInfo,
+    isGiftOrder,
+    giftRecipientName,
+    giftRecipientContactMethod,
+    giftRecipientContactValue,
+    giftMessage,
+    notifyRecipient,
+    showPricesToRecipient,
+    giftRecipientCanViewAndTrack
   } = useCart();
   const router = useRouter();
   const { toast } = useToast();
@@ -68,10 +76,23 @@ export default function ReviewOrderPage() {
 
     const initialDeliveryHistoryEntry: DeliveryHistoryEntry = {
       status: 'pending',
-      timestamp: Timestamp.now(), // Use client-side timestamp for initial entry
+      timestamp: Timestamp.now(), 
       notes: 'Order placed by customer.',
       actorId: user.uid,
     };
+
+    let giftDetailsToSave: GiftDetails | null = null;
+    if (isGiftOrder) {
+      giftDetailsToSave = {
+        recipientName: giftRecipientName,
+        recipientContactMethod: giftRecipientContactMethod,
+        recipientContactValue: giftRecipientContactValue,
+        giftMessage: giftMessage || undefined, // Make sure optional fields are undefined if empty
+        notifyRecipient: notifyRecipient,
+        showPricesToRecipient: notifyRecipient ? showPricesToRecipient : false, // Only relevant if notifying
+        recipientCanViewAndTrack: notifyRecipient ? giftRecipientCanViewAndTrack : false, // Only relevant if notifying
+      };
+    }
 
     const newOrder: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> = {
       customerId: user.uid,
@@ -98,6 +119,8 @@ export default function ReviewOrderPage() {
       estimatedDeliveryTime: null, 
       actualDeliveryTime: null,
       transactionId: null,
+      isGift: isGiftOrder,
+      giftDetails: giftDetailsToSave,
     };
 
     try {
@@ -111,7 +134,7 @@ export default function ReviewOrderPage() {
       if (cartItems.some(item => item.stock !== undefined && item.quantity !== undefined)) {
         const batch = writeBatch(db);
         cartItems.forEach(item => {
-          if (item.stock !== undefined && item.quantity !== undefined) { // Check again for safety
+          if (item.stock !== undefined && item.quantity !== undefined) { 
             const productRef = doc(db, 'products', item.productId);
             batch.update(productRef, { stock: item.stock - item.quantity });
           }
@@ -119,7 +142,6 @@ export default function ReviewOrderPage() {
         await batch.commit();
       }
       
-
       toast({ title: "Order Placed!", description: `Your order #${newOrderRef.id.substring(0, 8)}... has been successfully placed.` });
       clearCart();
       router.push(`/checkout/success/${newOrderRef.id}`);
@@ -158,6 +180,25 @@ export default function ReviewOrderPage() {
               <Link href="/checkout/shipping" className="text-sm text-primary hover:underline mt-2 inline-block">Edit Shipping Address</Link>
             </Card>
           </section>
+
+          {isGiftOrder && (
+            <section>
+              <h3 className="text-lg font-semibold mb-3 flex items-center"><Gift className="mr-2 h-5 w-5 text-primary"/>Gift Details:</h3>
+              <Card className="bg-muted/50 p-4 text-sm">
+                <p>This order is a gift for: <strong>{giftRecipientName}</strong></p>
+                {notifyRecipient && giftRecipientContactValue && (
+                  <>
+                    <p>Recipient will be notified via {giftRecipientContactMethod}: {giftRecipientContactValue}</p>
+                    {giftMessage && <p>Message: <em>"{giftMessage}"</em></p>}
+                    <p>Prices {showPricesToRecipient ? "will" : "will NOT"} be shown in the notification.</p>
+                    <p>Recipient {giftRecipientCanViewAndTrack ? "CAN" : "CANNOT"} view order details & track the gift.</p>
+                  </>
+                )}
+                {!notifyRecipient && <p>Recipient will not be notified directly by us.</p>}
+                <Link href="/checkout/shipping" className="text-sm text-primary hover:underline mt-2 inline-block">Edit Gift Details</Link>
+              </Card>
+            </section>
+          )}
 
           <section>
             <h3 className="text-lg font-semibold mb-3">Shipping Method:</h3>
@@ -241,5 +282,3 @@ export default function ReviewOrderPage() {
     </div>
   );
 }
-
-    
