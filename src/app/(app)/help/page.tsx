@@ -8,7 +8,9 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { HelpCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { HelpCircle, MessageSquareQuestion } from "lucide-react";
+import Link from "next/link";
 
 const faqs = [
   {
@@ -55,21 +57,35 @@ export default function HelpPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <h2 className="text-2xl font-headline font-semibold mb-4 text-center text-primary/90">
+          <h2 className="text-2xl font-headline font-semibold mb-6 text-center text-primary/90">
             💡 Frequently Asked Questions
           </h2>
-          <Accordion type="single" collapsible className="w-full">
+          <Accordion type="single" collapsible className="w-full space-y-3">
             {faqs.map((faq, index) => (
-              <AccordionItem value={`item-${index + 1}`} key={index}>
-                <AccordionTrigger className="text-left hover:text-primary text-base md:text-lg">
+              <AccordionItem 
+                value={`item-${index + 1}`} 
+                key={index}
+                className="border border-border rounded-lg shadow-sm bg-card hover:shadow-md transition-shadow data-[state=open]:shadow-lg"
+              >
+                <AccordionTrigger className="text-left hover:text-primary text-base md:text-lg px-4 py-3 font-medium">
                   {faq.question}
                 </AccordionTrigger>
-                <AccordionContent className="text-foreground/80 whitespace-pre-line leading-relaxed px-2">
+                <AccordionContent className="text-foreground/80 whitespace-pre-line leading-relaxed px-4 pb-4 pt-0">
                   {faq.answer}
                 </AccordionContent>
               </AccordionItem>
             ))}
           </Accordion>
+
+          <div className="mt-10 text-center">
+            <p className="mb-3 text-muted-foreground">Can't find what you're looking for?</p>
+            <Link href="/support" passHref>
+              <Button size="lg" variant="default">
+                <MessageSquareQuestion className="mr-2 h-5 w-5" />
+                Contact Support
+              </Button>
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>
