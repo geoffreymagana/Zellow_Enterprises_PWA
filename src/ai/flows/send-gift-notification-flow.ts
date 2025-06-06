@@ -11,7 +11,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
-export const GiftNotificationInputSchema = z.object({
+const GiftNotificationInputSchema = z.object({
   orderId: z.string().describe('The ID of the gift order.'),
   recipientName: z.string().describe("The recipient's name."),
   recipientContactMethod: z.enum(['email', 'phone', '']).describe("How to contact the recipient ('email', 'phone', or empty if not notifying)."),
@@ -23,7 +23,7 @@ export const GiftNotificationInputSchema = z.object({
 });
 export type GiftNotificationInput = z.infer<typeof GiftNotificationInputSchema>;
 
-export const GiftNotificationOutputSchema = z.object({
+const GiftNotificationOutputSchema = z.object({
   success: z.boolean(),
   message: z.string().describe('A message indicating the outcome of the notification attempt.'),
   trackingLink: z.string().optional().describe('The generated tracking link for the recipient.'),
