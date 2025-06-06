@@ -25,7 +25,7 @@ import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, where, s
 import { auth, db } from '@/lib/firebase';
 
 const employeeRoles: Exclude<UserRole, 'Admin' | 'Customer' | null>[] = [
-  'Technician', 'Rider', 'Supplier', 'SupplyManager', 
+  'Technician', 'Rider', 'Supplier', 
   'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'
 ];
 
@@ -471,3 +471,4 @@ export default function AdminUsersPage() {
     </div>
   );
 }
+

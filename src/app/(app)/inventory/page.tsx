@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import type { Product, StockRequest, StockRequestStatus } from "@/types";
-import { PlusCircle, Search, Edit, AlertTriangle, PackageCheck, PackageX, RefreshCw, Archive, ShoppingBasket, ClipboardList } from "lucide-react";
+import { PlusCircle, Search, Edit, AlertTriangle, PackageCheck, PackageX, RefreshCw, Boxes, ShoppingBasket, ClipboardList, ImageOff } from "lucide-react"; // Added Boxes
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
@@ -23,6 +23,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Loader2 } from "lucide-react";
 import { format } from 'date-fns';
+import Image from "next/image"; // Added Image
+import { cn } from "@/lib/utils"; // Added cn
 
 const requestStockFormSchema = z.object({
   requestedQuantity: z.coerce.number().min(1, "Quantity must be at least 1"),
@@ -30,18 +32,12 @@ const requestStockFormSchema = z.object({
 });
 type RequestStockFormValues = z.infer<typeof requestStockFormSchema>;
 
-const StockBadge = ({ stock }: { stock: number }) => {
-  let variant: BadgeProps['variant'] = "default";
-  let icon = <PackageCheck className="h-3 w-3 mr-1" />;
-  if (stock === 0) {
-    variant = "destructive";
-    icon = <PackageX className="h-3 w-3 mr-1" />;
-  } else if (stock < 20) { 
-    variant = "statusOrange"; // Using one of the custom status colors
-    icon = <AlertTriangle className="h-3 w-3 mr-1 text-white" />; // Ensure icon is visible on orange
-  }
-  return <Badge variant={variant} className="flex items-center text-xs">{icon}{stock} in stock</Badge>;
+const getStockLevelColor = (stock: number): string => {
+  if (stock === 0) return 'bg-destructive'; // Red
+  if (stock < 10) return 'bg-orange-500'; // Orange
+  return 'bg-green-500'; // Green
 };
+
 
 const getStockRequestStatusVariant = (status: StockRequestStatus): BadgeProps['variant'] => {
   switch (status) {
@@ -116,7 +112,7 @@ export default function InventoryPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user || !['InventoryManager', 'SupplyManager', 'Admin'].includes(role || '')) {
+    if (!user || !['InventoryManager', 'Admin'].includes(role || '')) {
       router.replace('/dashboard');
     } else {
       fetchProducts();
@@ -149,7 +145,7 @@ export default function InventoryPage() {
         requestedQuantity: values.requestedQuantity,
         requesterId: user.uid,
         requesterName: user.displayName || user.email || "Unknown User",
-        supplierId: productToRequest.supplier, // Use product's default supplier if available
+        supplierId: productToRequest.supplier, 
         status: 'pending_finance_approval',
         notes: values.notes || "",
       };
@@ -196,12 +192,11 @@ export default function InventoryPage() {
       <p className="text-muted-foreground">
         View product stock levels. 
         {role === 'InventoryManager' && " Request new stock from suppliers."}
-        {role === 'SupplyManager' && " Approve incoming stock from suppliers."}
       </p>
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Archive className="h-5 w-5" /> Current Stock Levels</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Boxes className="h-5 w-5" /> Current Stock Levels</CardTitle>
           <div className="flex items-center gap-2 mt-2">
             <Search className="h-5 w-5 text-muted-foreground" />
             <Input
@@ -218,37 +213,54 @@ export default function InventoryPage() {
           ) : filteredProducts.length === 0 ? (
             <p className="p-6 text-center text-muted-foreground">{products.length === 0 ? "No products found." : "No products match search."}</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-center">Current Stock</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProducts.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell className="text-xs">{item.categories?.join(', ') || 'N/A'}</TableCell>
-                    <TableCell className="text-center"><StockBadge stock={item.stock} /></TableCell>
-                    <TableCell className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
+              {filteredProducts.map((item) => (
+                <Card key={item.id} className="flex overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                  <div className={cn("w-2 flex-shrink-0", getStockLevelColor(item.stock))}></div>
+                  <div className="flex-grow p-3 flex flex-col">
+                    <div className="flex items-start gap-3 mb-2">
+                      <div className="relative w-20 h-20 bg-muted rounded-md overflow-hidden flex-shrink-0">
+                        {item.imageUrl ? (
+                          <Image 
+                            src={item.imageUrl} 
+                            alt={item.name} 
+                            fill
+                            sizes="80px"
+                            className="object-cover"
+                            data-ai-hint={item.categories?.[0]?.toLowerCase() || "inventory item"}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <ImageOff className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-grow min-w-0">
+                        <h3 className="text-sm font-semibold line-clamp-2 mb-1">{item.name}</h3>
+                        <p className="text-xs text-muted-foreground line-clamp-1">{item.categories?.join(', ') || 'N/A'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-auto flex justify-between items-end">
+                      <div className="text-left">
+                         <p className="text-xs text-muted-foreground">Stock</p>
+                         <p className="text-xl font-bold">{item.stock}</p>
+                      </div>
                       {role === 'InventoryManager' && (
                         <Button variant="outline" size="sm" onClick={() => handleOpenRequestDialog(item)} disabled={isRequestDialogOpen}>
-                          <ShoppingBasket className="mr-1 h-3 w-3"/> Request Stock
+                          <ShoppingBasket className="mr-1 h-3 w-3"/> Request
                         </Button>
                       )}
-                      {(role === 'Admin' || role === 'SupplyManager') && (
+                      {role === 'Admin' && (
                          <Link href={`/admin/products/edit/${item.id}`} passHref>
-                           <Button variant="ghost" size="icon" aria-label="Edit Product Details"><Edit className="h-4 w-4" /></Button>
+                           <Button variant="ghost" size="icon" aria-label="Edit Product Details"><Edit className="h-4 w-4"/></Button>
                          </Link>
                       )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
           )}
         </CardContent>
         {filteredProducts.length > 0 && <CardFooter className="pt-4"><p className="text-xs text-muted-foreground">Showing {filteredProducts.length} of {products.length} products.</p></CardFooter>}
@@ -316,3 +328,4 @@ export default function InventoryPage() {
     </div>
   );
 }
+

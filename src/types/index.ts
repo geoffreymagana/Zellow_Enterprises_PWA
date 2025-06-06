@@ -5,7 +5,7 @@ export type UserRole =
   | 'Technician'
   | 'Rider'
   | 'Supplier'
-  | 'SupplyManager'
+  // | 'SupplyManager' // Removed
   | 'FinanceManager'
   | 'ServiceManager'
   | 'InventoryManager'
@@ -281,3 +281,4 @@ export interface StockRequest {
   updatedAt: any; // Firestore Timestamp
   notes?: string; // General notes by requester
 }
+

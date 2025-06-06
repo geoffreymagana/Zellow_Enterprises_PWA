@@ -4,14 +4,14 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon, BadgeHelp, MailWarning, Banknote, CheckCircle2 } from 'lucide-react';
+import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon, BadgeHelp, MailWarning, Banknote, CheckCircle2, Warehouse } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState, useCallback } from 'react';
 import { collection, getDocs, query, where, onSnapshot, Unsubscribe, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User, Order, OrderStatus } from '@/types';
-import { useRouter } from 'next/navigation'; // Added useRouter
+import { useRouter } from 'next/navigation'; 
 
 // Helper component for dashboard items
 const DashboardItem = ({ title, value, icon: Icon, link, description, isLoadingValue }: { title: string; value?: string | number; icon: React.ElementType; link?: string; description?: string, isLoadingValue?: boolean }) => (
@@ -37,7 +37,7 @@ const DashboardItem = ({ title, value, icon: Icon, link, description, isLoadingV
 
 export default function DashboardPage() {
   const { user, role, loading: authLoading } = useAuth();
-  const router = useRouter(); // Added useRouter
+  const router = useRouter(); 
   
   // General Admin stats
   const [activeUserCount, setActiveUserCount] = useState<number | string>("...");
@@ -70,19 +70,24 @@ export default function DashboardPage() {
   const [riderCompletedTodayCount, setRiderCompletedTodayCount] = useState<number | string>("...");
   const [isLoadingRiderCompletedToday, setIsLoadingRiderCompletedToday] = useState(true);
 
+  // Inventory Manager specific state
+  const [lowStockItemsCount, setLowStockItemsCount] = useState<number | string>("...");
+  const [isLoadingLowStockItems, setIsLoadingLowStockItems] = useState(true);
+  const [pendingStockRequestsCount, setPendingStockRequestsCount] = useState<number | string>("...");
+  const [isLoadingPendingStockRequests, setIsLoadingPendingStockRequests] = useState(true);
+
 
   useEffect(() => {
     if (!authLoading && role === 'Customer') {
       router.replace('/products');
-      return; // Stop further execution for customers on this page
+      return; 
     }
 
     let unsubscribers: Unsubscribe[] = [];
-    if (!authLoading && db && user && role !== 'Customer') { // Ensure user and role are available
+    if (!authLoading && db && user && role !== 'Customer') { 
       
       const ordersCol = collection(db, 'orders');
 
-      // Common stats for Admin and FinanceManager for Payments Today
       if (role === 'Admin' || role === 'FinanceManager') {
         setIsLoadingPaymentsToday(true);
         const today = new Date();
@@ -233,10 +238,6 @@ export default function DashboardPage() {
         const qRiderCompletedToday = query(ordersCol, 
           where('riderId', '==', user.uid),
           where('status', '==', 'delivered'),
-          // Prioritize actualDeliveryTime, fall back to updatedAt if actualDeliveryTime is often null.
-          // Firestore doesn't support OR queries on different fields, so if actualDeliveryTime might be null,
-          // it's better to query on updatedAt or fetch and filter client-side.
-          // Assuming actualDeliveryTime is reliably set upon delivery completion:
           where('actualDeliveryTime', '>=', startOfDay),
           where('actualDeliveryTime', '<=', endOfDay)
         );
@@ -251,13 +252,41 @@ export default function DashboardPage() {
         setIsLoadingRiderActiveDeliveries(false);
         setIsLoadingRiderCompletedToday(false);
       }
+      
+      if (role === 'InventoryManager' || role === 'Admin') {
+        setIsLoadingLowStockItems(true);
+        setIsLoadingPendingStockRequests(true);
+        const productsCol = collection(db, 'products');
+        const qLowStock = query(productsCol, where("stock", "<", 10)); // Low stock threshold
+        const unsubLowStock = onSnapshot(qLowStock, (snapshot) => {
+            setLowStockItemsCount(snapshot.size);
+            setIsLoadingLowStockItems(false);
+        }, (error) => {
+            console.error("Error fetching low stock items:", error); setLowStockItemsCount("Error"); setIsLoadingLowStockItems(false);
+        });
+        unsubscribers.push(unsubLowStock);
+
+        const stockRequestsCol = collection(db, 'stockRequests');
+        const qPendingStockRequests = query(stockRequestsCol, where("status", "in", ["pending_finance_approval", "pending_supplier_fulfillment"]));
+        const unsubPendingStockRequests = onSnapshot(qPendingStockRequests, (snapshot) => {
+            setPendingStockRequestsCount(snapshot.size);
+            setIsLoadingPendingStockRequests(false);
+        }, (error) => {
+            console.error("Error fetching pending stock requests:", error); setPendingStockRequestsCount("Error"); setIsLoadingPendingStockRequests(false);
+        });
+        unsubscribers.push(unsubPendingStockRequests);
+      } else {
+        setIsLoadingLowStockItems(false);
+        setIsLoadingPendingStockRequests(false);
+      }
+
 
     }
     return () => unsubscribers.forEach(unsub => unsub());
   }, [authLoading, role, db, router, user]);
 
 
-  if (authLoading || !user || role === 'Customer') { // Also show loader if customer before redirect happens
+  if (authLoading || !user || role === 'Customer') { 
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
@@ -267,7 +296,6 @@ export default function DashboardPage() {
       case 'Technician': return "Technician Dashboard";
       case 'Rider': return "Rider Dashboard";
       case 'Supplier': return "Supplier Portal";
-      case 'SupplyManager': return "Supply Management";
       case 'FinanceManager': return "Finance Overview";
       case 'ServiceManager': return "Service Management";
       case 'InventoryManager': return "Inventory Control";
@@ -300,6 +328,7 @@ export default function DashboardPage() {
             <DashboardItem title="Payments Today" value={paymentsTodayCount} icon={Banknote} link="/admin/payments" description="Orders marked paid today." isLoadingValue={isLoadingPaymentsToday}/>
             <DashboardItem title="All Payments" icon={DollarSign} link="/admin/payments" />
             <DashboardItem title="Invoice Management" icon={FileArchive} link="/invoices" /> 
+            <DashboardItem title="Stock Request Approvals" icon={Coins} link="/finance/approvals" description="Approve/reject stock requests." isLoadingValue={isLoadingPendingStockRequests} />
           </>
         );
       case 'DispatchManager':
@@ -309,6 +338,14 @@ export default function DashboardPage() {
             <DashboardItem title="Awaiting Dispatch" value={ordersAwaitingDispatch} icon={Package} link="/admin/dispatch" description="Orders ready for assignment." isLoadingValue={isLoadingOrdersAwaiting} />
             <DashboardItem title="Ongoing Deliveries" value={ongoingDeliveries} icon={Route} link="/admin/dispatch" description="Deliveries in progress." isLoadingValue={isLoadingOngoingDeliveries} />
             <DashboardItem title="Full Dispatch Center" value={"Open"} icon={Component} link="/admin/dispatch" description="Access all dispatch tools." />
+          </>
+        );
+      case 'InventoryManager':
+        return (
+          <>
+            <DashboardItem title="All Inventory" value={"View"} icon={Warehouse} link="/inventory" description="Manage stock levels." />
+            <DashboardItem title="Low Stock Items" value={lowStockItemsCount} icon={AlertTriangle} link="/inventory?filter=lowstock" description="Items needing reorder." isLoadingValue={isLoadingLowStockItems} />
+            <DashboardItem title="Pending Stock Requests" value={pendingStockRequestsCount} icon={ShoppingCart} link="/inventory#requests" description="Track your requests." isLoadingValue={isLoadingPendingStockRequests} />
           </>
         );
       case 'Technician':
@@ -339,7 +376,7 @@ export default function DashboardPage() {
         Hello, {user.displayName || user.email}! Your role is: <span className="font-semibold text-primary">{role || 'Not Assigned'}</span>.
       </p>
       
-      {role !== 'Admin' && role !== 'DispatchManager' && role !== 'FinanceManager' && (
+      {role !== 'Admin' && role !== 'DispatchManager' && role !== 'FinanceManager' && role !== 'InventoryManager' && (
         <Alert>
           <BarChart className="h-4 w-4 mr-2" />
           <AlertTitle>Data Overview</AlertTitle>
@@ -375,6 +412,15 @@ export default function DashboardPage() {
           </AlertDescription>
         </Alert>
       )}
+      {role === 'InventoryManager' && (
+        <Alert variant="default" className="border-orange-500/50 bg-orange-500/5 text-orange-700 dark:text-orange-300">
+          <Warehouse className="h-4 w-4 mr-2 text-orange-500" />
+          <AlertTitle className="text-orange-600 dark:text-orange-400">Inventory Manager Dashboard</AlertTitle>
+          <AlertDescription className="text-orange-600/90 dark:text-orange-400/90">
+            Monitor stock levels, request new stock, and manage inventory data. Metrics are updated in real-time.
+          </AlertDescription>
+        </Alert>
+      )}
       {role === 'Rider' && (
         <Alert variant="default" className="border-accent/50 bg-accent/5 text-accent-foreground-muted">
           <Truck className="h-4 w-4 mr-2 text-accent" />
@@ -401,9 +447,11 @@ export default function DashboardPage() {
             {(role === 'Rider') && <Link href="/deliveries"><Button>Manage Deliveries</Button></Link>}
              {role === 'DispatchManager' && <Link href="/admin/dispatch"><Button><Component className="mr-2 h-4 w-4" />Open Dispatch Center</Button></Link>}
              {role === 'FinanceManager' && <Link href="/admin/payments"><Button><DollarSign className="mr-2 h-4 w-4" />View Payments</Button></Link>}
+             {role === 'InventoryManager' && <Link href="/inventory"><Button><Warehouse className="mr-2 h-4 w-4" />Manage Inventory</Button></Link>}
           </CardContent>
         </Card>
       )}
     </div>
   );
 }
+
