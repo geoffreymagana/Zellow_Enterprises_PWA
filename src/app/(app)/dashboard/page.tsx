@@ -50,7 +50,7 @@ export default function DashboardPage() {
   const [isLoadingActiveDeliveriesAdmin, setIsLoadingActiveDeliveriesAdmin] = useState(true);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number | string>("...");
   const [isLoadingPendingApprovals, setIsLoadingPendingApprovals] = useState(true);
-  const [paymentsTodayCount, setPaymentsTodayCount] = useState<number | string>("...");
+  const [paymentsTodayCount, setPaymentsTodayCount] = useState<number | string>("..."); // For Admin & Finance Manager
   const [isLoadingPaymentsToday, setIsLoadingPaymentsToday] = useState(true);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number | string>("...");
   const [isLoadingUnreadNotifications, setIsLoadingUnreadNotifications] = useState(true);
@@ -73,13 +73,42 @@ export default function DashboardPage() {
 
     let unsubscribers: Unsubscribe[] = [];
     if (!authLoading && db && role !== 'Customer') { // Ensure role is not Customer before fetching
+      
+      const ordersCol = collection(db, 'orders');
+
+      // Common stats for Admin and FinanceManager for Payments Today
+      if (role === 'Admin' || role === 'FinanceManager') {
+        setIsLoadingPaymentsToday(true);
+        const today = new Date();
+        const startOfDay = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0));
+        const endOfDay = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999));
+        
+        // Count orders marked as 'paid' AND updated/created 'today'
+        // Using updatedAt as a proxy for when it was marked paid.
+        // A dedicated paymentConfirmedAt field would be more accurate.
+        const qPaymentsToday = query(ordersCol, 
+            where("paymentStatus", "==", "paid"),
+            where("updatedAt", ">=", startOfDay),
+            where("updatedAt", "<=", endOfDay)
+        );
+        const unsubPaymentsToday = onSnapshot(qPaymentsToday, (snapshot) => {
+            setPaymentsTodayCount(snapshot.size);
+            setIsLoadingPaymentsToday(false);
+        }, (error) => {
+            console.error("Error fetching payments today count:", error); setPaymentsTodayCount("Error"); setIsLoadingPaymentsToday(false);
+        });
+        unsubscribers.push(unsubPaymentsToday);
+      } else {
+        setIsLoadingPaymentsToday(false);
+      }
+
+
       if (role === 'Admin') {
         setIsLoadingUserCount(true);
         setIsLoadingProductCount(true);
         setIsLoadingOrderCount(true);
         setIsLoadingActiveDeliveriesAdmin(true);
         setIsLoadingPendingApprovals(true);
-        setIsLoadingPaymentsToday(true);
         setIsLoadingUnreadNotifications(true);
 
         const usersCol = collection(db, 'users');
@@ -100,9 +129,8 @@ export default function DashboardPage() {
             console.error("Error fetching product count:", error); setTotalProductCount("Error"); setIsLoadingProductCount(false);
         });
         unsubscribers.push(unsubProducts);
-
-        const ordersColAdmin = collection(db, 'orders');
-        const unsubOrders = onSnapshot(ordersColAdmin, (snapshot) => {
+        
+        const unsubOrders = onSnapshot(ordersCol, (snapshot) => { // Re-use ordersCol
             setTotalOrderCount(snapshot.size);
             setIsLoadingOrderCount(false);
         }, (error) => {
@@ -111,7 +139,7 @@ export default function DashboardPage() {
         unsubscribers.push(unsubOrders);
         
         const activeDeliveryStatusesAdmin: OrderStatus[] = ['assigned', 'out_for_delivery', 'delivery_attempted'];
-        const qActiveDeliveriesAdmin = query(ordersColAdmin, where("status", "in", activeDeliveryStatusesAdmin));
+        const qActiveDeliveriesAdmin = query(ordersCol, where("status", "in", activeDeliveryStatusesAdmin)); // Re-use ordersCol
         const unsubActiveDeliveriesAdmin = onSnapshot(qActiveDeliveriesAdmin, (snapshot) => {
             setActiveDeliveriesCountAdmin(snapshot.size);
             setIsLoadingActiveDeliveriesAdmin(false);
@@ -129,19 +157,6 @@ export default function DashboardPage() {
             console.error("Error fetching pending approvals count:", error); setPendingApprovalsCount("Error"); setIsLoadingPendingApprovals(false);
         });
         unsubscribers.push(unsubPendingApprovals);
-
-        const today = new Date();
-        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
-        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
-        const paymentsCol = collection(db, 'payments'); // Assuming 'payments' collection
-        const qPaymentsToday = query(paymentsCol, where("createdAt", ">=", Timestamp.fromDate(startOfDay)), where("createdAt", "<=", Timestamp.fromDate(endOfDay)));
-        const unsubPaymentsToday = onSnapshot(qPaymentsToday, (snapshot) => {
-            setPaymentsTodayCount(snapshot.size);
-            setIsLoadingPaymentsToday(false);
-        }, (error) => {
-            console.error("Error fetching payments today count:", error); setPaymentsTodayCount("Error"); setIsLoadingPaymentsToday(false);
-        });
-        unsubscribers.push(unsubPaymentsToday);
         
         const notificationsCol = collection(db, 'notifications'); // Assuming 'notifications' collection
         const qUnreadNotifications = query(notificationsCol, where("isRead", "==", false));
@@ -153,10 +168,9 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubUnreadNotifications);
 
-
-      } else {
+      } else { // If not Admin, set non-Admin-specific loading states to false
         setIsLoadingUserCount(false); setIsLoadingProductCount(false); setIsLoadingOrderCount(false); setIsLoadingActiveDeliveriesAdmin(false);
-        setIsLoadingPendingApprovals(false); setIsLoadingPaymentsToday(false); setIsLoadingUnreadNotifications(false);
+        setIsLoadingPendingApprovals(false); setIsLoadingUnreadNotifications(false);
       }
 
       if (role === 'DispatchManager' || role === 'Admin') { // Admin can also see dispatch manager stats
@@ -171,8 +185,7 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubRiders);
 
-        const ordersColDispatch = collection(db, 'orders');
-        const qAwaiting = query(ordersColDispatch, where("status", "==", "awaiting_assignment"));
+        const qAwaiting = query(ordersCol, where("status", "==", "awaiting_assignment")); // Re-use ordersCol
         const unsubAwaiting = onSnapshot(qAwaiting, (snapshot) => {
           setOrdersAwaitingDispatch(snapshot.size); setIsLoadingOrdersAwaiting(false);
         }, (error) => {
@@ -181,7 +194,7 @@ export default function DashboardPage() {
         unsubscribers.push(unsubAwaiting);
         
         const qOngoingStatuses: OrderStatus[] = ['assigned', 'out_for_delivery'];
-        const qOngoingDeliveries = query(ordersColDispatch, where("status", "in", qOngoingStatuses));
+        const qOngoingDeliveries = query(ordersCol, where("status", "in", qOngoingStatuses)); // Re-use ordersCol
         const unsubOngoing = onSnapshot(qOngoingDeliveries, (snapshot) => {
             setOngoingDeliveries(snapshot.size); setIsLoadingOngoingDeliveries(false);
         }, (error) => {
@@ -189,7 +202,7 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubOngoing);
 
-      } else {
+      } else { // If not DispatchManager (and not Admin), set these loading states to false
         setIsLoadingActiveRiders(false); setIsLoadingOrdersAwaiting(false); setIsLoadingOngoingDeliveries(false);
       }
     }
@@ -226,13 +239,22 @@ export default function DashboardPage() {
             <DashboardItem title="Total Products" value={totalProductCount} icon={Package} link="/admin/products" description="Products in catalog." isLoadingValue={isLoadingProductCount} />
             <DashboardItem title="Total Orders" value={totalOrderCount} icon={ShoppingCart} link="/admin/orders" description="All customer orders." isLoadingValue={isLoadingOrderCount} />
             <DashboardItem title="Active Deliveries" value={activeDeliveriesCountAdmin} icon={Truck} link="/admin/deliveries" description="Ongoing deliveries." isLoadingValue={isLoadingActiveDeliveriesAdmin} />
-            <DashboardItem title="Payments Today" value={paymentsTodayCount} icon={Banknote} link="/admin/payments" isLoadingValue={isLoadingPaymentsToday}/>
+            <DashboardItem title="Payments Today" value={paymentsTodayCount} icon={Banknote} link="/admin/payments" description="Orders marked paid today." isLoadingValue={isLoadingPaymentsToday}/>
             <DashboardItem title="Pending Approvals" value={pendingApprovalsCount} icon={BadgeHelp} link="/admin/approvals" isLoadingValue={isLoadingPendingApprovals}/>
             <DashboardItem title="Unread Notifications" value={unreadNotificationsCount} icon={MailWarning} link="/admin/notifications" isLoadingValue={isLoadingUnreadNotifications}/>
             <DashboardItem title="System Reports" icon={FileArchive} link="/admin/reports" />
             <DashboardItem title="Customization Hub" icon={Layers} link="/admin/customizations" />
             <DashboardItem title="Shipping Config" icon={Ship} link="/admin/shipping" />
             <DashboardItem title="System Settings" icon={Settings} link="/admin/settings" />
+          </>
+        );
+      case 'FinanceManager':
+        return (
+          <>
+            <DashboardItem title="Payments Today" value={paymentsTodayCount} icon={Banknote} link="/admin/payments" description="Orders marked paid today." isLoadingValue={isLoadingPaymentsToday}/>
+            <DashboardItem title="All Payments" icon={DollarSign} link="/admin/payments" />
+            <DashboardItem title="Invoice Management" icon={FileArchive} link="/invoices" /> 
+            {/* Placeholder, Invoices page not fully implemented for Finance Mgr */}
           </>
         );
       case 'DispatchManager':
@@ -244,7 +266,6 @@ export default function DashboardPage() {
             <DashboardItem title="Full Dispatch Center" value={"Open"} icon={Component} link="/admin/dispatch" description="Access all dispatch tools." />
           </>
         );
-      // Customer case removed
       case 'Technician':
         return (
           <>
@@ -273,7 +294,7 @@ export default function DashboardPage() {
         Hello, {user.displayName || user.email}! Your role is: <span className="font-semibold text-primary">{role || 'Not Assigned'}</span>.
       </p>
       
-      {role !== 'Admin' && role !== 'DispatchManager' && ( // Customer case handled by redirect
+      {role !== 'Admin' && role !== 'DispatchManager' && role !== 'FinanceManager' && (
         <Alert>
           <BarChart className="h-4 w-4 mr-2" />
           <AlertTitle>Data Overview</AlertTitle>
@@ -300,7 +321,15 @@ export default function DashboardPage() {
           </AlertDescription>
         </Alert>
       )}
-      {/* Customer Alert Removed */}
+       {role === 'FinanceManager' && (
+        <Alert variant="default" className="border-green-500/50 bg-green-500/5 text-green-700 dark:text-green-300">
+          <DollarSign className="h-4 w-4 mr-2 text-green-500" />
+          <AlertTitle className="text-green-600 dark:text-green-400">Finance Dashboard</AlertTitle>
+          <AlertDescription className="text-green-600/90 dark:text-green-400/90">
+            Access payment records, transaction histories, and manage financial data. Metrics are updated in real-time.
+          </AlertDescription>
+        </Alert>
+      )}
 
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -308,19 +337,21 @@ export default function DashboardPage() {
       </div>
 
 
-      {role !== 'Admin' && ( // Customer case handled by redirect
+      {role !== 'Admin' && ( 
         <Card>
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            {/* Customer Quick Actions Removed */}
             {(role === 'Technician' || role === 'ServiceManager') && <Link href="/tasks"><Button>View Tasks</Button></Link>}
             {(role === 'Rider') && <Link href="/deliveries"><Button>Manage Deliveries</Button></Link>}
              {role === 'DispatchManager' && <Link href="/admin/dispatch"><Button><Component className="mr-2 h-4 w-4" />Open Dispatch Center</Button></Link>}
+             {role === 'FinanceManager' && <Link href="/admin/payments"><Button><DollarSign className="mr-2 h-4 w-4" />View Payments</Button></Link>}
           </CardContent>
         </Card>
       )}
     </div>
   );
 }
+
+    

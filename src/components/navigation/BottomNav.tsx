@@ -29,7 +29,7 @@ const navItems: NavItem[] = [
   { href: '/admin/dispatch', label: 'Dispatch', icon: SlidersHorizontal, roles: ['DispatchManager', 'Admin'] },
   // { href: '/rider/map', label: 'Route Map', icon: MapPin, roles: ['Rider'] }, // Rider map might be better accessed from delivery details
   { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['Supplier', 'FinanceManager'] },
-  { href: '/payments', label: 'Payments', icon: DollarSign, roles: ['FinanceManager'] },
+  { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['FinanceManager', 'Admin'] }, // Updated for FinanceManager & Admin
   { href: '/inventory', label: 'Inventory', icon: Warehouse, roles: ['InventoryManager', 'SupplyManager'] },
   { href: '/profile', label: 'Profile', icon: UserCircle, roles: [...allAppRoles, 'Admin', null] },
 ];
@@ -106,3 +106,5 @@ export function BottomNav() {
     </nav>
   );
 }
+
+    
