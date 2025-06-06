@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useAuth } from '@/hooks/useAuth';
@@ -7,24 +6,24 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label"; // Added Label import
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft, Save, AlertTriangle, Package, User, Settings2, Truck, CreditCard, GiftIcon, PlusCircle, Edit, Users } from 'lucide-react';
-import type { Order, OrderStatus, Task, User as AppUser, ProductCustomizationOption, DeliveryHistoryEntry, OrderItem as OrderItemType } from '@/types';
+import type { Order, OrderStatus, Task, User as AppUser, DeliveryHistoryEntry, OrderItem as OrderItemType } from '@/types';
 import { Badge } from "@/components/ui/badge";
-import { Separator } from '@/components/ui/separator'; // Corrected import, ensuring quotes are standard
+import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
 import Link from 'next/link';
-import { doc, getDoc, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, Timestamp, arrayUnion } from 'firebase/firestore'; // Added arrayUnion
+import { doc, getDoc, updateDoc, collection, addDoc, serverTimestamp, query, where, getDocs, Timestamp, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format } from 'date-fns'; // Removed formatDistanceToNow as it's not used
+import { format } from 'date-fns';
 
 const taskFormSchema = z.object({
   taskType: z.string().min(1, "Task type is required"),
@@ -49,11 +48,9 @@ const allOrderStatuses: OrderStatus[] = ['pending', 'processing', 'awaiting_assi
 function OrderTaskItem({ task }: { task: Task }) {
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'N/A';
-    // Check if it's a Firebase Timestamp
     if (timestamp && typeof timestamp.toDate === 'function') {
       return format(timestamp.toDate(), 'PPp');
     }
-    // If it's already a Date object or a string that can be parsed
     const date = new Date(timestamp);
     if (isNaN(date.getTime())) return 'Invalid Date';
     return format(date, 'PPp');
@@ -169,23 +166,22 @@ export default function AdminOrderDetailPage() {
       const orderRef = doc(db, 'orders', orderId);
       const newHistoryEntry: DeliveryHistoryEntry = {
         status: data.status as OrderStatus,
-        timestamp: serverTimestamp(), // This is fine for a top-level field or when adding to an array with arrayUnion
+        timestamp: serverTimestamp(), 
         notes: `Status updated to ${data.status} by ${user.displayName || user.email}`,
         actorId: user.uid,
       };
       await updateDoc(orderRef, { 
         status: data.status, 
         updatedAt: serverTimestamp(),
-        deliveryHistory: arrayUnion(newHistoryEntry) // Using arrayUnion to add to the array
+        deliveryHistory: arrayUnion(newHistoryEntry) 
       });
-      // To reflect immediately, we update local state. Firestore listener would be more robust.
+      
       setOrder(prev => prev ? { 
           ...prev, 
           status: data.status as OrderStatus, 
-          // Manually create a client-side timestamp for immediate UI update of history
           deliveryHistory: [...(prev.deliveryHistory || []), {...newHistoryEntry, timestamp: new Date() }] 
       } : null);
-      statusForm.reset({ status: data.status as OrderStatus }); // Reset form to new status
+      statusForm.reset({ status: data.status as OrderStatus }); 
       toast({ title: "Order Status Updated", description: `Order marked as ${data.status}.` });
     } catch (error) {
       console.error("Error updating order status:", error);
@@ -213,7 +209,7 @@ export default function AdminOrderDetailPage() {
       return;
     }
 
-    const newTaskData = { // Explicitly type to match Task structure, excluding fields Firestore generates
+    const newTaskData = { 
       orderId: orderId,
       itemName: currentItemForTask.name,
       taskType: data.taskType,
@@ -229,8 +225,8 @@ export default function AdminOrderDetailPage() {
       const createdTask: Task = { 
         ...newTaskData, 
         id: docRef.id, 
-        createdAt: new Date(), // Client-side approx for immediate UI
-        updatedAt: new Date()  // Client-side approx for immediate UI
+        createdAt: new Date(), 
+        updatedAt: new Date()  
       };
       setOrderTasks(prev => [...prev, createdTask]);
       toast({ title: "Task Created", description: `Task for ${currentItemForTask.name} assigned to ${selectedTechnician.displayName || selectedTechnician.email}.` });
@@ -336,8 +332,7 @@ export default function AdminOrderDetailPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
-            </CardContent>
+              </TableContent>
             <CardFooter className="justify-end font-bold text-lg border-t pt-4">
               Order Total: {formatPrice(order.totalAmount)}
             </CardFooter>
@@ -384,13 +379,16 @@ export default function AdminOrderDetailPage() {
           {/* Payment & Shipping Method */}
           <Card>
             <CardHeader><CardTitle className="font-headline text-lg flex items-center"><CreditCard className="mr-2 h-5 w-5"/>Payment & Method</CardTitle></CardHeader>
-            <CardContent className="space-y-1 text-sm">
-              <p><strong>Payment Method:</strong> <span className="capitalize">{order.paymentMethod?.replace(/_/g, ' ') || 'N/A'}</span></p>
-              <p><strong>Payment Status:</strong> <Badge variant={order.paymentStatus === 'paid' ? 'default' : 'secondary'} className="capitalize">{order.paymentStatus?.replace(/_/g, ' ') || 'N/A'}</Badge></p>
-              {order.transactionId && <p><strong>Transaction ID:</strong> {order.transactionId}</p>}
+            <CardContent className="space-y-2 text-sm">
+              <div><strong>Payment Method:</strong> <span className="capitalize">{order.paymentMethod?.replace(/_/g, ' ') || 'N/A'}</span></div>
+              <div className="flex items-center">
+                <strong className="mr-2">Payment Status:</strong> 
+                <Badge variant={order.paymentStatus === 'paid' ? 'default' : 'secondary'} className="capitalize">{order.paymentStatus?.replace(/_/g, ' ') || 'N/A'}</Badge>
+              </div>
+              {order.transactionId && <div><strong>Transaction ID:</strong> {order.transactionId}</div>}
               <Separator className="my-2"/>
-              <p><strong>Shipping Method:</strong> {order.shippingMethodName || 'N/A'}</p>
-              <p><strong>Shipping Cost:</strong> {formatPrice(order.shippingCost)}</p>
+              <div><strong>Shipping Method:</strong> {order.shippingMethodName || 'N/A'}</div>
+              <div><strong>Shipping Cost:</strong> {formatPrice(order.shippingCost)}</div>
             </CardContent>
           </Card>
           
@@ -472,5 +470,3 @@ export default function AdminOrderDetailPage() {
     </div>
   );
 }
-
-        
