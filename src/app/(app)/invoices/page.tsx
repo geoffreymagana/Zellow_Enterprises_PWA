@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
-import type { Invoice, InvoiceStatus } from "@/types"; // Updated type
+import type { Invoice, InvoiceStatus } from "@/types"; 
 import { FileText, PlusCircle, Search, Download, Eye, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
@@ -26,8 +26,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 const formatKsh = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -36,9 +46,9 @@ const formatKsh = (price: number): string => {
 const getInvoiceStatusBadgeVariant = (status: InvoiceStatus): BadgeProps['variant'] => {
   switch (status) {
     case 'draft': return 'outline';
-    case 'sent': return 'statusBlue'; // Blue for sent by supplier
-    case 'pending_approval': return 'statusYellow'; // Yellow for Finance Manager to approve
-    case 'approved_for_payment': return 'statusAmber'; // Orange when approved, payment pending
+    case 'sent': return 'statusBlue'; 
+    case 'pending_approval': return 'statusYellow'; 
+    case 'approved_for_payment': return 'statusAmber'; 
     case 'paid': return 'statusGreen';
     case 'overdue': return 'statusRed';
     case 'cancelled':
@@ -72,7 +82,7 @@ export default function InvoicesPage() {
     let q;
     if (role === 'Supplier') {
       q = query(collection(db, 'invoices'), where("supplierId", "==", user.uid), orderBy("createdAt", "desc"));
-    } else { // FinanceManager or Admin sees all 'pending_approval' invoices
+    } else { 
       q = query(collection(db, 'invoices'), where("status", "==", "pending_approval"), orderBy("createdAt", "desc"));
     }
     
@@ -111,7 +121,7 @@ export default function InvoicesPage() {
   const handleOpenActionModal = (invoice: Invoice, type: "approve" | "reject") => {
     setActionableInvoice(invoice);
     setActionType(type);
-    setRejectionReason(""); // Clear previous reason
+    setRejectionReason(""); 
     setIsActionModalOpen(true);
   };
 
@@ -123,7 +133,7 @@ export default function InvoicesPage() {
     const updateData: any = {
       status: newStatus,
       updatedAt: serverTimestamp(),
-      financeManagerId: user.uid, // Assuming Finance Manager or Admin is doing this
+      financeManagerId: user.uid, 
       financeManagerName: user.displayName || user.email,
     };
     if (actionType === "reject") {
@@ -136,7 +146,6 @@ export default function InvoicesPage() {
       toast({ title: `Invoice ${actionType === "approve" ? "Approved" : "Rejected"}`, description: `Invoice ${actionableInvoice.invoiceNumber} has been ${newStatus.replace(/_/g, ' ')}.` });
       setIsActionModalOpen(false);
       setActionableInvoice(null);
-      // Invoices list will update via onSnapshot
     } catch (e: any) {
       console.error(`Error ${actionType}ing invoice:`, e);
       toast({ title: "Error", description: `Could not ${actionType} the invoice.`, variant: "destructive" });
@@ -222,7 +231,6 @@ export default function InvoicesPage() {
                           </Button>
                         </>
                       )}
-                      {/* <Button variant="ghost" size="icon" title="Download PDF (Not Implemented Yet)"><Download className="h-4 w-4" /></Button> */}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -233,7 +241,6 @@ export default function InvoicesPage() {
         {(role === 'FinanceManager' || role === 'Admin') && filteredInvoices.length > 0 && (
             <CardFooter className="pt-4 flex justify-between items-center">
                 <p className="text-xs text-muted-foreground">Showing {filteredInvoices.length} invoices pending approval.</p>
-                {/* <Button variant="outline"><Download className="mr-2 h-4 w-4"/>Export All</Button> */}
             </CardFooter>
         )}
          {role === 'Supplier' && filteredInvoices.length > 0 && (
@@ -243,7 +250,6 @@ export default function InvoicesPage() {
         )}
       </Card>
 
-      {/* Action Dialog for Approve/Reject */}
       <Dialog open={isActionModalOpen} onOpenChange={(isOpen) => { if (!isOpen) setActionableInvoice(null); setIsActionModalOpen(isOpen); }}>
         <DialogContent>
           <DialogHeader>
