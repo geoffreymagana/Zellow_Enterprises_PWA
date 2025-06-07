@@ -24,7 +24,7 @@ import {
   LayoutDashboard, Users, Package, ShoppingCart, Layers, DollarSign,
   Truck, Settings as SettingsIcon, UserCircle, LogOutIcon, Menu, Bell,
   FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIconLucide, ListChecks,
-  Aperture, Coins, Warehouse
+  Aperture, Coins, Warehouse, PackageSearch
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
@@ -47,7 +47,9 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   const baseAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager'] },
     { href: '/admin/users', label: 'Users', icon: Users, roles: ['Admin'] },
-    { href: '/admin/products', label: 'Products', icon: Package, roles: ['Admin'] }, // InventoryManager uses /inventory
+    { href: '/admin/products', label: 'Products', icon: Package, roles: ['Admin'] },
+    { href: '/inventory', label: 'Inventory Mgt', icon: Warehouse, roles: ['Admin', 'InventoryManager'] }, // Admin can oversee
+    { href: '/inventory/receivership', label: 'Receive Stock', icon: PackageSearch, roles: ['Admin', 'InventoryManager'] }, // Admin can oversee
     { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, roles: ['Admin', 'ServiceManager'] },
     { href: '/admin/customizations', label: 'Customizations', icon: Layers, roles: ['Admin'] },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'] },
@@ -304,7 +306,10 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
                               {role === 'Technician' && <Link href="/tasks" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/tasks") ? "bg-muted text-primary font-semibold" : ""}`}><ListChecks className="mr-2 h-4 w-4" />Tasks</Link>}
                               {role === 'Rider' && <Link href="/deliveries" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/deliveries") ? "bg-muted text-primary font-semibold" : ""}`}><Truck className="mr-2 h-4 w-4" />Deliveries</Link>}
                               {role === 'Supplier' && <Link href="/supplier/stock-requests" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/supplier/stock-requests") ? "bg-muted text-primary font-semibold" : ""}`}><Warehouse className="mr-2 h-4 w-4" />Stock Requests</Link>}
-                              {role === 'InventoryManager' && <Link href="/inventory" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/inventory") ? "bg-muted text-primary font-semibold" : ""}`}><Package className="mr-2 h-4 w-4" />Inventory</Link>}
+                              {role === 'InventoryManager' && (<>
+                                <Link href="/inventory" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/inventory") && !pathname.startsWith("/inventory/receivership") ? "bg-muted text-primary font-semibold" : ""}`}><Package className="mr-2 h-4 w-4" />Inventory</Link>
+                                <Link href="/inventory/receivership" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/inventory/receivership") ? "bg-muted text-primary font-semibold" : ""}`}><PackageSearch className="mr-2 h-4 w-4" />Receive Stock</Link>
+                              </>)}
                               <Link href="/profile" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/profile" ? "bg-muted text-primary font-semibold" : ""}`}><UserCircle className="mr-2 h-4 w-4" />Profile</Link>
                           </nav>
                         </ScrollArea>
@@ -355,4 +360,3 @@ export default function AppGroupLayout({ children }: LayoutProps) {
 
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
-

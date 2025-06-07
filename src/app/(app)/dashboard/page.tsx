@@ -4,7 +4,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon, BadgeHelp, MailWarning, Banknote, CheckCircle2, Warehouse, ListChecks, PackageX } from 'lucide-react';
+import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon, BadgeHelp, MailWarning, Banknote, CheckCircle2, Warehouse, ListChecks, PackageX, PackageSearch } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState, useCallback } from 'react';
@@ -71,6 +71,10 @@ export default function DashboardPage() {
 
   const [pendingStockRequestsCount, setPendingStockRequestsCount] = useState<number | string>("..."); // Admin & InventoryManager
   const [isLoadingPendingStockRequests, setIsLoadingPendingStockRequests] = useState(true);
+  
+  const [itemsAwaitingReceiptCount, setItemsAwaitingReceiptCount] = useState<number | string>("..."); // Admin & InventoryManager
+  const [isLoadingItemsAwaitingReceipt, setIsLoadingItemsAwaitingReceipt] = useState(true);
+
 
   // Dispatch Manager specific state
   const [activeRidersCount, setActiveRidersCount] = useState<number | string>("...");
@@ -98,6 +102,7 @@ export default function DashboardPage() {
       
       const ordersCol = collection(db, 'orders');
       const productsCol = collection(db, 'products');
+      const stockRequestsCol = collection(db, 'stockRequests');
 
       // Fetch all products for Admin and InventoryManager for detailed stats
       if (role === 'Admin' || role === 'InventoryManager') {
@@ -112,32 +117,40 @@ export default function DashboardPage() {
           setTotalInventoryValue(fetchedProducts.reduce((acc, p) => acc + (p.price * p.stock), 0));
           
           setIsLoadingAllProductsForStats(false);
-          if (role === 'InventoryManager') setIsLoadingPendingStockRequests(true); // Trigger stock requests fetch next
         }, (error) => {
           console.error("Error fetching all products for stats:", error);
           setTotalProductCount("Error"); setLowStockItemsCount("Error"); setOutOfStockItemsCount("Error"); setTotalInventoryValue("Error");
           setIsLoadingAllProductsForStats(false);
         });
         unsubscribers.push(unsubAllProducts);
+
+        // Items Awaiting Receipt (for Inventory Manager & Admin)
+        setIsLoadingItemsAwaitingReceipt(true);
+        const qItemsAwaitingReceipt = query(stockRequestsCol, where("status", "==", "awaiting_receipt"));
+        const unsubItemsAwaitingReceipt = onSnapshot(qItemsAwaitingReceipt, (snapshot) => {
+            setItemsAwaitingReceiptCount(snapshot.size);
+            setIsLoadingItemsAwaitingReceipt(false);
+        }, (error) => {
+            console.error("Error fetching items awaiting receipt count:", error); setItemsAwaitingReceiptCount("Error"); setIsLoadingItemsAwaitingReceipt(false);
+        });
+        unsubscribers.push(unsubItemsAwaitingReceipt);
       } else {
         setIsLoadingAllProductsForStats(false);
+        setIsLoadingItemsAwaitingReceipt(false);
       }
       
-      // Fetch pending stock requests for Admin and Inventory Manager
+      // Fetch pending stock requests for Admin and Inventory Manager (requests they initiated or need to action)
       if (role === 'Admin' || role === 'InventoryManager') {
         setIsLoadingPendingStockRequests(true);
-        const stockRequestsCol = collection(db, 'stockRequests');
-        // Admins see all pending, InventoryManagers see requests that might need their attention or are from them.
-        // For dashboard stat, let's show Inventory Manager ones they initiated that are pending ANY approval, Admins see ALL pending any approval.
         let qPendingStockRequests;
-        if (role === 'InventoryManager') {
+        if (role === 'InventoryManager') { // IM sees requests they initiated
             qPendingStockRequests = query(stockRequestsCol, 
                 where("requesterId", "==", user.uid), 
-                where("status", "in", ["pending_finance_approval", "pending_supplier_fulfillment"])
+                where("status", "in", ["pending_finance_approval", "pending_supplier_fulfillment"]) // Added awaiting_receipt here if IM needs to track them through
             );
-        } else { // Admin
+        } else { // Admin sees ALL requests that need some form of approval/action
              qPendingStockRequests = query(stockRequestsCol, 
-                where("status", "in", ["pending_finance_approval", "pending_supplier_fulfillment"])
+                where("status", "in", ["pending_finance_approval", "pending_supplier_fulfillment", "awaiting_receipt"])
             );
         }
         const unsubPendingStockRequests = onSnapshot(qPendingStockRequests, (snapshot) => {
@@ -341,6 +354,7 @@ export default function DashboardPage() {
             <DashboardItem title="Out of Stock Items" value={outOfStockItemsCount} icon={PackageX} link="/inventory?filter=outofstock" description="Items with 0 stock." isLoadingValue={isLoadingAllProductsForStats} />
             <DashboardItem title="Inventory Value" value={totalInventoryValue} icon={DollarSign} link="/inventory" description="Total value of stock." isLoadingValue={isLoadingAllProductsForStats} isPrice />
             <DashboardItem title="Pending Stock Requests" value={pendingStockRequestsCount} icon={ListChecks} link="/finance/approvals" description="Stock requests needing action." isLoadingValue={isLoadingPendingStockRequests} />
+            <DashboardItem title="Items Awaiting Receipt" value={itemsAwaitingReceiptCount} icon={PackageSearch} link="/inventory/receivership" description="Items from suppliers to be confirmed." isLoadingValue={isLoadingItemsAwaitingReceipt} />
             <DashboardItem title="Total Orders" value={totalOrderCount} icon={ShoppingCart} link="/admin/orders" description="All customer orders." isLoadingValue={isLoadingOrderCount} />
             <DashboardItem title="Active Deliveries" value={activeDeliveriesCountAdmin} icon={Truck} link="/admin/deliveries" description="Ongoing deliveries." isLoadingValue={isLoadingActiveDeliveriesAdmin} />
             <DashboardItem title="Payments Today" value={paymentsTodayCount} icon={Banknote} link="/admin/payments" description="Orders marked paid today." isLoadingValue={isLoadingPaymentsToday}/>
@@ -358,7 +372,7 @@ export default function DashboardPage() {
             <DashboardItem title="Payments Today" value={paymentsTodayCount} icon={Banknote} link="/admin/payments" description="Orders marked paid today." isLoadingValue={isLoadingPaymentsToday}/>
             <DashboardItem title="All Payments" icon={DollarSign} link="/admin/payments" />
             <DashboardItem title="Invoice Management" icon={FileArchive} link="/invoices" /> 
-            <DashboardItem title="Stock Request Approvals" icon={ListChecks} link="/finance/approvals" description="Approve/reject stock requests." isLoadingValue={isLoadingPendingStockRequests} />
+            <DashboardItem title="Stock Request Approvals" value={pendingStockRequestsCount} icon={ListChecks} link="/finance/approvals" description="Approve/reject stock requests." isLoadingValue={isLoadingPendingStockRequests} />
           </>
         );
       case 'DispatchManager':
@@ -378,6 +392,7 @@ export default function DashboardPage() {
             <DashboardItem title="Out of Stock Items" value={outOfStockItemsCount} icon={PackageX} link="/inventory?filter=outofstock" description="Items with 0 stock." isLoadingValue={isLoadingAllProductsForStats} />
             <DashboardItem title="Total Inventory Value" value={totalInventoryValue} icon={DollarSign} link="/inventory" description="Estimated value of current stock." isLoadingValue={isLoadingAllProductsForStats} isPrice />
             <DashboardItem title="My Pending Stock Requests" value={pendingStockRequestsCount} icon={ShoppingCart} link="/inventory#requests" description="Track your requests." isLoadingValue={isLoadingPendingStockRequests} />
+            <DashboardItem title="Items Awaiting Receipt" value={itemsAwaitingReceiptCount} icon={PackageSearch} link="/inventory/receivership" description="Items from suppliers to be confirmed." isLoadingValue={isLoadingItemsAwaitingReceipt} />
             <DashboardItem title="All Inventory" value={"View"} icon={Warehouse} link="/inventory" description="Manage stock levels." />
           </>
         );

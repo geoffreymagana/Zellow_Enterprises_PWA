@@ -17,11 +17,15 @@ import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea';
 import { Input } from '@/components/ui/input'; // For fulfilled quantity
+import { Label } from '@/components/ui/label';
+
 
 const getStockRequestStatusVariant = (status: StockRequestStatus): BadgeProps['variant'] => {
   switch (status) {
     case 'pending_finance_approval': return 'statusYellow';
     case 'pending_supplier_fulfillment': return 'statusAmber';
+    case 'awaiting_receipt': return 'statusBlue'; // Changed from fulfilled to blue
+    case 'received': return 'statusGreen'; // If suppliers ever see this
     case 'fulfilled': return 'statusGreen';
     case 'rejected_finance':
     case 'rejected_supplier':
@@ -51,13 +55,10 @@ export default function SupplierStockRequestsPage() {
       return () => {};
     }
     setIsLoading(true);
-    // Suppliers should see requests assigned to them OR all requests pending supplier fulfillment
-    // This example assumes a simple model where suppliers see all 'pending_supplier_fulfillment'
-    // A more complex model would filter by `supplierId` on the StockRequest
     const q = query(
         collection(db, 'stockRequests'), 
         where("status", "==", "pending_supplier_fulfillment"),
-        // where("supplierId", "==", user.uid), // Uncomment and adapt if requests are directly assigned
+        // where("supplierId", "==", user.uid), // If direct assignment
         orderBy("createdAt", "desc")
     );
     
@@ -84,7 +85,7 @@ export default function SupplierStockRequestsPage() {
 
   const handleOpenFulfillModal = (request: StockRequest) => {
     setActionableRequest(request);
-    setFulfilledQuantity(request.requestedQuantity); // Default to requested quantity
+    setFulfilledQuantity(request.requestedQuantity); 
     setSupplierNotes("");
     setIsFulfillModalOpen(true);
   };
@@ -106,26 +107,21 @@ export default function SupplierStockRequestsPage() {
     try {
       const requestRef = doc(db, 'stockRequests', actionableRequest.id);
       await updateDoc(requestRef, {
-        status: 'fulfilled',
-        supplierId: user.uid, // Record which supplier fulfilled it
+        status: 'awaiting_receipt', // Changed status
+        supplierId: user.uid, 
         supplierName: user.displayName || user.email,
         supplierActionTimestamp: serverTimestamp(),
         supplierNotes: supplierNotes || (numFulfilledQuantity < actionableRequest.requestedQuantity ? "Partially fulfilled." : "Fulfilled as requested."),
         fulfilledQuantity: numFulfilledQuantity,
         updatedAt: serverTimestamp(),
       });
-      // TODO: In a real app, you would also update the product's stock level here.
-      // This might involve a transaction if multiple products/requests are handled.
-      // Example:
-      // const productRef = doc(db, 'products', actionableRequest.productId);
-      // await updateDoc(productRef, { stock: increment(numFulfilledQuantity) }); // Requires `increment` from firebase/firestore
-
-      toast({ title: "Request Fulfilled", description: `Stock request for ${actionableRequest.productName} marked as fulfilled.` });
+      
+      toast({ title: "Request Marked as Fulfilled", description: `Stock request for ${actionableRequest.productName} is now awaiting receipt by Inventory Manager.` });
       setIsFulfillModalOpen(false);
       setActionableRequest(null);
     } catch (e: any) {
       console.error("Error fulfilling request:", e);
-      toast({ title: "Error", description: "Could not fulfill the request.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not mark request as fulfilled.", variant: "destructive" });
     } finally {
       setIsSubmittingFulfillment(false);
     }

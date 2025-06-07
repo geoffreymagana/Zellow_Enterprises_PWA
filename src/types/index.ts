@@ -5,7 +5,6 @@ export type UserRole =
   | 'Technician'
   | 'Rider'
   | 'Supplier'
-  // | 'SupplyManager' // Removed
   | 'FinanceManager'
   | 'ServiceManager'
   | 'InventoryManager'
@@ -255,7 +254,9 @@ export interface CustomizationGroupDefinition {
 export type StockRequestStatus = 
   | 'pending_finance_approval'
   | 'pending_supplier_fulfillment'
-  | 'fulfilled'
+  | 'awaiting_receipt' // New status: Supplier has fulfilled, waiting for IM to receive
+  | 'received' // New status: IM has confirmed receipt and updated stock
+  | 'fulfilled' // Kept for backward compatibility or if direct fulfillment without IM check is needed
   | 'rejected_finance'
   | 'rejected_supplier'
   | 'cancelled';
@@ -277,8 +278,15 @@ export interface StockRequest {
   supplierNotes?: string; // Notes from supplier, e.g., partial fulfillment
   fulfilledQuantity?: number; // Quantity actually fulfilled by supplier
   supplierActionTimestamp?: any; // Firestore Timestamp
+  
+  // New fields for Inventory Manager receipt
+  inventoryManagerReceiptNotes?: string;
+  receivedQuantity?: number; // Actual quantity received by IM
+  receivedById?: string; // IM UID
+  receivedByName?: string; // IM Name
+  receivedAt?: any; // Firestore Timestamp
+
   createdAt: any; // Firestore Timestamp
   updatedAt: any; // Firestore Timestamp
   notes?: string; // General notes by requester
 }
-
