@@ -4,18 +4,18 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge, BadgeProps } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle, PackageSearch, RefreshCw, Edit } from 'lucide-react';
 import type { StockRequest, StockRequestStatus, Product } from '@/types';
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, runTransaction, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -23,9 +23,9 @@ const getStockRequestStatusVariant = (status: StockRequestStatus): BadgeProps['v
   switch (status) {
     case 'pending_finance_approval': return 'statusYellow';
     case 'pending_supplier_fulfillment': return 'statusAmber';
-    case 'awaiting_receipt': return 'statusBlue';
-    case 'received': return 'statusGreen';
-    case 'fulfilled': return 'statusGreen'; // Should ideally not be seen here often
+    case 'awaiting_receipt': return 'statusBlue'; 
+    case 'received': return 'statusGreen'; 
+    case 'fulfilled': return 'statusGreen'; 
     case 'rejected_finance':
     case 'rejected_supplier':
     case 'cancelled': 
@@ -57,7 +57,7 @@ export default function InventoryReceivershipPage() {
     const q = query(
         collection(db, 'stockRequests'), 
         where("status", "==", "awaiting_receipt"),
-        orderBy("supplierActionTimestamp", "desc") // Order by when supplier fulfilled
+        orderBy("supplierActionTimestamp", "desc") 
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -83,7 +83,7 @@ export default function InventoryReceivershipPage() {
 
   const handleOpenReceiveModal = (request: StockRequest) => {
     setActionableRequest(request);
-    setReceivedQuantity(request.fulfilledQuantity || request.requestedQuantity); // Default to what supplier sent
+    setReceivedQuantity(request.fulfilledQuantity || request.requestedQuantity); 
     setReceiptNotes("");
     setIsReceiveModalOpen(true);
   };
@@ -92,12 +92,10 @@ export default function InventoryReceivershipPage() {
     if (!db || !user || !actionableRequest || receivedQuantity === "") return;
     
     const numReceivedQuantity = Number(receivedQuantity);
-    if (isNaN(numReceivedQuantity) || numReceivedQuantity < 0) { // Allow 0 if nothing was received despite supplier claim
+    if (isNaN(numReceivedQuantity) || numReceivedQuantity < 0) { 
       toast({ title: "Invalid Quantity", description: "Received quantity must be a non-negative number.", variant: "destructive" });
       return;
     }
-    // Note: We don't check against fulfilledQuantity from supplier here, as IM is confirming actuals.
-    // They might receive less than what supplier claimed.
 
     setIsSubmittingReceipt(true);
     try {
@@ -105,7 +103,6 @@ export default function InventoryReceivershipPage() {
         const stockRequestRef = doc(db, 'stockRequests', actionableRequest.id);
         const productRef = doc(db, 'products', actionableRequest.productId);
 
-        // 1. Get current product stock
         const productDoc = await transaction.get(productRef);
         if (!productDoc.exists()) {
           throw new Error("Product not found in inventory.");
@@ -113,7 +110,6 @@ export default function InventoryReceivershipPage() {
         const currentStock = productDoc.data().stock as number;
         const newStock = currentStock + numReceivedQuantity;
 
-        // 2. Update StockRequest
         transaction.update(stockRequestRef, {
           status: 'received',
           receivedQuantity: numReceivedQuantity,
@@ -124,7 +120,6 @@ export default function InventoryReceivershipPage() {
           updatedAt: serverTimestamp(),
         });
 
-        // 3. Update Product Stock
         transaction.update(productRef, {
           stock: newStock,
           updatedAt: serverTimestamp()
@@ -134,7 +129,7 @@ export default function InventoryReceivershipPage() {
       toast({ title: "Stock Received", description: `Receipt for ${actionableRequest.productName} confirmed. Stock updated.` });
       setIsReceiveModalOpen(false);
       setActionableRequest(null);
-      fetchRequests(); // Re-fetch to update the list
+      fetchRequests(); 
     } catch (e: any) {
       console.error("Error confirming receipt:", e);
       toast({ title: "Error", description: e.message || "Could not confirm receipt.", variant: "destructive" });
@@ -246,3 +241,5 @@ export default function InventoryReceivershipPage() {
     </div>
   );
 }
+
+    
