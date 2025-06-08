@@ -48,7 +48,7 @@ export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) 
 
 
   return (
-    <ChartContainer config={chartConfig} className="aspect-auto h-full w-full"> {/* Changed min-h to aspect-auto h-full */}
+    <ChartContainer config={chartConfig} className="h-full w-full">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
             accessibilityLayer
@@ -77,7 +77,7 @@ export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) 
             tickLine={false}
             axisLine={false}
             tickMargin={5}
-            width={100} 
+            width={120} // Increased width for longer product names
             className="text-xs truncate"
             interval={0} 
             />
