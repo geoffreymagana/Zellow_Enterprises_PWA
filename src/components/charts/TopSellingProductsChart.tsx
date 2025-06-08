@@ -3,12 +3,9 @@
 
 import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import { TrendingUp } from "lucide-react"
-
 import {
-  ChartContainer,
   ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart"
+} from "@/components/ui/chart" // ChartContainer is not needed if we manually handle layout
 
 export interface ProductSalesData {
   name: string;
@@ -17,23 +14,48 @@ export interface ProductSalesData {
 }
 
 interface TopSellingProductsChartProps {
-  data: ProductSalesData[];
+  data: ProductSalesData[]; // Expecting top 5 products
 }
 
-const chartConfig = {
-  totalRevenue: {
-    label: "Total Revenue",
-    color: "hsl(var(--chart-1))",
-  },
-  totalQuantity: {
-    label: "Total Quantity Sold",
-    color: "hsl(var(--chart-2))",
-  },
-} satisfies ChartConfig;
+const chartColors = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+];
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
 };
+
+const formatAxisCurrency = (value: number): string => {
+  if (Math.abs(value) >= 1000000) {
+    return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  }
+  if (Math.abs(value) >= 1000) {
+    return (value / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  }
+  return value.toString();
+};
+
+const CustomLegendContent = ({ payload }: any) => {
+  if (!payload) return null;
+  return (
+    <ul className="space-y-1">
+      {payload.map((entry: any, index: number) => (
+        <li key={`item-${index}`} className="flex items-center text-xs">
+          <span
+            className="inline-block w-2.5 h-2.5 rounded-full mr-1.5"
+            style={{ backgroundColor: entry.color }}
+          />
+          <span className="truncate max-w-[100px] sm:max-w-[120px]" title={entry.payload.name}>{entry.payload.name}</span>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
 
 export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) {
   if (!data || data.length === 0) {
@@ -46,10 +68,9 @@ export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) 
   
   const sortedData = [...data].sort((a,b) => a.totalRevenue - b.totalRevenue);
 
-
   return (
-    <ChartContainer config={chartConfig} className="h-full w-full">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="h-full w-full flex">
+      <ResponsiveContainer width="70%" height="100%">
         <BarChart
             accessibilityLayer
             data={sortedData}
@@ -61,30 +82,30 @@ export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) 
             bottom: 5,
             }}
         >
-            <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+            <CartesianGrid horizontal={false} strokeDasharray="3 3" className="stroke-border/50" />
             <XAxis 
                 type="number" 
                 dataKey="totalRevenue" 
-                tickFormatter={(value) => formatCurrency(value as number)}
+                tickFormatter={(value) => formatAxisCurrency(value as number)}
                 tickLine={true}
                 axisLine={false}
                 tickMargin={5}
-                className="text-xs"
+                className="text-xs fill-muted-foreground"
             />
             <YAxis
             dataKey="name"
             type="category"
             tickLine={false}
             axisLine={false}
-            tickMargin={5}
-            width={100} 
-            className="text-xs truncate"
+            tickFormatter={() => ''} // Hide Y-axis text labels
+            width={0} // Effectively hides the axis space
             interval={0} 
             />
             <Tooltip 
                 cursor={{ fill: "hsl(var(--muted))" }} 
                 content={<ChartTooltipContent 
                     formatter={(value, name, props) => {
+                        // Assuming the payload contains the full product info
                         if (name === "totalRevenue") {
                             return (
                                 <div className="flex flex-col text-xs min-w-[150px]">
@@ -99,21 +120,29 @@ export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) 
                     hideLabel 
                 />}
             />
-            <Bar dataKey="totalRevenue" fill="var(--color-totalRevenue)" radius={4}>
+            <Bar dataKey="totalRevenue" radius={4}>
+              {sortedData.map((entry, index) => (
+                <TrendingUp key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
+              ))}
             <LabelList
                 dataKey="totalRevenue"
                 position="right"
                 offset={8}
                 className="fill-foreground text-[10px]"
-                formatter={(value: number) => formatCurrency(value)}
+                formatter={(value: number) => formatAxisCurrency(value)}
             />
             </Bar>
         </BarChart>
       </ResponsiveContainer>
-    </ChartContainer>
+      <div className="w-[30%] h-full flex flex-col justify-center items-start pl-3 pr-1 text-xs overflow-y-auto">
+         <CustomLegendContent payload={
+            sortedData.map((entry, index) => ({
+                value: entry.name,
+                color: chartColors[index % chartColors.length],
+                payload: entry // Pass the full entry for legend to access name
+            })).reverse() // Reverse to match chart order (top bar is last in sortedData)
+        } />
+      </div>
+    </div>
   )
 }
-
-    
-
-    

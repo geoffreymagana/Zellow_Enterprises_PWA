@@ -84,12 +84,14 @@ export default function FinancialsPage() {
 
         order.items.forEach((item: FirestoreOrderItem) => {
           const product = productsMap.get(item.productId);
-          const baseProductPrice = product ? product.price : (item.price / item.quantity); 
+          // Use item.price (which is unit price at time of sale including customizations)
+          // And product.price (base product price) to differentiate.
+          const baseProductPrice = product ? product.price : (item.price / item.quantity); // Fallback if product not found
 
           revenueFromProductSales += baseProductPrice * item.quantity;
           
-          const itemTotalBasePrice = baseProductPrice * item.quantity;
-          const customizationRevenueForItem = item.price - itemTotalBasePrice;
+          // Customization revenue is the difference between item's sale price and its base price, times quantity
+          const customizationRevenueForItem = (item.price - baseProductPrice) * item.quantity;
           if (customizationRevenueForItem > 0) {
             revenueFromCustomizations += customizationRevenueForItem;
           }
@@ -138,7 +140,7 @@ export default function FinancialsPage() {
 
       const dailyDataForMonthChart: DailyDataPoint[] = daysInTargetMonth.map(day => ({
         day: format(day, 'MMM dd'),
-        dateObject: day, // Store the full date object
+        dateObject: day,
         revenue: 0,
         expenses: 0,
       }));
@@ -200,7 +202,7 @@ export default function FinancialsPage() {
       });
       const topProductsArray = Object.values(productSalesAgg)
         .sort((a,b) => b.totalRevenue - a.totalRevenue)
-        .slice(0, 7); 
+        .slice(0, 5); // Get top 5 products
       setTopProductsData(topProductsArray);
 
 
@@ -309,7 +311,7 @@ export default function FinancialsPage() {
             <CardTitle className="font-headline text-lg">Revenue Breakdown by Source</CardTitle>
             <CardDescription>Contribution of different revenue streams.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[320px] sm:h-[360px] md:h-[400px] w-full pb-0">
+          <CardContent className="h-[360px] sm:h-[420px] md:h-[480px] lg:h-[520px] w-full pb-0">
              {revenueBreakdownData.length > 0 ? (
                 <RevenueBreakdownChart data={revenueBreakdownData} />
              ) : (
@@ -325,7 +327,7 @@ export default function FinancialsPage() {
             <CardTitle className="font-headline text-lg">Top Selling Products (by Revenue)</CardTitle>
             <CardDescription>Performance of best-selling items based on revenue from paid orders.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[320px] sm:h-[360px] md:h-[400px] w-full pb-0">
+          <CardContent className="h-[360px] sm:h-[420px] md:h-[480px] lg:h-[520px] w-full pb-0">
              {topProductsData.length > 0 ? (
                 <TopSellingProductsChart data={topProductsData} />
              ) : (
@@ -350,6 +352,3 @@ export default function FinancialsPage() {
     </div>
   );
 }
-    
-
-    
