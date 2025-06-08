@@ -1,11 +1,13 @@
 
 "use client"
 
-import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
+import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts" // Added Cell
 import { TrendingUp } from "lucide-react"
 import {
+  ChartContainer, // Import ChartContainer
   ChartTooltipContent,
-} from "@/components/ui/chart" // ChartContainer is not needed if we manually handle layout
+  type ChartConfig, // Import ChartConfig
+} from "@/components/ui/chart"
 
 export interface ProductSalesData {
   name: string;
@@ -56,6 +58,13 @@ const CustomLegendContent = ({ payload }: any) => {
   );
 };
 
+// Minimal chart config for the tooltip context
+const chartConfig = {
+  totalRevenue: {
+    label: "Total Revenue",
+  },
+} satisfies ChartConfig;
+
 
 export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) {
   if (!data || data.length === 0) {
@@ -70,77 +79,78 @@ export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) 
 
   return (
     <div className="h-full w-full flex">
-      <ResponsiveContainer width="70%" height="100%">
-        <BarChart
-            accessibilityLayer
-            data={sortedData}
-            layout="vertical"
-            margin={{
-            left: 5, 
-            right: 30, 
-            top: 5,
-            bottom: 5,
-            }}
-        >
-            <CartesianGrid horizontal={false} strokeDasharray="3 3" className="stroke-border/50" />
-            <XAxis 
-                type="number" 
-                dataKey="totalRevenue" 
-                tickFormatter={(value) => formatAxisCurrency(value as number)}
-                tickLine={true}
-                axisLine={false}
-                tickMargin={5}
-                className="text-xs fill-muted-foreground"
-            />
-            <YAxis
-            dataKey="name"
-            type="category"
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={() => ''} // Hide Y-axis text labels
-            width={0} // Effectively hides the axis space
-            interval={0} 
-            />
-            <Tooltip 
-                cursor={{ fill: "hsl(var(--muted))" }} 
-                content={<ChartTooltipContent 
-                    formatter={(value, name, props) => {
-                        // Assuming the payload contains the full product info
-                        if (name === "totalRevenue") {
-                            return (
-                                <div className="flex flex-col text-xs min-w-[150px]">
-                                    <span className="font-medium">{props.payload.name}</span>
-                                    <span className="font-bold text-foreground">{formatCurrency(value as number)}</span>
-                                    <span className="text-muted-foreground">Qty: {props.payload.totalQuantity}</span>
-                                </div>
-                            )
-                        }
-                         return null;
-                    }}
-                    hideLabel 
-                />}
-            />
-            <Bar dataKey="totalRevenue" radius={4}>
-              {sortedData.map((entry, index) => (
-                <TrendingUp key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
-              ))}
-            <LabelList
-                dataKey="totalRevenue"
-                position="right"
-                offset={8}
-                className="fill-foreground text-[10px]"
-                formatter={(value: number) => formatAxisCurrency(value)}
-            />
-            </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+      <ChartContainer config={chartConfig} className="h-full w-full flex-1"> {/* Wrap with ChartContainer */}
+        <ResponsiveContainer width="70%" height="100%">
+          <BarChart
+              accessibilityLayer
+              data={sortedData}
+              layout="vertical"
+              margin={{
+              left: 5, 
+              right: 30, 
+              top: 5,
+              bottom: 5,
+              }}
+          >
+              <CartesianGrid horizontal={false} strokeDasharray="3 3" className="stroke-border/50" />
+              <XAxis 
+                  type="number" 
+                  dataKey="totalRevenue" 
+                  tickFormatter={(value) => formatAxisCurrency(value as number)}
+                  tickLine={true}
+                  axisLine={false}
+                  tickMargin={5}
+                  className="text-xs fill-muted-foreground"
+              />
+              <YAxis
+              dataKey="name"
+              type="category"
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={() => ''} 
+              width={0} 
+              interval={0} 
+              />
+              <Tooltip 
+                  cursor={{ fill: "hsl(var(--muted))" }} 
+                  content={<ChartTooltipContent 
+                      formatter={(value, name, props) => {
+                          if (name === "totalRevenue") {
+                              return (
+                                  <div className="flex flex-col text-xs min-w-[150px]">
+                                      <span className="font-medium">{props.payload.name}</span>
+                                      <span className="font-bold text-foreground">{formatCurrency(value as number)}</span>
+                                      <span className="text-muted-foreground">Qty: {props.payload.totalQuantity}</span>
+                                  </div>
+                              )
+                          }
+                          return null;
+                      }}
+                      hideLabel 
+                  />}
+              />
+              <Bar dataKey="totalRevenue" radius={4}>
+                {sortedData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
+                ))}
+              <LabelList
+                  dataKey="totalRevenue"
+                  position="right"
+                  offset={8}
+                  className="fill-foreground text-[10px]"
+                  formatter={(value: number) => formatAxisCurrency(value)}
+              />
+              </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </ChartContainer>
       <div className="w-[30%] h-full flex flex-col justify-center items-start pl-3 pr-1 text-xs overflow-y-auto">
          <CustomLegendContent payload={
             sortedData.map((entry, index) => ({
                 value: entry.name,
                 color: chartColors[index % chartColors.length],
-                payload: entry // Pass the full entry for legend to access name
-            })).reverse() // Reverse to match chart order (top bar is last in sortedData)
+                payload: entry 
+            })).reverse() 
         } />
       </div>
     </div>
