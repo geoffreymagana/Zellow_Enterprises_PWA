@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Trash2, PlusCircle, MinusCircle, ShoppingCart, ArrowLeft, CreditCard } from 'lucide-react';
+import { Trash2, PlusCircle, MinusCircle, ShoppingCart, ArrowLeft, CreditCard, Image as ImageIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Separator } from '@/components/ui/separator';
@@ -76,9 +76,17 @@ export default function CartPage() {
                           <p className="mt-1 text-sm text-muted-foreground">Unit Price: {formatPrice(item.currentPrice)}</p>
                           {item.customizations && Object.keys(item.customizations).length > 0 && (
                             <div className="mt-1 text-xs text-muted-foreground">
-                              {Object.entries(item.customizations).map(([key, value]) => (
-                                <span key={key} className="block capitalize">{key.replace(/_/g, ' ')}: {String(value)}</span>
-                              ))}
+                              {Object.entries(item.customizations).map(([key, value]) => {
+                                const isCloudinaryUrl = typeof value === 'string' && value.includes('res.cloudinary.com');
+                                const displayValue = isCloudinaryUrl ? (
+                                  <a href={value} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center">
+                                    <ImageIcon className="h-3 w-3 mr-1" /> View Image
+                                  </a>
+                                ) : String(value);
+                                return (
+                                  <span key={key} className="block capitalize">{key.replace(/_/g, ' ')}: {displayValue}</span>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
@@ -131,3 +139,4 @@ export default function CartPage() {
     </div>
   );
 }
+

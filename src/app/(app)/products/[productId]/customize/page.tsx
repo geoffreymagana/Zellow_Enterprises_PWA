@@ -19,12 +19,16 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from "zod";
-import { Loader2, AlertTriangle, ArrowLeft, ShoppingCart } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, ShoppingCart, UploadCloud, ImagePlus, CheckCircleIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Progress } from '@/components/ui/progress';
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
 };
+
+const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
 export default function CustomizeProductPage() {
   const params = useParams();
@@ -44,7 +48,9 @@ export default function CustomizeProductPage() {
 
   const [customizationSchema, setCustomizationSchema] = useState<z.ZodObject<any> | null>(null);
   const [defaultFormValues, setDefaultFormValues] = useState<Record<string, any>>({});
-  
+
+  const [uploadStates, setUploadStates] = useState<Record<string, { progress: number; error?: string; uploading: boolean; url?: string }>>({});
+
   const form = useForm<Record<string, any>>({
     resolver: customizationSchema ? zodResolver(customizationSchema) : undefined,
     defaultValues: defaultFormValues,
@@ -67,6 +73,8 @@ export default function CustomizeProductPage() {
       if (opt.type === 'checkbox' && selectedValue === true && (opt as any).priceAdjustmentIfChecked) {
         calculatedPrice += (opt as any).priceAdjustmentIfChecked;
       }
+      // Note: Image uploads typically don't have direct price adjustments in this model,
+      // but if they did, logic would go here.
     });
     setCurrentPrice(calculatedPrice);
   }, [product, resolvedOptions, form]);
@@ -80,7 +88,7 @@ export default function CustomizeProductPage() {
     }
     setIsLoading(true);
     setError(null);
-    setCustomizationSchema(null); // Reset schema on new fetch
+    setCustomizationSchema(null);
     setDefaultFormValues({});
 
     try {
@@ -117,6 +125,7 @@ export default function CustomizeProductPage() {
         if (finalOptions.length > 0) {
           const shape: Record<string, z.ZodTypeAny> = {};
           const newDefaultValues: Record<string, any> = {};
+          const initialUploadStates: Record<string, any> = {};
 
           finalOptions.forEach(opt => {
             let fieldSchema: z.ZodTypeAny;
@@ -139,8 +148,9 @@ export default function CustomizeProductPage() {
                 newDefaultValues[opt.id] = typeof opt.defaultValue === 'boolean' ? opt.defaultValue : false;
                 break;
               case 'image_upload':
-                fieldSchema = z.string().url({ message: "Please enter a valid image URL." }).optional().or(z.literal(''));
-                newDefaultValues[opt.id] = opt.defaultValue ?? "";
+                fieldSchema = z.string().url({ message: "A valid image URL is required after upload." }).optional().or(z.literal(''));
+                newDefaultValues[opt.id] = opt.defaultValue ?? ""; // This will store the URL
+                initialUploadStates[opt.id] = { progress: 0, error: undefined, uploading: false, url: newDefaultValues[opt.id] || undefined };
                 break;
               default:
                 fieldSchema = z.any().optional();
@@ -151,9 +161,11 @@ export default function CustomizeProductPage() {
           
           setCustomizationSchema(z.object(shape));
           setDefaultFormValues(newDefaultValues);
+          setUploadStates(initialUploadStates);
         } else {
-          setCustomizationSchema(z.object({})); // No options, empty schema
+          setCustomizationSchema(z.object({}));
           setDefaultFormValues({});
+          setUploadStates({});
         }
       } else {
         setError("Item not found.");
@@ -183,23 +195,74 @@ export default function CustomizeProductPage() {
   }, [authLoading, user, productId, router, fetchProductAndOptions]);
   
   useEffect(() => {
-    // This effect ensures the form is re-initialized with new defaultValues
-    // and resolver when the schema changes.
     if (customizationSchema) {
-      form.reset(defaultFormValues, {
-        // @ts-ignore zodResolver is compatible
-        resolver: zodResolver(customizationSchema),
-      });
+      form.reset(defaultFormValues);
     }
   }, [customizationSchema, defaultFormValues, form]);
 
 
   useEffect(() => {
-    if (product && form.formState.isDirty) { // Only subscribe if form is initialized
+    if (product && form.formState.isDirty) {
         const subscription = form.watch(() => calculatePrice());
         return () => subscription.unsubscribe();
     }
-  }, [form, product, calculatePrice]); // Removed resolvedOptions dependency, calculatePrice now uses it internally
+  }, [form, product, calculatePrice]);
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>, option: ProductCustomizationOption) => {
+    if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+      toast({ title: "Upload Error", description: "Cloudinary environment variables not configured.", variant: "destructive" });
+      setUploadStates(prev => ({ ...prev, [option.id]: { ...prev[option.id], error: "Upload service not configured.", uploading: false }}));
+      return;
+    }
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Client-side validation
+    if (option.acceptedFileTypes) {
+      const allowedTypes = option.acceptedFileTypes.split(',').map(t => t.trim().toLowerCase());
+      const fileExtension = `.${file.name.split('.').pop()?.toLowerCase()}`;
+      if (!allowedTypes.includes(fileExtension) && !allowedTypes.includes(file.type.toLowerCase())) {
+          setUploadStates(prev => ({ ...prev, [option.id]: { ...prev[option.id], error: `Invalid file type. Allowed: ${option.acceptedFileTypes}`, uploading: false }}));
+          toast({ title: "Upload Error", description: `Invalid file type. Allowed: ${option.acceptedFileTypes}`, variant: "destructive"});
+          return;
+      }
+    }
+    if (option.maxFileSizeMB && file.size > option.maxFileSizeMB * 1024 * 1024) {
+        setUploadStates(prev => ({ ...prev, [option.id]: { ...prev[option.id], error: `File too large. Max: ${option.maxFileSizeMB}MB`, uploading: false }}));
+        toast({ title: "Upload Error", description: `File too large. Max: ${option.maxFileSizeMB}MB`, variant: "destructive"});
+        return;
+    }
+
+    setUploadStates(prev => ({ ...prev, [option.id]: { progress: 0, error: undefined, uploading: true }}));
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    // You can add formData.append('folder', 'your_folder_name'); here if you want to override upload preset folder
+
+    try {
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+        method: 'POST',
+        body: formData,
+        // TODO: Implement XHR for progress tracking if needed, fetch doesn't support it out of box
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Upload failed');
+      }
+
+      const data = await response.json();
+      form.setValue(option.id, data.secure_url);
+      setUploadStates(prev => ({ ...prev, [option.id]: { progress: 100, error: undefined, uploading: false, url: data.secure_url }}));
+      calculatePrice(); // Recalculate price if image upload has associated cost (not implemented yet but good practice)
+      toast({ title: "Image Uploaded", description: `${option.label} updated successfully.`, variant: "default" });
+    } catch (err: any) {
+      console.error("Cloudinary upload error:", err);
+      setUploadStates(prev => ({ ...prev, [option.id]: { ...prev[option.id], error: err.message || "Upload failed", uploading: false }}));
+      toast({ title: "Upload Failed", description: err.message || "Could not upload image.", variant: "destructive" });
+    }
+  };
 
   const onSubmit: SubmitHandler<Record<string, any>> = async (data) => {
     if (!product) return;
@@ -207,11 +270,9 @@ export default function CustomizeProductPage() {
     
     const customizationsToSave: Record<string, any> = {};
     resolvedOptions.forEach(opt => {
-      // Only include if value exists and is not just an un-touched default for non-required optional fields.
       if (data[opt.id] !== undefined && data[opt.id] !== '' && data[opt.id] !== false) {
         customizationsToSave[opt.id] = data[opt.id];
       } else if (opt.required && (data[opt.id] === undefined || data[opt.id] === '' || data[opt.id] === false)) {
-        // This case should be caught by Zod validation, but as a safeguard:
         console.warn(`Required field ${opt.id} missing value during submission.`);
       }
     });
@@ -294,7 +355,7 @@ export default function CustomizeProductPage() {
                     <div className="text-2xl font-bold text-right mb-2">
                         Total Price: {formatPrice(currentPrice)}
                     </div>
-                    {product.stock === 0 && (
+                     {product.stock === 0 && (
                          <p className="text-destructive text-center font-semibold">This item is currently out of stock.</p>
                     )}
                   <Button type="button" size="lg" className="w-full" 
@@ -361,14 +422,44 @@ export default function CustomizeProductPage() {
                                  </label>
                               </div>
                             )}
-                             {option.type === 'image_upload' && ( 
-                                <Input 
-                                  type="text"
-                                  {...field}
-                                  value={String(field.value ?? "")}
-                                  onChange={(e) => {field.onChange(e); setTimeout(calculatePrice, 0);}}
-                                  placeholder={option.placeholder || "Paste image URL here"}
+                            {option.type === 'image_upload' && (
+                              <div className="space-y-2">
+                                <Input
+                                  id={option.id}
+                                  type="file"
+                                  accept={option.acceptedFileTypes || "image/*"}
+                                  onChange={(e) => handleImageUpload(e, option)}
+                                  className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                                  disabled={uploadStates[option.id]?.uploading}
                                 />
+                                {uploadStates[option.id]?.uploading && (
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Loader2 className="h-4 w-4 animate-spin"/> Uploading...
+                                    {/* <Progress value={uploadStates[option.id]?.progress || 0} className="w-full h-2" /> */}
+                                  </div>
+                                )}
+                                {uploadStates[option.id]?.error && <p className="text-xs text-destructive">{uploadStates[option.id]?.error}</p>}
+                                {field.value && !uploadStates[option.id]?.uploading && (
+                                  <div className="mt-2 p-2 border rounded-md bg-muted/50 relative w-32 h-32 group">
+                                    <Image src={field.value} alt="Upload preview" layout="fill" objectFit="cover" className="rounded-md" />
+                                    <Button 
+                                      type="button" 
+                                      variant="destructive" 
+                                      size="icon" 
+                                      className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      onClick={() => {
+                                        form.setValue(option.id, "");
+                                        setUploadStates(prev => ({ ...prev, [option.id]: { ...prev[option.id], url: undefined, error: undefined }}));
+                                      }}
+                                    > X </Button>
+                                  </div>
+                                )}
+                                {!field.value && !uploadStates[option.id]?.uploading && (
+                                  <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground p-2 border rounded-md border-dashed justify-center h-24">
+                                      <ImagePlus className="h-5 w-5"/> <span>Upload Image</span>
+                                  </div>
+                                )}
+                              </div>
                              )}
                             <FormMessage />
                           </FormItem>
@@ -384,7 +475,7 @@ export default function CustomizeProductPage() {
                       {product.stock === 0 && (
                            <p className="text-destructive text-center font-semibold">This item is currently out of stock.</p>
                       )}
-                    <Button type="submit" size="lg" className="w-full" disabled={isSubmitting || product.stock === 0}>
+                    <Button type="submit" size="lg" className="w-full" disabled={isSubmitting || product.stock === 0 || Object.values(uploadStates).some(s => s.uploading)}>
                       {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ShoppingCart className="mr-2 h-5 w-5" /> }
                       Save Customizations & Add to Cart
                     </Button>
@@ -403,3 +494,4 @@ export default function CustomizeProductPage() {
     </div>
   );
 }
+
