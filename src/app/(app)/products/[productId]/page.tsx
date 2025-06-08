@@ -4,16 +4,18 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Product } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
-import { useCart } from '@/contexts/CartContext'; // Import useCart
+import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Loader2, AlertTriangle, ShoppingCart, ArrowLeft, Settings } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2, AlertTriangle, ShoppingCart, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -23,7 +25,7 @@ export default function ProductDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { addToCart } = useCart(); // Get addToCart from context
+  const { addToCart } = useCart();
   const { toast } = useToast();
   
   const productId = typeof params.productId === 'string' ? params.productId : null;
@@ -32,6 +34,11 @@ export default function ProductDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+
+  const [fbtSuggestions, setFbtSuggestions] = useState<Product[]>([]);
+  const [selectedFbtItems, setSelectedFbtItems] = useState<Set<string>>(new Set());
+  const [isLoadingFbt, setIsLoadingFbt] = useState(false);
+
 
   const fetchProduct = useCallback(async () => {
     if (!productId || !db) {
@@ -60,6 +67,33 @@ export default function ProductDetailsPage() {
     }
   }, [productId, toast]);
 
+  const fetchFBTSuggestions = useCallback(async () => {
+    if (!product || !product.categories || product.categories.length === 0 || !db) {
+      setFbtSuggestions([]);
+      return;
+    }
+    setIsLoadingFbt(true);
+    try {
+      const q = query(
+        collection(db, "products"),
+        where("categories", "array-contains", product.categories[0]),
+        where("id", "!=", product.id),
+        orderBy("createdAt", "desc"),
+        limit(5)
+      );
+      const querySnapshot = await getDocs(q);
+      const suggestions: Product[] = [];
+      querySnapshot.forEach((doc) => {
+        suggestions.push({ id: doc.id, ...doc.data() } as Product);
+      });
+      setFbtSuggestions(suggestions);
+    } catch (err) {
+      console.error("Error fetching FBT suggestions:", err);
+    } finally {
+      setIsLoadingFbt(false);
+    }
+  }, [product]);
+
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -74,15 +108,56 @@ export default function ProductDetailsPage() {
     }
   }, [authLoading, user, productId, router, fetchProduct]);
 
-  const handleAddToCart = () => {
-    if (!product) return;
-    setIsAddingToCart(true);
-    // For non-customizable products, add directly with quantity 1
-    addToCart(product, 1); 
-    // Consider adding a small delay or confirmation before resetting isAddingToCart
-    setTimeout(() => setIsAddingToCart(false), 1000); 
+  useEffect(() => {
+    if (product && product.categories && product.categories.length > 0) {
+      fetchFBTSuggestions();
+    }
+  }, [product, fetchFBTSuggestions]);
+
+
+  const handleToggleFbtItem = (fbtProductId: string) => {
+    setSelectedFbtItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(fbtProductId)) {
+        newSet.delete(fbtProductId);
+      } else {
+        newSet.add(fbtProductId);
+      }
+      return newSet;
+    });
   };
 
+  const handleMainAction = () => {
+    if (!product) return;
+    setIsAddingToCart(true);
+
+    // Add main product (non-customized version if it has customizations)
+    addToCart(product, 1);
+
+    // Add selected FBT items
+    let fbtAddedCount = 0;
+    selectedFbtItems.forEach(fbtId => {
+      const fbtProduct = fbtSuggestions.find(p => p.id === fbtId);
+      if (fbtProduct && fbtProduct.stock > 0) {
+        addToCart(fbtProduct, 1); 
+        fbtAddedCount++;
+      }
+    });
+    
+    let description = `${product.name} added to cart.`;
+    if (fbtAddedCount > 0) {
+        description += ` ${fbtAddedCount} additional item(s) also added.`;
+    }
+
+    toast({ title: "Items Added", description });
+    setSelectedFbtItems(new Set()); // Clear FBT selection
+    
+    // Navigate to cart page after a slight delay to allow toast to be seen
+    setTimeout(() => {
+        setIsAddingToCart(false);
+        router.push('/orders/cart'); 
+    }, 700);
+  };
 
   if (isLoading || authLoading) {
     return (
@@ -100,7 +175,7 @@ export default function ProductDetailsPage() {
         <h2 className="text-xl font-semibold mb-2">Error Loading Item</h2>
         <p className="text-muted-foreground mb-4">{error}</p>
         <Button onClick={() => router.back()} variant="outline">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
+            Go Back
         </Button>
       </div>
     );
@@ -113,7 +188,7 @@ export default function ProductDetailsPage() {
         <h2 className="text-xl font-semibold mb-2">Item Not Found</h2>
         <p className="text-muted-foreground mb-4">The item you are looking for could not be found.</p>
         <Button onClick={() => router.push('/products')} variant="outline">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Products
+            Back to Products
         </Button>
       </div>
     );
@@ -122,10 +197,7 @@ export default function ProductDetailsPage() {
   const hasCustomizations = product.customizationOptions && product.customizationOptions.length > 0;
 
   return (
-    <div className="container mx-auto px-0 sm:px-4 py-8">
-      <Button onClick={() => router.push('/products')} variant="outline" size="sm" className="mb-6">
-        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Products
-      </Button>
+    <div className="container mx-auto px-0 sm:px-4 py-8 pb-28"> {/* Added pb-28 for sticky footer */}
       <Card className="overflow-hidden shadow-none sm:shadow-lg rounded-none sm:rounded-lg">
         <div className="md:flex">
           <div className="md:w-1/2">
@@ -156,28 +228,102 @@ export default function ProductDetailsPage() {
               {product.stock === 0 && (
                 <p className="text-sm text-destructive mt-1 font-semibold">Out of stock</p>
               )}
-
             </CardContent>
-            <CardFooter className="p-0 mt-6 pt-6 border-t flex flex-col sm:flex-row gap-3 items-stretch">
-              {hasCustomizations ? (
-                <Link href={`/products/${product.id}/customize`} passHref className="flex-1">
-                  <Button size="lg" variant="outline" className="w-full" disabled={product.stock === 0}>
-                    <Settings className="mr-2 h-5 w-5" /> Customize Item
-                  </Button>
-                </Link>
-              ) : (
-                 <Button size="lg" variant="default" className="flex-1" onClick={handleAddToCart} disabled={product.stock === 0 || isAddingToCart}>
-                    {isAddingToCart ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ShoppingCart className="mr-2 h-5 w-5" />}
-                     Add to Cart
-                 </Button>
-              )}
-              {!hasCustomizations && ( // Show Add to Cart button if no customizations
-                 <span className="sm:hidden"></span> // Placeholder for spacing on small screens or remove if not needed
-              )}
-            </CardFooter>
+            {/* Removed original CardFooter with buttons as they are moved to sticky footer */}
           </div>
         </div>
       </Card>
+
+      {/* Frequently Bought Together Section */}
+      {isLoadingFbt ? (
+        <div className="mt-8 text-center">
+            <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
+            <p className="text-sm text-muted-foreground">Loading suggestions...</p>
+        </div>
+      ) : fbtSuggestions.length > 0 && (
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="text-xl font-headline">Frequently Bought Together</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-3">
+              {fbtSuggestions.map(item => (
+                <li key={item.id} className="flex items-center gap-3 p-2.5 border rounded-md hover:bg-muted/50 transition-colors">
+                  <Checkbox
+                    id={`fbt-${item.id}`}
+                    checked={selectedFbtItems.has(item.id)}
+                    onCheckedChange={() => handleToggleFbtItem(item.id)}
+                    disabled={item.stock === 0}
+                  />
+                  <Label htmlFor={`fbt-${item.id}`} className={`flex-grow cursor-pointer ${item.stock === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    <div className="flex items-center gap-3">
+                      <div className="relative w-12 h-12 bg-muted rounded-sm overflow-hidden flex-shrink-0">
+                        <Image
+                          src={item.imageUrl || 'https://placehold.co/48x48.png'}
+                          alt={item.name}
+                          fill
+                          sizes="48px"
+                          className="object-cover"
+                          data-ai-hint="related product"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium leading-tight">{item.name}</p>
+                        <p className="text-xs text-primary font-semibold">{formatPrice(item.price)}</p>
+                        {item.stock === 0 && <p className="text-xs text-destructive">Out of stock</p>}
+                      </div>
+                    </div>
+                  </Label>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Sticky Footer for Actions */}
+      <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border p-3 shadow-lg z-20 md:hidden"> {/* Hide on md and larger since BottomNav will take over */}
+        <div className="container mx-auto px-4 flex gap-3 items-center justify-center sm:justify-end">
+          {hasCustomizations && (
+            <Link href={`/products/${product.id}/customize`} passHref className="flex-1 sm:flex-none">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto" disabled={product.stock === 0}>
+                Customize
+              </Button>
+            </Link>
+          )}
+          <Button
+            size="lg"
+            variant="default"
+            className="flex-1 sm:flex-none w-full sm:w-auto"
+            onClick={handleMainAction}
+            disabled={product.stock === 0 || isAddingToCart}
+          >
+            {isAddingToCart ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+            Add to Cart
+          </Button>
+        </div>
+      </div>
+       {/* Non-sticky buttons for larger screens (md and up), placed where footer would normally be if content is short */}
+      <div className="hidden md:flex mt-8 pt-6 border-t justify-end gap-3">
+        {hasCustomizations && (
+            <Link href={`/products/${product.id}/customize`} passHref>
+              <Button size="lg" variant="outline" disabled={product.stock === 0}>
+                Customize
+              </Button>
+            </Link>
+          )}
+          <Button
+            size="lg"
+            variant="default"
+            onClick={handleMainAction}
+            disabled={product.stock === 0 || isAddingToCart}
+          >
+            {isAddingToCart ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+            Add to Cart
+          </Button>
+      </div>
     </div>
   );
 }
+
+    
