@@ -4,13 +4,13 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon, BadgeHelp, MailWarning, Banknote, CheckCircle2, Warehouse, ListChecks, PackageX, PackageSearch } from 'lucide-react';
+import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon, BadgeHelp, MailWarning, Banknote, CheckCircle2, Warehouse, ListChecks, PackageX, PackageSearch, FileText, Coins } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState, useCallback } from 'react';
 import { collection, getDocs, query, where, onSnapshot, Unsubscribe, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { User, Order, OrderStatus, Product, StockRequest } from '@/types';
+import type { User, Order, OrderStatus, Product, StockRequest, Invoice } from '@/types';
 import { useRouter } from 'next/navigation'; 
 
 const formatPrice = (price: number): string => {
@@ -90,6 +90,14 @@ export default function DashboardPage() {
   const [riderCompletedTodayCount, setRiderCompletedTodayCount] = useState<number | string>("...");
   const [isLoadingRiderCompletedToday, setIsLoadingRiderCompletedToday] = useState(true);
 
+  // Supplier specific state
+  const [supplierNewStockRequestsToday, setSupplierNewStockRequestsToday] = useState<number | string>("...");
+  const [isLoadingSupplierNewStockRequests, setIsLoadingSupplierNewStockRequests] = useState(true);
+  const [supplierFulfilledRequests, setSupplierFulfilledRequests] = useState<number | string>("...");
+  const [isLoadingSupplierFulfilled, setIsLoadingSupplierFulfilled] = useState(true);
+  const [supplierPendingInvoices, setSupplierPendingInvoices] = useState<number | string>("...");
+  const [isLoadingSupplierPendingInvoices, setIsLoadingSupplierPendingInvoices] = useState(true);
+
 
   useEffect(() => {
     if (!authLoading && role === 'Customer') {
@@ -103,6 +111,7 @@ export default function DashboardPage() {
       const ordersCol = collection(db, 'orders');
       const productsCol = collection(db, 'products');
       const stockRequestsCol = collection(db, 'stockRequests');
+      const invoicesCol = collection(db, 'invoices');
 
       // Fetch all products for Admin and InventoryManager for detailed stats
       if (role === 'Admin' || role === 'InventoryManager') {
@@ -320,6 +329,58 @@ export default function DashboardPage() {
         setIsLoadingRiderActiveDeliveries(false);
         setIsLoadingRiderCompletedToday(false);
       }
+
+      if (role === 'Supplier') {
+        setIsLoadingSupplierNewStockRequests(true);
+        setIsLoadingSupplierFulfilled(true);
+        setIsLoadingSupplierPendingInvoices(true);
+
+        const today = new Date();
+        const startOfDay = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0));
+        const endOfDay = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999));
+
+        const qNewStockRequests = query(stockRequestsCol,
+          where('status', '==', 'pending_supplier_fulfillment'),
+          where('createdAt', '>=', startOfDay),
+          where('createdAt', '<=', endOfDay)
+        );
+        const unsubNewStockRequests = onSnapshot(qNewStockRequests, (snapshot) => {
+          setSupplierNewStockRequestsToday(snapshot.size);
+          setIsLoadingSupplierNewStockRequests(false);
+        }, (error) => {
+          console.error("Error fetching new stock requests for supplier:", error); setSupplierNewStockRequestsToday("Error"); setIsLoadingSupplierNewStockRequests(false);
+        });
+        unsubscribers.push(unsubNewStockRequests);
+
+        const qFulfilled = query(stockRequestsCol,
+          where('supplierId', '==', user.uid),
+          where('status', 'in', ['awaiting_receipt', 'received'])
+        );
+        const unsubFulfilled = onSnapshot(qFulfilled, (snapshot) => {
+          setSupplierFulfilledRequests(snapshot.size);
+          setIsLoadingSupplierFulfilled(false);
+        }, (error) => {
+          console.error("Error fetching fulfilled requests for supplier:", error); setSupplierFulfilledRequests("Error"); setIsLoadingSupplierFulfilled(false);
+        });
+        unsubscribers.push(unsubFulfilled);
+
+        const qPendingInvoices = query(invoicesCol,
+          where('supplierId', '==', user.uid),
+          where('status', 'in', ['pending_approval', 'approved_for_payment'])
+        );
+        const unsubPendingInvoices = onSnapshot(qPendingInvoices, (snapshot) => {
+          setSupplierPendingInvoices(snapshot.size);
+          setIsLoadingSupplierPendingInvoices(false);
+        }, (error) => {
+          console.error("Error fetching pending invoices for supplier:", error); setSupplierPendingInvoices("Error"); setIsLoadingSupplierPendingInvoices(false);
+        });
+        unsubscribers.push(unsubPendingInvoices);
+      } else {
+        setIsLoadingSupplierNewStockRequests(false);
+        setIsLoadingSupplierFulfilled(false);
+        setIsLoadingSupplierPendingInvoices(false);
+      }
+
     }
     return () => unsubscribers.forEach(unsub => unsub());
   }, [authLoading, role, db, router, user]);
@@ -371,7 +432,7 @@ export default function DashboardPage() {
           <>
             <DashboardItem title="Payments Today" value={paymentsTodayCount} icon={Banknote} link="/admin/payments" description="Orders marked paid today." isLoadingValue={isLoadingPaymentsToday}/>
             <DashboardItem title="All Payments" icon={DollarSign} link="/admin/payments" />
-            <DashboardItem title="Invoice Management" icon={FileArchive} link="/invoices" /> 
+            <DashboardItem title="Supplier Invoices" icon={FileText} link="/invoices" description="Review and manage supplier invoices." />
             <DashboardItem title="Stock Request Approvals" value={pendingStockRequestsCount} icon={ListChecks} link="/finance/approvals" description="Approve/reject stock requests." isLoadingValue={isLoadingPendingStockRequests} />
           </>
         );
@@ -394,6 +455,15 @@ export default function DashboardPage() {
             <DashboardItem title="My Pending Stock Requests" value={pendingStockRequestsCount} icon={ShoppingCart} link="/inventory#requests" description="Track your requests." isLoadingValue={isLoadingPendingStockRequests} />
             <DashboardItem title="Items Awaiting Receipt" value={itemsAwaitingReceiptCount} icon={PackageSearch} link="/inventory/receivership" description="Items from suppliers to be confirmed." isLoadingValue={isLoadingItemsAwaitingReceipt} />
             <DashboardItem title="All Inventory" value={"View"} icon={Warehouse} link="/inventory" description="Manage stock levels." />
+          </>
+        );
+      case 'Supplier':
+        return (
+          <>
+            <DashboardItem title="New Stock Requests Today" value={supplierNewStockRequestsToday} icon={Warehouse} link="/supplier/stock-requests" description="Requests needing fulfillment action." isLoadingValue={isLoadingSupplierNewStockRequests} />
+            <DashboardItem title="Fulfilled/Invoiced Orders" value={supplierFulfilledRequests} icon={CheckCircle2} link="/supplier/stock-requests?filter=fulfilled" description="Requests you have invoiced." isLoadingValue={isLoadingSupplierFulfilled} />
+            <DashboardItem title="Pending Invoices" value={supplierPendingInvoices} icon={FileText} link="/invoices?filter=pending" description="Your invoices awaiting payment/approval." isLoadingValue={isLoadingSupplierPendingInvoices} />
+            <DashboardItem title="All Stock Requests" icon={ListChecks} link="/supplier/stock-requests" description="View all requests assigned to you." />
           </>
         );
       case 'Technician':
@@ -424,7 +494,7 @@ export default function DashboardPage() {
         Hello, {user.displayName || user.email}! Your role is: <span className="font-semibold text-primary">{role || 'Not Assigned'}</span>.
       </p>
       
-      {role !== 'Admin' && role !== 'DispatchManager' && role !== 'FinanceManager' && role !== 'InventoryManager' && (
+      {role !== 'Admin' && role !== 'DispatchManager' && role !== 'FinanceManager' && role !== 'InventoryManager' && role !== 'Supplier' && (
         <Alert>
           <BarChart className="h-4 w-4 mr-2" />
           <AlertTitle>Data Overview</AlertTitle>
@@ -469,6 +539,15 @@ export default function DashboardPage() {
           </AlertDescription>
         </Alert>
       )}
+       {role === 'Supplier' && (
+        <Alert variant="default" className="border-purple-500/50 bg-purple-500/5 text-purple-700 dark:text-purple-300">
+          <PackageSearch className="h-4 w-4 mr-2 text-purple-500" />
+          <AlertTitle className="text-purple-600 dark:text-purple-400">Supplier Portal Dashboard</AlertTitle>
+          <AlertDescription className="text-purple-600/90 dark:text-purple-400/90">
+            View stock requests, manage your fulfillments, and submit invoices. Your key metrics are updated here.
+          </AlertDescription>
+        </Alert>
+      )}
       {role === 'Rider' && (
         <Alert variant="default" className="border-accent/50 bg-accent/5 text-accent-foreground-muted">
           <Truck className="h-4 w-4 mr-2 text-accent" />
@@ -485,7 +564,7 @@ export default function DashboardPage() {
       </div>
 
 
-      {role !== 'Admin' && ( 
+      {(role !== 'Admin' && role !== 'Supplier') && ( 
         <Card>
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
@@ -499,6 +578,16 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
+      {role === 'Supplier' && (
+          <Card>
+            <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+                 <Link href="/supplier/stock-requests"><Button><Warehouse className="mr-2 h-4 w-4" />View Stock Requests</Button></Link>
+                 <Link href="/invoices"><Button variant="outline"><FileText className="mr-2 h-4 w-4" />My Submitted Invoices</Button></Link>
+            </CardContent>
+          </Card>
+      )}
     </div>
   );
 }
+
