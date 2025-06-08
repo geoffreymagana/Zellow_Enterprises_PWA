@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -97,14 +98,17 @@ const DialogTitle = React.forwardRef<
 DialogTitle.displayName = DialogPrimitive.Title.displayName
 
 const DialogDescription = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Description>,
+  HTMLDivElement, // Changed to HTMLDivElement as we are rendering a div
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
->(({ className, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <DialogPrimitive.Description
-    ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    asChild // Use asChild to pass props to our custom div
     {...props}
-  />
+  >
+    <div ref={ref} className={cn("text-sm text-muted-foreground", className)}>
+      {children}
+    </div>
+  </DialogPrimitive.Description>
 ))
 DialogDescription.displayName = DialogPrimitive.Description.displayName
 
