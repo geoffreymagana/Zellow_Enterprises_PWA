@@ -305,7 +305,7 @@ export default function FinancialsPage() {
           </CardContent>
         </Card>
 
-      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="font-headline text-lg">Revenue Breakdown by Source</CardTitle>
