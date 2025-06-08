@@ -2,14 +2,9 @@
 "use client"
 
 import { TrendingUp, ArrowDownRight, ArrowUpRight, DollarSign } from "lucide-react"
-import { AreaChart, CartesianGrid, Line, LineChart, ReferenceLine, Tooltip, XAxis, YAxis, ComposedChart, Area, Legend, ResponsiveContainer } from "recharts"
+import { AreaChart, CartesianGrid, Area, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis, ReferenceLine } from "recharts" // Changed LineChart to AreaChart, Line to Area
 
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
   CardTitle,
 } from "@/components/ui/card"
 import {
@@ -18,10 +13,10 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import { format, subMonths } from "date-fns"
+import { format } from "date-fns"
 
 export interface MonthlyDataPoint {
-  month: string; // Should be like "Jan", "Feb"
+  month: string; 
   revenue: number;
   expenses: number;
   netProfit: number;
@@ -34,17 +29,13 @@ interface MonthlyRevenueExpensesChartProps {
 
 const chartConfig = {
   revenue: {
-    label: "Revenue",
+    label: "Monthly Revenue", // Updated label
     color: "hsl(var(--chart-2))", // Greenish
   },
   expenses: {
-    label: "Expenses",
+    label: "Monthly Expenses", // Updated label
     color: "hsl(var(--destructive))", // Red
   },
-  netProfit: { // For tooltip, if needed
-    label: "Net Profit",
-    color: "hsl(var(--chart-1))",
-  }
 } satisfies ChartConfig
 
 const formatCurrency = (value: number) => {
@@ -64,12 +55,11 @@ export function MonthlyRevenueExpensesChart({ data: rawData }: MonthlyRevenueExp
   }
 
   let processedData = [...rawData];
-  // Handle single data point: prepend a zero-value point for the previous month
   if (rawData.length === 1) {
-    const singleMonth = rawData[0].month; // e.g., "Jan"
-    // This is a naive way to get "previous month", better to use date-fns if full date was available
-    // For simplicity, if original month is 'Jan', prev is 'Dec', else just 'Prev Month'
-    const prevMonthLabel = singleMonth === "Jan" ? "Dec" : (singleMonth === "Feb" ? "Jan" : "Prev");
+    const singleMonth = rawData[0].month.split(" ")[0]; // Get "Jan" from "Jan 2024"
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const singleMonthIndex = monthNames.indexOf(singleMonth);
+    const prevMonthLabel = singleMonthIndex > 0 ? monthNames[singleMonthIndex - 1] : "Prev";
 
     processedData = [
       { month: prevMonthLabel, revenue: 0, expenses: 0, netProfit: 0, cumulativeNetProfit: 0 },
@@ -77,8 +67,7 @@ export function MonthlyRevenueExpensesChart({ data: rawData }: MonthlyRevenueExp
     ];
   }
 
-
-  const latestMonthData = rawData[rawData.length - 1]; // Use rawData for latest month figures before prepending
+  const latestMonthData = rawData[rawData.length - 1];
   const totalBalance = latestMonthData.cumulativeNetProfit;
   const latestMonthNetChange = latestMonthData.netProfit;
 
@@ -102,13 +91,13 @@ export function MonthlyRevenueExpensesChart({ data: rawData }: MonthlyRevenueExp
                 {formatCurrencyWithDecimals(latestMonthNetChange)}
                 </span>
                 <span className="text-muted-foreground">
-                {latestMonthData.month}
+                {latestMonthData.month.split(" ")[0]} {/* Display only month name */}
                 </span>
             </div>
             </div>
         </div>
       <ResponsiveContainer width="100%" height="80%">
-        <ComposedChart
+        <AreaChart // Changed from ComposedChart to AreaChart for simplicity with areas
             accessibilityLayer
             data={processedData}
             margin={{
@@ -117,13 +106,23 @@ export function MonthlyRevenueExpensesChart({ data: rawData }: MonthlyRevenueExp
             top: 5,
             }}
         >
+            <defs>
+                <linearGradient id="fillRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-revenue)" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="var(--color-revenue)" stopOpacity={0.1}/>
+                </linearGradient>
+                <linearGradient id="fillExpenses" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-expenses)" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="var(--color-expenses)" stopOpacity={0.1}/>
+                </linearGradient>
+            </defs>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis
             dataKey="month"
             tickLine={true}
             axisLine={false}
             tickMargin={8}
-            // tickFormatter={(value) => value.slice(0, 3)} // Already should be like "Jan"
+            tickFormatter={(value) => value.slice(0, 3)} // Already "Jan", "Feb", etc.
             />
             <YAxis
             tickLine={true}
@@ -132,14 +131,14 @@ export function MonthlyRevenueExpensesChart({ data: rawData }: MonthlyRevenueExp
             tickFormatter={(value) => formatCurrency(value as number)}
             />
             <Tooltip
-                cursor={false}
+                cursor={{ stroke: "hsl(var(--border))", strokeWidth: 1, strokeDasharray: "3 3" }}
                 content={<ChartTooltipContent 
-                    indicator="line" 
+                    indicator="dot" 
                     hideLabel 
                     formatter={(value, name, props) => {
                         const itemConfig = chartConfig[name as keyof typeof chartConfig];
                         return (
-                            <div className="flex min-w-[140px] items-center text-xs">
+                            <div className="flex min-w-[150px] items-center text-xs">
                                 <div className="flex flex-1 items-center gap-1.5">
                                     <div
                                         className="aspect-square w-2.5 shrink-0 rounded-[2px]"
@@ -156,24 +155,28 @@ export function MonthlyRevenueExpensesChart({ data: rawData }: MonthlyRevenueExp
                 />}
             />
             <Legend verticalAlign="top" height={40}/>
-            <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="3 3" />
-            <Line 
+            <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="3 3" strokeWidth={1.5}/>
+            <Area 
                 dataKey="revenue" 
                 type="monotone" 
+                fill="url(#fillRevenue)"
                 stroke="var(--color-revenue)" 
                 strokeWidth={2.5} 
-                dot={{ r: 4, fill: "var(--color-revenue)", strokeWidth:0 }}
-                activeDot={{ r: 6, strokeWidth: 0 }}
+                dot={{ r: 3, fill: "var(--color-revenue)", strokeWidth:0 }}
+                activeDot={{ r: 5, strokeWidth: 1, stroke: "var(--background)" }}
+                stackId="1" // Optional: if you want to stack, but for overlap this is fine
             />
-            <Line 
+            <Area 
                 dataKey="expenses" 
                 type="monotone" 
+                fill="url(#fillExpenses)"
                 stroke="var(--color-expenses)" 
                 strokeWidth={2.5} 
-                dot={{ r: 4, fill: "var(--color-expenses)", strokeWidth:0 }}
-                activeDot={{ r: 6, strokeWidth: 0 }}
+                dot={{ r: 3, fill: "var(--color-expenses)", strokeWidth:0 }}
+                activeDot={{ r: 5, strokeWidth: 1, stroke: "var(--background)" }}
+                stackId="2" // Optional
             />
-        </ComposedChart>
+        </AreaChart>
       </ResponsiveContainer>
     </ChartContainer>
   )
