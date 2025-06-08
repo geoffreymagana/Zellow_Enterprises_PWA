@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import type { Invoice, InvoiceStatus } from "@/types"; 
-import { FileText, Search, Download, Eye, Loader2, CheckCircle, XCircle, CalendarDays, FileClock, AlertCircle, CheckCircle2 as PaidIcon, Hourglass, FileX, FileDiff } from "lucide-react";
+import { FileText, Search, Download, Eye, Loader2, CheckCircle, XCircle, CalendarDays, FileClock, AlertCircle, CheckCircle2 as PaidIcon, Hourglass, FileX, FileDiff, PlusCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
@@ -85,7 +85,8 @@ export default function InvoicesPage() {
   });
 
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
-  const [isActionModalOpen, setIsActionModalOpen] = useState(false); // For approve/reject
+  const [actionableInvoice, setActionableInvoice] = useState<Invoice | null>(null);
+  const [isActionModalOpen, setIsActionModalOpen] = useState(false); 
   const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
@@ -109,7 +110,7 @@ export default function InvoicesPage() {
     if (role === 'Supplier') {
       q = query(collection(db, 'invoices'), where("supplierId", "==", user.uid), orderBy("createdAt", "desc"));
     } else { 
-      q = query(collection(db, 'invoices'), orderBy("createdAt", "desc")); // FM/Admin see all
+      q = query(collection(db, 'invoices'), orderBy("createdAt", "desc")); 
     }
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -205,9 +206,9 @@ export default function InvoicesPage() {
     try {
       const invoiceRef = doc(db, 'invoices', viewingInvoice.id);
       const paymentData = {
-        method: "Internal Transfer", // Placeholder
+        method: "Internal Transfer", 
         paidAt: serverTimestamp(),
-        transactionId: `ZE-PAY-${Date.now()}` // Placeholder
+        transactionId: `ZE-PAY-${Date.now()}` 
       };
       await updateDoc(invoiceRef, {
         status: 'paid',
@@ -272,17 +273,15 @@ export default function InvoicesPage() {
                 className="pl-8 h-9"
               />
             </div>
-            {role !== 'Supplier' && (
-              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="w-full sm:w-auto">
-                <TabsList className="grid grid-cols-3 sm:flex w-full sm:w-auto">
-                  {(role === 'Supplier' ? supplierTabsConfig : TABS_CONFIG).map(tab => (
-                     <TabsTrigger key={tab.value} value={tab.value} className="text-xs px-2.5 py-1.5 h-auto sm:flex-grow-0">
-                      {tab.icon && <tab.icon className="mr-1.5 h-3.5 w-3.5 hidden sm:inline-block"/>} {tab.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-            )}
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="w-full sm:w-auto">
+              <TabsList className="grid grid-cols-3 sm:flex w-full sm:w-auto">
+                {(role === 'Supplier' ? supplierTabsConfig : TABS_CONFIG).map(tab => (
+                    <TabsTrigger key={tab.value} value={tab.value} className="text-xs px-2.5 py-1.5 h-auto sm:flex-grow-0">
+                    {tab.icon && <tab.icon className="mr-1.5 h-3.5 w-3.5 hidden sm:inline-block"/>} {tab.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -369,8 +368,8 @@ export default function InvoicesPage() {
             <div className="flex gap-2">
               {(role === 'FinanceManager' || role === 'Admin') && viewingInvoice?.status === 'pending_approval' && (
                 <>
-                  <Button variant="destructive" size="sm" onClick={() => { setViewingInvoice(null); handleOpenActionModal(viewingInvoice!, "reject");}} disabled={isSubmittingAction}>Reject</Button>
-                  <Button variant="default" size="sm" onClick={() => {setViewingInvoice(null); handleOpenActionModal(viewingInvoice!, "approve");}} disabled={isSubmittingAction}>Approve</Button>
+                  <Button variant="destructive" size="sm" onClick={() => { if(viewingInvoice) {handleOpenActionModal(viewingInvoice, "reject"); setViewingInvoice(null);}}} disabled={isSubmittingAction}>Reject</Button>
+                  <Button variant="default" size="sm" onClick={() => { if(viewingInvoice) {handleOpenActionModal(viewingInvoice, "approve"); setViewingInvoice(null);}}} disabled={isSubmittingAction}>Approve</Button>
                 </>
               )}
               {(role === 'FinanceManager' || role === 'Admin') && viewingInvoice?.status === 'approved_for_payment' && (
@@ -385,39 +384,42 @@ export default function InvoicesPage() {
 
       {/* Approve/Reject Dialog */}
       <Dialog open={isActionModalOpen} onOpenChange={(isOpen) => { if (!isOpen) setActionableInvoice(null); setIsActionModalOpen(isOpen); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="capitalize">{actionType} Invoice {actionableInvoice?.invoiceNumber}</DialogTitle>
-            <DialogDescription>
-              Supplier: {actionableInvoice?.supplierName}. Amount: {formatKsh(actionableInvoice?.totalAmount || 0)}.
-            </DialogDescription>
-          </DialogHeader>
-          {actionType === "reject" && (
-            <div className="py-2 space-y-1">
-              <Label htmlFor="rejectionReason">Reason for Rejection (Required)</Label>
-              <Textarea 
-                id="rejectionReason" 
-                value={rejectionReason} 
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Provide a clear reason for rejection..."
-              />
-            </div>
-          )}
-          <DialogFooter>
-            <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-            <Button 
-              type="button" 
-              onClick={handleConfirmAction} 
-              disabled={isSubmittingAction || (actionType === "reject" && !rejectionReason.trim())}
-              variant={actionType === "reject" ? "destructive" : "default"}
-            >
-              {isSubmittingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-              Confirm {actionType?.charAt(0).toUpperCase() + (actionType || '').slice(1)}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+        {actionableInvoice && isActionModalOpen && (
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="capitalize">{actionType} Invoice {actionableInvoice.invoiceNumber}</DialogTitle>
+              <DialogDescription>
+                Supplier: {actionableInvoice.supplierName}. Amount: {formatKsh(actionableInvoice.totalAmount || 0)}.
+              </DialogDescription>
+            </DialogHeader>
+            {actionType === "reject" && (
+              <div className="py-2 space-y-1">
+                <Label htmlFor="rejectionReason">Reason for Rejection (Required)</Label>
+                <Textarea 
+                  id="rejectionReason" 
+                  value={rejectionReason} 
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="Provide a clear reason for rejection..."
+                />
+              </div>
+            )}
+            <DialogFooter>
+              <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+              <Button 
+                type="button" 
+                onClick={handleConfirmAction} 
+                disabled={isSubmittingAction || (actionType === "reject" && !rejectionReason.trim())}
+                variant={actionType === "reject" ? "destructive" : "default"}
+              >
+                {isSubmittingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                Confirm {actionType?.charAt(0).toUpperCase() + (actionType || '').slice(1)}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        )}
       </Dialog>
 
     </div>
   );
 }
+
