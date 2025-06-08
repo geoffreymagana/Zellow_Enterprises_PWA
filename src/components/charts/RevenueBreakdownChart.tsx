@@ -53,7 +53,7 @@ export function RevenueBreakdownChart({ data }: RevenueBreakdownChartProps) {
   return (
     <ChartContainer
       config={chartConfig}
-      className="mx-auto aspect-square max-h-[300px] sm:max-h-[350px]" // Adjusted max-h for better fit
+      className="mx-auto aspect-square max-h-[300px] sm:max-h-[350px]" // Keeps the donut relatively square and sized
     >
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
@@ -83,6 +83,7 @@ export function RevenueBreakdownChart({ data }: RevenueBreakdownChartProps) {
             dataKey="value"
             nameKey="name"
             innerRadius="30%" // Makes it a donut chart
+            outerRadius="70%" // Control size of the pie itself
             strokeWidth={2}
             labelLine={false}
             label={({
@@ -93,23 +94,26 @@ export function RevenueBreakdownChart({ data }: RevenueBreakdownChartProps) {
               outerRadius,
               value,
               index,
+              percent
             }) => {
               const RADIAN = Math.PI / 180
-              const radius = 12 + innerRadius + (outerRadius - innerRadius)
+              // Adjust radius for label position to be slightly outside the pie
+              const radius = outerRadius + 15 
               const x = cx + radius * Math.cos(-midAngle * RADIAN)
               const y = cy + radius * Math.sin(-midAngle * RADIAN)
 
-              if (data[index].value / totalValue < 0.05) return null; // Hide small labels
+              // Hide small labels to prevent overlap
+              if (percent < 0.05) return null; 
 
               return (
                 <text
                   x={x}
                   y={y}
-                  className="fill-muted-foreground text-xs"
+                  className="fill-muted-foreground text-[10px] sm:text-xs" // Smaller text for labels
                   textAnchor={x > cx ? "start" : "end"}
                   dominantBaseline="central"
                 >
-                  {data[index].name} ({(value / totalValue * 100).toFixed(0)}%)
+                  {`${data[index].name} (${(percent * 100).toFixed(0)}%)`}
                 </text>
               )
             }}
@@ -119,18 +123,21 @@ export function RevenueBreakdownChart({ data }: RevenueBreakdownChartProps) {
             ))}
           </Pie>
           <Legend
-            verticalAlign="bottom"
-            height={40}
+            layout="vertical"
+            verticalAlign="middle"
+            align="right"
+            wrapperStyle={{ paddingLeft: "10px", fontSize: "12px" }} // Add padding and control font size
+            iconSize={10}
             content={({ payload }) => {
               return (
-                <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
+                <ul className="flex flex-col gap-y-1 text-xs">
                   {payload?.map((entry, index) => (
                      <li key={`legend-${index}`} className="flex items-center gap-1.5">
                       <span
                         className="h-2.5 w-2.5 rounded-full"
                         style={{ backgroundColor: entry.color }}
                       />
-                      {entry.value}
+                      {entry.value} ({((entry.payload?.value / totalValue) * 100).toFixed(0)}%)
                     </li>
                   ))}
                 </ul>
@@ -142,3 +149,4 @@ export function RevenueBreakdownChart({ data }: RevenueBreakdownChartProps) {
     </ChartContainer>
   )
 }
+

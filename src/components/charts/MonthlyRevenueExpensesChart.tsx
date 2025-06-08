@@ -89,13 +89,13 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
             </div>
             </div>
         </div>
-      <ResponsiveContainer width="100%" className="flex-grow">
+      <ResponsiveContainer width="100%" height="100%" className="flex-grow">
         <AreaChart
             accessibilityLayer
             data={processedData}
             margin={{
-                left: -10, 
-                right: 15, // Increased right margin slightly for labels
+                left: 10, // Adjusted left margin
+                right: 15, 
                 top: 5,
                 bottom: 5,
             }}
@@ -117,7 +117,6 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
               axisLine={false}
               tickMargin={8}
               className="text-xs"
-              // Smart tick display for daily data if too dense
               interval={processedData.length > 15 ? Math.floor(processedData.length / 10) : (processedData.length > 7 ? 1 : 0) } 
             />
             <YAxis
@@ -176,3 +175,4 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
     </ChartContainer>
   )
 }
+
