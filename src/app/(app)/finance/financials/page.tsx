@@ -82,21 +82,30 @@ export default function FinancialsPage() {
 
         order.items.forEach((item: FirestoreOrderItem) => {
           const product = productsMap.get(item.productId);
-          const baseProductPrice = product ? product.price : item.price; // Fallback to item.price if product not found
+          // Use the product's base price from the 'products' collection if available, 
+          // otherwise fallback to the item's stored price (which might include old pricing or errors).
+          // For customization calculation, item.price (at time of sale) is compared to product base price.
+          const baseProductPrice = product ? product.price : item.unitPrice || item.price; // item.unitPrice should be base, item.price might be total for item
 
-          const baseItemRevenue = baseProductPrice * item.quantity;
-          revenueFromProductSales += baseItemRevenue;
 
-          const itemCustomizationRevenue = (item.price * item.quantity) - baseItemRevenue;
-          if (itemCustomizationRevenue > 0) {
-            revenueFromCustomizations += itemCustomizationRevenue;
+          // For "Product Sales" revenue, use the base price.
+          revenueFromProductSales += baseProductPrice * item.quantity;
+
+          // For "Customizations" revenue, calculate the difference.
+          // item.price here should be the price of the item including customizations from the order.
+          const itemTotalCustomizedPrice = item.price; // This is total price for the line item in the order (qty * (base + cust))
+          const itemUnitCustomizedPrice = item.price / item.quantity; // Price per unit including customization
+
+          const customizationRevenueForItem = (itemUnitCustomizedPrice - baseProductPrice) * item.quantity;
+          if (customizationRevenueForItem > 0) {
+            revenueFromCustomizations += customizationRevenueForItem;
           }
           
           if (!productSalesAgg[item.productId]) {
             productSalesAgg[item.productId] = { name: item.name, totalRevenue: 0, totalQuantity: 0 };
           }
-          // For top selling products, use the item's price as it reflects total customer payment for that item
-          productSalesAgg[item.productId].totalRevenue += item.price * item.quantity; 
+          // For top selling products, use the item's total price as it reflects total customer payment for that item
+          productSalesAgg[item.productId].totalRevenue += itemTotalCustomizedPrice; 
           productSalesAgg[item.productId].totalQuantity += item.quantity;
         });
       });
@@ -121,14 +130,14 @@ export default function FinancialsPage() {
         { name: "Product Sales", value: revenueFromProductSales, color: "hsl(var(--chart-1))" },
         { name: "Customizations", value: revenueFromCustomizations, color: "hsl(var(--chart-2))" },
         { name: "Delivery Fees", value: revenueFromDeliveryFees, color: "hsl(var(--chart-3))" },
-      ].filter(source => source.value > 0)); // Filter out sources with 0 revenue
+      ].filter(source => source.value > 0));
 
 
       let targetMonthDate = lastTransactionDate;
-      if (lastTransactionDate.getFullYear() === 1970 && firstTransactionDate.getFullYear() !== new Date().getFullYear() + 50) { // if last tx is epoch, but first is not future
-         targetMonthDate = firstTransactionDate; // Use first transaction date if last is still epoch
+      if (lastTransactionDate.getFullYear() === 1970 && firstTransactionDate.getFullYear() !== new Date().getFullYear() + 50) { 
+         targetMonthDate = firstTransactionDate; 
       }
-      if (targetMonthDate.getFullYear() === 1970) { // No transactions found at all
+      if (targetMonthDate.getFullYear() === 1970) { 
         targetMonthDate = new Date(); 
       }
       
@@ -138,7 +147,7 @@ export default function FinancialsPage() {
         end: (isSameMonth(targetMonthDate, new Date())) ? new Date() : endOfMonth(targetMonthDate)
       });
 
-      const dailyDataForChart: DailyDataPoint[] = daysInTargetMonth.map(day => ({
+      const dailyDataForMonthChart: DailyDataPoint[] = daysInTargetMonth.map(day => ({
         day: format(day, 'MMM dd'),
         revenue: 0,
         expenses: 0,
@@ -151,7 +160,7 @@ export default function FinancialsPage() {
         const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date();
         if (isSameMonth(orderDate, targetMonthDate)) {
           const dayKey = format(orderDate, 'MMM dd');
-          const dayEntry = dailyDataForChart.find(d => d.day === dayKey);
+          const dayEntry = dailyDataForMonthChart.find(d => d.day === dayKey);
           if (dayEntry) {
             dayEntry.revenue += order.totalAmount;
             currentMonthNetChange += order.totalAmount;
@@ -164,7 +173,7 @@ export default function FinancialsPage() {
         const invoiceDate = invoice.invoiceDate?.toDate ? invoice.invoiceDate.toDate() : new Date();
          if (isSameMonth(invoiceDate, targetMonthDate)) {
           const dayKey = format(invoiceDate, 'MMM dd');
-          const dayEntry = dailyDataForChart.find(d => d.day === dayKey);
+          const dayEntry = dailyDataForMonthChart.find(d => d.day === dayKey);
           if (dayEntry) {
             dayEntry.expenses += invoice.totalAmount;
             currentMonthNetChange -= invoice.totalAmount;
@@ -172,7 +181,7 @@ export default function FinancialsPage() {
         }
       });
       
-      setDailyChartData(dailyDataForChart);
+      setDailyChartData(dailyDataForMonthChart);
       setLatestMonthNetChange(currentMonthNetChange);
 
       const topProductsArray = Object.values(productSalesAgg)
@@ -265,7 +274,7 @@ export default function FinancialsPage() {
           <CardContent className="h-[400px] sm:h-[450px] pb-0">
            {dailyChartData.length > 0 ? (
               <MonthlyRevenueExpensesChart 
-                dailyData={dailyDataForChart} 
+                dailyData={dailyChartData} 
                 overallCumulativeNetProfit={overallCumulativeNetProfit}
                 latestMonthNetChange={latestMonthNetChange}
                 latestMonthLabel={latestMonthLabel}
@@ -300,7 +309,7 @@ export default function FinancialsPage() {
             <CardTitle className="font-headline text-lg">Top Selling Products (by Revenue)</CardTitle>
             <CardDescription>Performance of best-selling items based on revenue from paid orders.</CardDescription>
           </CardHeader>
-          <CardContent className="min-h-[350px] sm:min-h-[400px] pb-0">
+          <CardContent className="min-h-[300px] sm:min-h-[350px] w-full h-full pb-0">
              {topProductsData.length > 0 ? (
                 <TopSellingProductsChart data={topProductsData} />
              ) : (
