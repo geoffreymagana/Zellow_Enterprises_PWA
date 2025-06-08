@@ -5,14 +5,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, DollarSign, ShoppingCart, TrendingUp, Coins, PackageIcon } from 'lucide-react';
+import { Loader2, DollarSign, ShoppingCart, TrendingUp, Coins, PackageIcon, PieChartIcon } from 'lucide-react';
 import Image from 'next/image';
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order, Invoice, OrderItem as FirestoreOrderItem } from '@/types'; // Renamed OrderItem to avoid conflict
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isBefore, isAfter, subMonths } from 'date-fns';
+import type { Order, Invoice, Product, OrderItem as FirestoreOrderItem } from '@/types';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isBefore, isAfter } from 'date-fns';
 import { MonthlyRevenueExpensesChart, type DailyDataPoint } from '@/components/charts/MonthlyRevenueExpensesChart';
 import { TopSellingProductsChart, type ProductSalesData } from '@/components/charts/TopSellingProductsChart';
+import { RevenueBreakdownChart, type RevenueSourceData } from '@/components/charts/RevenueBreakdownChart';
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -28,6 +29,7 @@ export default function FinancialsPage() {
   const [latestMonthNetChange, setLatestMonthNetChange] = useState<number>(0);
 
   const [topProductsData, setTopProductsData] = useState<ProductSalesData[]>([]);
+  const [revenueBreakdownData, setRevenueBreakdownData] = useState<RevenueSourceData[]>([]);
 
   const [totalRevenueAllTime, setTotalRevenueAllTime] = useState<number>(0);
   const [totalSalesAllTime, setTotalSalesAllTime] = useState<number>(0);
@@ -43,42 +45,58 @@ export default function FinancialsPage() {
     }
     setIsLoadingStats(true);
     try {
+      const productsQuery = query(collection(db, 'products'));
       const paidOrdersQuery = query(collection(db, 'orders'), where("paymentStatus", "==", "paid"));
       const paidInvoicesQuery = query(collection(db, 'invoices'), where("status", "==", "paid"));
 
-      const [ordersSnapshot, invoicesSnapshot] = await Promise.all([
+      const [productsSnapshot, ordersSnapshot, invoicesSnapshot] = await Promise.all([
+        getDocs(productsQuery),
         getDocs(paidOrdersQuery),
         getDocs(paidInvoicesQuery)
       ]);
+
+      const productsMap = new Map<string, Product>();
+      productsSnapshot.forEach(doc => productsMap.set(doc.id, { id: doc.id, ...doc.data() } as Product));
 
       let allTimeRevenueCalc = 0;
       let allTimeExpensesCalc = 0;
       let salesCount = 0;
       const productSalesAgg: Record<string, { name: string; totalRevenue: number; totalQuantity: number }> = {};
       
-      let firstTransactionDate = new Date(); // Initialize to a very future date
-      let lastTransactionDate = new Date(1970, 0, 1); // Initialize to a very past date
-      
-      const monthlyRevenueMap: Record<string, number> = {};
-      const monthlyExpensesMap: Record<string, number> = {};
+      let revenueFromProductSales = 0;
+      let revenueFromCustomizations = 0;
+      let revenueFromDeliveryFees = 0;
 
+      let firstTransactionDate = new Date(); 
+      let lastTransactionDate = new Date(1970, 0, 1); 
+      
       ordersSnapshot.forEach((doc) => {
         const order = doc.data() as Order;
         allTimeRevenueCalc += order.totalAmount;
         salesCount++;
+        revenueFromDeliveryFees += order.shippingCost || 0;
         
         const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date();
         if (isBefore(orderDate, firstTransactionDate)) firstTransactionDate = orderDate;
         if (isAfter(orderDate, lastTransactionDate)) lastTransactionDate = orderDate;
 
-        const monthYearKey = format(orderDate, 'yyyy-MM');
-        monthlyRevenueMap[monthYearKey] = (monthlyRevenueMap[monthYearKey] || 0) + order.totalAmount;
-
         order.items.forEach((item: FirestoreOrderItem) => {
+          const product = productsMap.get(item.productId);
+          const baseProductPrice = product ? product.price : item.price; // Fallback to item.price if product not found
+
+          const baseItemRevenue = baseProductPrice * item.quantity;
+          revenueFromProductSales += baseItemRevenue;
+
+          const itemCustomizationRevenue = (item.price * item.quantity) - baseItemRevenue;
+          if (itemCustomizationRevenue > 0) {
+            revenueFromCustomizations += itemCustomizationRevenue;
+          }
+          
           if (!productSalesAgg[item.productId]) {
             productSalesAgg[item.productId] = { name: item.name, totalRevenue: 0, totalQuantity: 0 };
           }
-          productSalesAgg[item.productId].totalRevenue += item.price;
+          // For top selling products, use the item's price as it reflects total customer payment for that item
+          productSalesAgg[item.productId].totalRevenue += item.price * item.quantity; 
           productSalesAgg[item.productId].totalQuantity += item.quantity;
         });
       });
@@ -90,9 +108,6 @@ export default function FinancialsPage() {
         const invoiceDate = invoice.invoiceDate?.toDate ? invoice.invoiceDate.toDate() : new Date();
          if (isBefore(invoiceDate, firstTransactionDate)) firstTransactionDate = invoiceDate;
         if (isAfter(invoiceDate, lastTransactionDate)) lastTransactionDate = invoiceDate;
-
-        const monthYearKey = format(invoiceDate, 'yyyy-MM');
-        monthlyExpensesMap[monthYearKey] = (monthlyExpensesMap[monthYearKey] || 0) + invoice.totalAmount;
       });
 
       setTotalRevenueAllTime(allTimeRevenueCalc);
@@ -100,13 +115,21 @@ export default function FinancialsPage() {
       setTotalExpensesAllTime(allTimeExpensesCalc);
       const allTimeNetProfit = allTimeRevenueCalc - allTimeExpensesCalc;
       setNetProfitAllTime(allTimeNetProfit);
-      setOverallCumulativeNetProfit(allTimeNetProfit); // This is for the "Total Balance" display
+      setOverallCumulativeNetProfit(allTimeNetProfit);
+
+      setRevenueBreakdownData([
+        { name: "Product Sales", value: revenueFromProductSales, color: "hsl(var(--chart-1))" },
+        { name: "Customizations", value: revenueFromCustomizations, color: "hsl(var(--chart-2))" },
+        { name: "Delivery Fees", value: revenueFromDeliveryFees, color: "hsl(var(--chart-3))" },
+      ].filter(source => source.value > 0)); // Filter out sources with 0 revenue
 
 
-      // Determine target month for daily chart (most recent month with activity)
       let targetMonthDate = lastTransactionDate;
-      if (lastTransactionDate.getFullYear() === 1970) { // No transactions found
-        targetMonthDate = new Date(); // Default to current month if no data
+      if (lastTransactionDate.getFullYear() === 1970 && firstTransactionDate.getFullYear() !== new Date().getFullYear() + 50) { // if last tx is epoch, but first is not future
+         targetMonthDate = firstTransactionDate; // Use first transaction date if last is still epoch
+      }
+      if (targetMonthDate.getFullYear() === 1970) { // No transactions found at all
+        targetMonthDate = new Date(); 
       }
       
       setLatestMonthLabel(format(targetMonthDate, 'MMMM yyyy'));
@@ -237,12 +260,12 @@ export default function FinancialsPage() {
       <Card>
           <CardHeader>
             <CardTitle className="font-headline text-lg">Monthly Revenue vs Expenses</CardTitle>
-            <CardDescription>Daily trend for the latest active month. (Overall Balance: {formatPrice(overallCumulativeNetProfit)})</CardDescription>
+            <CardDescription>Daily trend for the latest active month.</CardDescription>
           </CardHeader>
           <CardContent className="h-[400px] sm:h-[450px] pb-0">
            {dailyChartData.length > 0 ? (
               <MonthlyRevenueExpensesChart 
-                dailyData={dailyChartData} 
+                dailyData={dailyDataForChart} 
                 overallCumulativeNetProfit={overallCumulativeNetProfit}
                 latestMonthNetChange={latestMonthNetChange}
                 latestMonthLabel={latestMonthLabel}
@@ -258,29 +281,47 @@ export default function FinancialsPage() {
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline text-lg">Top Selling Products (by Revenue)</CardTitle>
-            <CardDescription>Performance of best-selling items based on revenue from paid orders.</CardDescription>
+            <CardTitle className="font-headline text-lg">Revenue Breakdown by Source</CardTitle>
+            <CardDescription>Contribution of different revenue streams.</CardDescription>
           </CardHeader>
           <CardContent className="h-[350px] sm:h-[400px] pb-0">
-             {topProductsData.length > 0 ? (
-                <TopSellingProductsChart data={topProductsData} />
+             {revenueBreakdownData.length > 0 ? (
+                <RevenueBreakdownChart data={revenueBreakdownData} />
              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                    No sales data available for top products.
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 text-center">
+                    <PieChartIcon className="h-10 w-10 mb-2 text-muted-foreground/70" />
+                    No revenue breakdown data available.
                 </div>
              )}
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline text-lg">Revenue Breakdown by Source</CardTitle>
-            <CardDescription>Contribution of different revenue streams. (Placeholder)</CardDescription>
+            <CardTitle className="font-headline text-lg">Top Selling Products (by Revenue)</CardTitle>
+            <CardDescription>Performance of best-selling items based on revenue from paid orders.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[350px] sm:h-[400px] flex items-center justify-center bg-muted/50 rounded-md">
-            <Image src="https://placehold.co/600x300.png?text=Revenue+Sources+Chart" alt="Revenue Sources Chart Placeholder" width={600} height={300} className="opacity-50" data-ai-hint="revenue sources chart" />
+          <CardContent className="min-h-[350px] sm:min-h-[400px] pb-0">
+             {topProductsData.length > 0 ? (
+                <TopSellingProductsChart data={topProductsData} />
+             ) : (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 text-center">
+                    <PackageIcon className="h-10 w-10 mb-2 text-muted-foreground/70"/>
+                    No sales data available for top products.
+                </div>
+             )}
           </CardContent>
         </Card>
       </div>
+      
+       <Card>
+          <CardHeader>
+            <CardTitle className="font-headline text-lg">Expense Breakdown by Category</CardTitle>
+            <CardDescription>Spending across different operational categories. (Placeholder)</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[350px] sm:h-[400px] flex items-center justify-center bg-muted/50 rounded-md">
+            <Image src="https://placehold.co/600x300.png?text=Expense+Categories+Chart" alt="Expense Categories Chart Placeholder" width={600} height={300} className="opacity-50" data-ai-hint="expense categories chart"/>
+          </CardContent>
+        </Card>
     </div>
   );
 }

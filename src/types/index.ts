@@ -1,4 +1,5 @@
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -47,7 +48,7 @@ export interface Product {
   id: string;
   name: string;
   description: string;
-  price: number;
+  price: number; // This is the BASE unit price of the product
   imageUrl?: string;
   stock: number;
   categories?: string[];
@@ -93,7 +94,7 @@ export interface ShippingAddress {
 export interface OrderItem {
   productId: string;
   name: string;
-  price: number; // Price per item AT TIME OF PURCHASE (incl. customization adjustments)
+  price: number; // Price per item AT TIME OF PURCHASE (this unit price INCLUDES customization adjustments if any were applied during cart addition)
   quantity: number;
   imageUrl?: string | null;
   customizations?: Record<string, any> | null; // { optionId: selectedValue, ... }
@@ -106,7 +107,7 @@ export interface GiftDetails {
   giftMessage?: string;
   notifyRecipient: boolean;
   showPricesToRecipient: boolean;
-  recipientCanViewAndTrack: boolean; // New field
+  recipientCanViewAndTrack: boolean; 
 }
 
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
@@ -125,8 +126,8 @@ export interface Order {
   customerEmail: string;
   customerPhone: string;
   items: OrderItem[];
-  totalAmount: number;
-  subTotal: number;
+  totalAmount: number; // Overall total including shipping
+  subTotal: number; // Total of items (items prices * quantity)
   shippingCost: number;
   status: OrderStatus;
   createdAt: any; // Firestore Timestamp
@@ -134,86 +135,84 @@ export interface Order {
   shippingAddress: ShippingAddress;
   shippingMethodId?: string | null;
   shippingMethodName?: string | null;
-  deliveryId?: string | null; // Link to a potential separate delivery document/task
+  deliveryId?: string | null; 
   riderId?: string | null;
-  riderName?: string | null; // Denormalized for quick display
+  riderName?: string | null; 
   deliveryCoordinates?: { lat: number; lng: number } | null;
-  deliveryNotes?: string | null; // Notes specifically for the delivery driver
-  color?: string | null; // For map marker differentiation, set by admin/dispatcher
-  estimatedDeliveryTime?: any | null; // Firestore Timestamp or Date
-  actualDeliveryTime?: any | null; // Firestore Timestamp or Date
+  deliveryNotes?: string | null; 
+  color?: string | null; 
+  estimatedDeliveryTime?: any | null; 
+  actualDeliveryTime?: any | null; 
   deliveryHistory?: DeliveryHistoryEntry[];
-  paymentMethod?: string | null; // e.g., 'cod', 'mpesa', 'card'
+  paymentMethod?: string | null; 
   paymentStatus: PaymentStatus;
-  transactionId?: string | null; // ID from payment gateway
+  transactionId?: string | null; 
   isGift?: boolean;
   giftDetails?: GiftDetails | null;
-  rating?: OrderRating | null; // New field for order rating
+  rating?: OrderRating | null; 
 }
 
 export interface CartItem {
-  productId: string; // Product ID
+  productId: string; 
   name: string;
-  unitPrice: number; // Base price of the product
-  currentPrice: number; // Price for one unit INCLUDING customizations
+  unitPrice: number; // Base unit price of the product (from Product.price)
+  currentPrice: number; // Price for one unit INCLUDING customizations (calculated at time of adding to cart or customization)
   imageUrl?: string;
   quantity: number;
   stock: number;
   customizations?: Record<string, any>;
-  cartItemId: string; // Unique ID for this specific cart entry (productId + sorted customization signature)
+  cartItemId: string; 
 }
 
 
 export interface Task {
   id: string;
-  orderId?: string; // Can be null if it's a general task not tied to an order
-  itemName?: string; // Denormalized product name if related to order item
-  taskType: string; // e.g., Engraving, Printing, Stocking, Approval
-  description: string; // Specific instructions for the task
-  assigneeId?: string; // UID of the technician, manager etc.
-  assigneeName?: string; // Denormalized assignee name
+  orderId?: string; 
+  itemName?: string; 
+  taskType: string; 
+  description: string; 
+  assigneeId?: string; 
+  assigneeName?: string; 
   status: 'pending' | 'in-progress' | 'completed' | 'needs_approval' | 'blocked' | 'rejected';
-  relatedDocId?: string; // e.g. orderId for order tasks, stockRequestId for stock tasks
-  createdAt: any; // Firestore Timestamp
-  updatedAt: any; // Firestore Timestamp
-  dueDate?: any; // Optional Firestore Timestamp
+  relatedDocId?: string; 
+  createdAt: any; 
+  updatedAt: any; 
+  dueDate?: any; 
   notes?: string;
 }
 
 export interface ShippingRegion {
   id: string;
-  name: string; // e.g., "Nairobi CBD & Westlands", "Mombasa Island"
-  county: string; // e.g., "Nairobi", "Mombasa"
-  towns: string[]; // List of towns/areas covered by this region
+  name: string; 
+  county: string; 
+  towns: string[]; 
   active: boolean;
-  createdAt?: any; // Firestore Timestamp or Date
-  updatedAt?: any; // Firestore Timestamp or Date
+  createdAt?: any; 
+  updatedAt?: any; 
 }
 
 export interface ShippingMethod {
   id: string;
-  name: string; // e.g., "Standard Delivery", "Express Delivery"
+  name: string; 
   description: string;
-  duration: string; // e.g., "1-2 business days", "Same-day (within 3 hours)"
-  basePrice: number; // Default price if no specific region rate
+  duration: string; 
+  basePrice: number; 
   active: boolean;
-  createdAt?: any; // Firestore Timestamp or Date
-  updatedAt?: any; // Firestore Timestamp or Date
+  createdAt?: any; 
+  updatedAt?: any; 
 }
 
-// This defines a specific rate for a method in a particular region
 export interface ShippingRate {
   id: string;
-  regionId: string; // Foreign key to ShippingRegion
-  methodId: string; // Foreign key to ShippingMethod
-  customPrice: number; // The price for this method in this region
-  notes?: string; // Optional notes for this specific rate
+  regionId: string; 
+  methodId: string; 
+  customPrice: number; 
+  notes?: string; 
   active: boolean;
-  createdAt?: any; // Firestore Timestamp or Date
-  updatedAt?: any; // Firestore Timestamp or Date
+  createdAt?: any; 
+  updatedAt?: any; 
 }
 
-// Customization Group Definitions
 export interface CustomizationGroupChoiceDefinition {
   value: string;
   label: string;
@@ -226,115 +225,104 @@ export interface CustomizationGroupOptionDefinition {
   type: 'select' | 'text' | 'checkbox' | 'image_upload';
   required?: boolean;
   showToCustomerByDefault?: boolean;
-
-  // For 'select'
   choices?: CustomizationGroupChoiceDefinition[];
-
-  // For 'text'
   placeholder?: string;
   maxLength?: number;
-
-  // For 'checkbox'
-  checkboxLabel?: string; // Label for the checkbox itself
-  priceAdjustmentIfChecked?: number; // Price adjustment if this checkbox is checked
-
-  // For 'image_upload'
-  acceptedFileTypes?: string; // e.g., ".png, .jpg, .jpeg"
+  checkboxLabel?: string; 
+  priceAdjustmentIfChecked?: number; 
+  acceptedFileTypes?: string; 
   maxFileSizeMB?: number;
 }
 
 export interface CustomizationGroupDefinition {
-  id: string; // Firestore document ID
+  id: string; 
   name: string;
   options: CustomizationGroupOptionDefinition[];
-  createdAt?: any; // Firestore Timestamp
-  updatedAt?: any; // Firestore Timestamp
+  createdAt?: any; 
+  updatedAt?: any; 
 }
 
 export type StockRequestStatus = 
   | 'pending_finance_approval'
   | 'pending_supplier_fulfillment'
-  | 'awaiting_receipt' // Supplier has fulfilled, waiting for IM to receive
-  | 'received' // IM has confirmed receipt and updated stock
-  | 'fulfilled' // Kept for backward compatibility or if direct fulfillment without IM check is needed
+  | 'awaiting_receipt' 
+  | 'received' 
+  | 'fulfilled' 
   | 'rejected_finance'
   | 'rejected_supplier'
   | 'cancelled';
 
 export interface StockRequest {
-  id: string; // Firestore document ID
+  id: string; 
   productId: string;
-  productName: string; // Denormalized
+  productName: string; 
   requestedQuantity: number;
-  requesterId: string; // Inventory Manager UID
-  requesterName: string; // Inventory Manager Name
-  supplierId?: string; // Optional: Specific supplier targeted (can be product's default supplier)
-  supplierName?: string; // Denormalized
+  requesterId: string; 
+  requesterName: string; 
+  supplierId?: string; 
+  supplierName?: string; 
   status: StockRequestStatus;
-  financeManagerId?: string | null; // UID of Finance Manager who actioned
-  financeManagerName?: string | null; // Name of Finance Manager
-  financeActionTimestamp?: any; // Firestore Timestamp
-  financeNotes?: string; // Notes from finance, e.g., rejection reason
-  supplierNotes?: string; // Notes from supplier, e.g., partial fulfillment
-  fulfilledQuantity?: number; // Quantity actually fulfilled by supplier
-  supplierActionTimestamp?: any; // Firestore Timestamp
-  
+  financeManagerId?: string | null; 
+  financeManagerName?: string | null; 
+  financeActionTimestamp?: any; 
+  financeNotes?: string; 
+  supplierNotes?: string; 
+  fulfilledQuantity?: number; 
+  supplierActionTimestamp?: any; 
   inventoryManagerReceiptNotes?: string;
-  receivedQuantity?: number; // Actual quantity received by IM
-  receivedById?: string; // IM UID
-  receivedByName?: string; // IM Name
-  receivedAt?: any; // Firestore Timestamp
-  
-  invoiceId?: string; // ID of the invoice generated by the supplier for this request
-
-  createdAt: any; // Firestore Timestamp
-  updatedAt: any; // Firestore Timestamp
-  notes?: string; // General notes by requester
+  receivedQuantity?: number; 
+  receivedById?: string; 
+  receivedByName?: string; 
+  receivedAt?: any; 
+  invoiceId?: string; 
+  createdAt: any; 
+  updatedAt: any; 
+  notes?: string; 
 }
 
-// Invoice Management
 export interface InvoiceItem {
-  id?: string; // for useFieldArray key
+  id?: string; 
   description: string;
   quantity: number;
   unitPrice: number;
-  totalPrice: number; // Calculated: quantity * unitPrice
+  totalPrice: number; 
 }
 
 export type InvoiceStatus =
   | 'draft'
-  | 'sent' // Sent to Zellow by Supplier (awaiting approval) - OR sent by Zellow to external client
-  | 'pending_approval' // Specifically for supplier invoices awaiting finance manager approval
-  | 'approved_for_payment' // Finance manager approved, awaiting payment processing
+  | 'sent' 
+  | 'pending_approval' 
+  | 'approved_for_payment' 
   | 'paid'
   | 'overdue'
   | 'cancelled'
-  | 'rejected'; // If finance manager rejects
+  | 'rejected'; 
 
 export interface Invoice {
-  id: string; // Firestore document ID
-  invoiceNumber: string; // Auto-generated or manual
-  supplierId?: string; // UID of the supplier who created it (if applicable)
-  supplierName?: string; // Denormalized
-  clientId?: string; // For Zellow, this would be our internal ID or a fixed value
-  clientName: string; // e.g., "Zellow Enterprises"
-  invoiceDate: any; // Firestore Timestamp
-  dueDate: any; // Firestore Timestamp
+  id: string; 
+  invoiceNumber: string; 
+  supplierId?: string; 
+  supplierName?: string; 
+  clientId?: string; 
+  clientName: string; 
+  invoiceDate: any; 
+  dueDate: any; 
   items: InvoiceItem[];
-  subTotal: number; // Sum of all item.totalPrice
-  taxRate?: number; // e.g., 0.05 for 5%. Optional.
-  taxAmount?: number; // Calculated: subTotal * taxRate. Optional.
-  totalAmount: number; // subTotal + taxAmount (if applicable)
+  subTotal: number; 
+  taxRate?: number; 
+  taxAmount?: number; 
+  totalAmount: number; 
   status: InvoiceStatus;
-  notes?: string; // General notes for the invoice
-  stockRequestId?: string; // Link to the stock request if this invoice is for one
-  createdAt: any; // Firestore Timestamp
-  updatedAt: any; // Firestore Timestamp
-  paymentDetails?: { // Optional details about payment
+  notes?: string; 
+  stockRequestId?: string; 
+  createdAt: any; 
+  updatedAt: any; 
+  paymentDetails?: { 
     method?: string;
     transactionId?: string;
-    paidAt?: any; // Firestore Timestamp
+    paidAt?: any; 
   };
-  financeManagerId?: string; // UID of Finance Manager who actioned
-  financeManagerName?: string; // Name of Finance Manager
+  financeManagerId?: string; 
+  financeManagerName?: string; 
 }
+
