@@ -5,13 +5,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, DollarSign, ShoppingCart, TrendingUp, Coins, PackageIcon } from 'lucide-react'; // BarChart2Icon was used before, keeping for consistency if it was intended for a different use
+import { Loader2, DollarSign, ShoppingCart, TrendingUp, Coins, PackageIcon } from 'lucide-react';
 import Image from 'next/image';
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order, Invoice, OrderItem } from '@/types';
-import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from 'date-fns';
-import { MonthlyRevenueExpensesChart, type MonthlyDataPoint } from '@/components/charts/MonthlyRevenueExpensesChart';
+import type { Order, Invoice, OrderItem as FirestoreOrderItem } from '@/types'; // Renamed OrderItem to avoid conflict
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isBefore, isAfter, subMonths } from 'date-fns';
+import { MonthlyRevenueExpensesChart, type DailyDataPoint } from '@/components/charts/MonthlyRevenueExpensesChart';
 import { TopSellingProductsChart, type ProductSalesData } from '@/components/charts/TopSellingProductsChart';
 
 const formatPrice = (price: number): string => {
@@ -22,7 +22,11 @@ export default function FinancialsPage() {
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [monthlyData, setMonthlyData] = useState<MonthlyDataPoint[]>([]);
+  const [dailyChartData, setDailyChartData] = useState<DailyDataPoint[]>([]);
+  const [latestMonthLabel, setLatestMonthLabel] = useState<string>("");
+  const [overallCumulativeNetProfit, setOverallCumulativeNetProfit] = useState<number>(0);
+  const [latestMonthNetChange, setLatestMonthNetChange] = useState<number>(0);
+
   const [topProductsData, setTopProductsData] = useState<ProductSalesData[]>([]);
 
   const [totalRevenueAllTime, setTotalRevenueAllTime] = useState<number>(0);
@@ -47,72 +51,108 @@ export default function FinancialsPage() {
         getDocs(paidInvoicesQuery)
       ]);
 
-      let revenueByMonth: Record<string, number> = {};
-      let productSales: Record<string, { name: string; totalRevenue: number; totalQuantity: number }> = {};
+      let allTimeRevenueCalc = 0;
+      let allTimeExpensesCalc = 0;
       let salesCount = 0;
-      let allTimeRevenue = 0;
-      let firstTransactionDate = new Date();
-      let lastTransactionDate = new Date(1970, 0, 1);
-
+      const productSalesAgg: Record<string, { name: string; totalRevenue: number; totalQuantity: number }> = {};
+      
+      let firstTransactionDate = new Date(); // Initialize to a very future date
+      let lastTransactionDate = new Date(1970, 0, 1); // Initialize to a very past date
+      
+      const monthlyRevenueMap: Record<string, number> = {};
+      const monthlyExpensesMap: Record<string, number> = {};
 
       ordersSnapshot.forEach((doc) => {
         const order = doc.data() as Order;
-        allTimeRevenue += order.totalAmount;
+        allTimeRevenueCalc += order.totalAmount;
         salesCount++;
         
         const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date();
-        if (orderDate < firstTransactionDate) firstTransactionDate = orderDate;
-        if (orderDate > lastTransactionDate) lastTransactionDate = orderDate;
+        if (isBefore(orderDate, firstTransactionDate)) firstTransactionDate = orderDate;
+        if (isAfter(orderDate, lastTransactionDate)) lastTransactionDate = orderDate;
 
-        const monthYear = format(orderDate, 'MMM yyyy');
-        revenueByMonth[monthYear] = (revenueByMonth[monthYear] || 0) + order.totalAmount;
+        const monthYearKey = format(orderDate, 'yyyy-MM');
+        monthlyRevenueMap[monthYearKey] = (monthlyRevenueMap[monthYearKey] || 0) + order.totalAmount;
 
-        order.items.forEach((item: OrderItem) => {
-          if (!productSales[item.productId]) {
-            productSales[item.productId] = { name: item.name, totalRevenue: 0, totalQuantity: 0 };
+        order.items.forEach((item: FirestoreOrderItem) => {
+          if (!productSalesAgg[item.productId]) {
+            productSalesAgg[item.productId] = { name: item.name, totalRevenue: 0, totalQuantity: 0 };
           }
-          // Assuming item.price is the final price per unit for this order item
-          productSales[item.productId].totalRevenue += (item.price); 
-          productSales[item.productId].totalQuantity += item.quantity;
+          productSalesAgg[item.productId].totalRevenue += item.price;
+          productSalesAgg[item.productId].totalQuantity += item.quantity;
         });
       });
 
-      let expensesByMonth: Record<string, number> = {};
-      let allTimeExpenses = 0;
       invoicesSnapshot.forEach((doc) => {
         const invoice = doc.data() as Invoice;
-        allTimeExpenses += invoice.totalAmount;
-
+        allTimeExpensesCalc += invoice.totalAmount;
+        
         const invoiceDate = invoice.invoiceDate?.toDate ? invoice.invoiceDate.toDate() : new Date();
-        if (invoiceDate < firstTransactionDate) firstTransactionDate = invoiceDate;
-        if (invoiceDate > lastTransactionDate) lastTransactionDate = invoiceDate;
+         if (isBefore(invoiceDate, firstTransactionDate)) firstTransactionDate = invoiceDate;
+        if (isAfter(invoiceDate, lastTransactionDate)) lastTransactionDate = invoiceDate;
 
-        const monthYear = format(invoiceDate, 'MMM yyyy');
-        expensesByMonth[monthYear] = (expensesByMonth[monthYear] || 0) + invoice.totalAmount;
+        const monthYearKey = format(invoiceDate, 'yyyy-MM');
+        monthlyExpensesMap[monthYearKey] = (monthlyExpensesMap[monthYearKey] || 0) + invoice.totalAmount;
       });
 
-      setTotalRevenueAllTime(allTimeRevenue);
+      setTotalRevenueAllTime(allTimeRevenueCalc);
       setTotalSalesAllTime(salesCount);
-      setTotalExpensesAllTime(allTimeExpenses);
-      setNetProfitAllTime(allTimeRevenue - allTimeExpenses);
+      setTotalExpensesAllTime(allTimeExpensesCalc);
+      const allTimeNetProfit = allTimeRevenueCalc - allTimeExpensesCalc;
+      setNetProfitAllTime(allTimeNetProfit);
+      setOverallCumulativeNetProfit(allTimeNetProfit); // This is for the "Total Balance" display
 
-      // Determine the range of months to display, e.g., last 12 months or all available
-      const dateRangeMonths = (firstTransactionDate.getFullYear() === new Date(1970,0,1).getFullYear() && lastTransactionDate.getFullYear() === new Date(1970,0,1).getFullYear())
-        ? eachMonthOfInterval({ start: subMonths(new Date(), 11), end: new Date()})
-        : eachMonthOfInterval({ start: startOfMonth(firstTransactionDate), end: endOfMonth(lastTransactionDate) });
+
+      // Determine target month for daily chart (most recent month with activity)
+      let targetMonthDate = lastTransactionDate;
+      if (lastTransactionDate.getFullYear() === 1970) { // No transactions found
+        targetMonthDate = new Date(); // Default to current month if no data
+      }
       
-      let cumulativeProfit = 0;
-      const chartData: MonthlyDataPoint[] = dateRangeMonths.map(monthStart => {
-        const monthKey = format(monthStart, 'MMM yyyy');
-        const revenue = revenueByMonth[monthKey] || 0;
-        const expenses = expensesByMonth[monthKey] || 0;
-        const netProfit = revenue - expenses;
-        cumulativeProfit += netProfit;
-        return { month: format(monthStart, 'MMM'), revenue, expenses, netProfit, cumulativeNetProfit: cumulativeProfit };
+      setLatestMonthLabel(format(targetMonthDate, 'MMMM yyyy'));
+      const daysInTargetMonth = eachDayOfInterval({
+        start: startOfMonth(targetMonthDate),
+        end: (isSameMonth(targetMonthDate, new Date())) ? new Date() : endOfMonth(targetMonthDate)
       });
-      setMonthlyData(chartData);
 
-      const topProductsArray = Object.values(productSales)
+      const dailyDataForChart: DailyDataPoint[] = daysInTargetMonth.map(day => ({
+        day: format(day, 'MMM dd'),
+        revenue: 0,
+        expenses: 0,
+      }));
+
+      let currentMonthNetChange = 0;
+
+      ordersSnapshot.forEach((doc) => {
+        const order = doc.data() as Order;
+        const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date();
+        if (isSameMonth(orderDate, targetMonthDate)) {
+          const dayKey = format(orderDate, 'MMM dd');
+          const dayEntry = dailyDataForChart.find(d => d.day === dayKey);
+          if (dayEntry) {
+            dayEntry.revenue += order.totalAmount;
+            currentMonthNetChange += order.totalAmount;
+          }
+        }
+      });
+
+      invoicesSnapshot.forEach((doc) => {
+        const invoice = doc.data() as Invoice;
+        const invoiceDate = invoice.invoiceDate?.toDate ? invoice.invoiceDate.toDate() : new Date();
+         if (isSameMonth(invoiceDate, targetMonthDate)) {
+          const dayKey = format(invoiceDate, 'MMM dd');
+          const dayEntry = dailyDataForChart.find(d => d.day === dayKey);
+          if (dayEntry) {
+            dayEntry.expenses += invoice.totalAmount;
+            currentMonthNetChange -= invoice.totalAmount;
+          }
+        }
+      });
+      
+      setDailyChartData(dailyDataForChart);
+      setLatestMonthNetChange(currentMonthNetChange);
+
+      const topProductsArray = Object.values(productSalesAgg)
         .sort((a,b) => b.totalRevenue - a.totalRevenue)
         .slice(0, 7); 
       setTopProductsData(topProductsArray);
@@ -184,12 +224,12 @@ export default function FinancialsPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
+            <CardTitle className="text-sm font-medium">Net Profit (All Time)</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatPrice(netProfitAllTime)}</div>
-            <p className="text-xs text-muted-foreground">Revenue - Expenses (All Time)</p>
+            <p className="text-xs text-muted-foreground">Revenue - Expenses</p>
           </CardContent>
         </Card>
       </div>
@@ -197,14 +237,19 @@ export default function FinancialsPage() {
       <Card>
           <CardHeader>
             <CardTitle className="font-headline text-lg">Monthly Revenue vs Expenses</CardTitle>
-            <CardDescription>Financial health trend with monthly revenue and expenses.</CardDescription>
+            <CardDescription>Daily trend for the latest active month. (Overall Balance: {formatPrice(overallCumulativeNetProfit)})</CardDescription>
           </CardHeader>
           <CardContent className="h-[400px] sm:h-[450px] pb-0">
-           {monthlyData.length > 0 ? (
-              <MonthlyRevenueExpensesChart data={monthlyData} />
+           {dailyChartData.length > 0 ? (
+              <MonthlyRevenueExpensesChart 
+                dailyData={dailyChartData} 
+                overallCumulativeNetProfit={overallCumulativeNetProfit}
+                latestMonthNetChange={latestMonthNetChange}
+                latestMonthLabel={latestMonthLabel}
+              />
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
-                No monthly data available to display chart.
+                No data available for the selected month.
               </div>
             )}
           </CardContent>
@@ -239,3 +284,5 @@ export default function FinancialsPage() {
     </div>
   );
 }
+
+    

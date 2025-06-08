@@ -6,7 +6,6 @@ import { TrendingUp } from "lucide-react"
 
 import {
   ChartContainer,
-  ChartTooltip as RechartsTooltip,
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
@@ -49,7 +48,7 @@ export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) 
 
 
   return (
-    <ChartContainer config={chartConfig} className="min-h-[300px] sm:min-h-[350px] w-full">
+    <ChartContainer config={chartConfig} className="aspect-auto h-full w-full"> {/* Changed min-h to aspect-auto h-full */}
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
             accessibilityLayer
@@ -57,7 +56,7 @@ export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) 
             layout="vertical"
             margin={{
             left: 5, 
-            right: 30, // Increased right margin for labels
+            right: 30, 
             top: 5,
             bottom: 5,
             }}
@@ -78,11 +77,11 @@ export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) 
             tickLine={false}
             axisLine={false}
             tickMargin={5}
-            width={100} // Adjusted for potentially longer names
+            width={100} 
             className="text-xs truncate"
             interval={0} 
             />
-            <RechartsTooltip 
+            <Tooltip 
                 cursor={{ fill: "hsl(var(--muted))" }} 
                 content={<ChartTooltipContent 
                     formatter={(value, name, props) => {
@@ -95,9 +94,9 @@ export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) 
                                 </div>
                             )
                         }
-                         return null; // Hide other tooltips if not needed
+                         return null;
                     }}
-                    hideLabel // Using custom formatter for label
+                    hideLabel 
                 />}
             />
             <Bar dataKey="totalRevenue" fill="var(--color-totalRevenue)" radius={4}>
@@ -114,3 +113,5 @@ export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) 
     </ChartContainer>
   )
 }
+
+    

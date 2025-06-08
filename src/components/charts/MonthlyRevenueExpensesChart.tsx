@@ -2,38 +2,37 @@
 "use client"
 
 import { TrendingUp, ArrowDownRight, ArrowUpRight, DollarSign } from "lucide-react"
-import { AreaChart, CartesianGrid, Area, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis, ReferenceLine } from "recharts" // Changed LineChart to AreaChart, Line to Area
+import { AreaChart, Area, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis, ReferenceLine } from "recharts"
 
 import {
   CardTitle,
 } from "@/components/ui/card"
 import {
   ChartContainer,
-  ChartTooltip as RechartsTooltip,
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import { format } from "date-fns"
 
-export interface MonthlyDataPoint {
-  month: string; 
+export interface DailyDataPoint {
+  day: string; // e.g., "Jun 01"
   revenue: number;
   expenses: number;
-  netProfit: number;
-  cumulativeNetProfit: number;
 }
 
 interface MonthlyRevenueExpensesChartProps {
-  data: MonthlyDataPoint[];
+  dailyData: DailyDataPoint[];
+  overallCumulativeNetProfit: number;
+  latestMonthNetChange: number;
+  latestMonthLabel: string;
 }
 
 const chartConfig = {
   revenue: {
-    label: "Monthly Revenue", // Updated label
-    color: "hsl(var(--chart-2))", // Greenish
+    label: "Daily Revenue",
+    color: "hsl(var(--chart-2))", // Greenish accent
   },
   expenses: {
-    label: "Monthly Expenses", // Updated label
+    label: "Daily Expenses",
     color: "hsl(var(--destructive))", // Red
   },
 } satisfies ChartConfig
@@ -45,40 +44,33 @@ const formatCurrencyWithDecimals = (value: number) => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(value);
 };
 
-export function MonthlyRevenueExpensesChart({ data: rawData }: MonthlyRevenueExpensesChartProps) {
-  if (!rawData || rawData.length === 0) {
+export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetProfit, latestMonthNetChange, latestMonthLabel }: MonthlyRevenueExpensesChartProps) {
+  if (!dailyData || dailyData.length === 0) {
     return (
         <div className="flex items-center justify-center h-full text-muted-foreground p-4">
-            No data available for the revenue vs expenses chart.
+            No daily data available for the selected month.
         </div>
     );
   }
 
-  let processedData = [...rawData];
-  if (rawData.length === 1) {
-    const singleMonth = rawData[0].month.split(" ")[0]; // Get "Jan" from "Jan 2024"
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const singleMonthIndex = monthNames.indexOf(singleMonth);
-    const prevMonthLabel = singleMonthIndex > 0 ? monthNames[singleMonthIndex - 1] : "Prev";
-
+  let processedData = [...dailyData];
+  // If only one actual data point, prepend a zero-value point for the previous conceptual day to draw a line from zero
+  if (dailyData.length === 1) {
     processedData = [
-      { month: prevMonthLabel, revenue: 0, expenses: 0, netProfit: 0, cumulativeNetProfit: 0 },
-      ...rawData,
+      { day: "Start", revenue: 0, expenses: 0 }, // Dummy point
+      ...dailyData,
     ];
   }
 
-  const latestMonthData = rawData[rawData.length - 1];
-  const totalBalance = latestMonthData.cumulativeNetProfit;
-  const latestMonthNetChange = latestMonthData.netProfit;
 
   return (
     <ChartContainer config={chartConfig} className="aspect-auto h-full w-full">
         <div className="flex items-start justify-between gap-4 px-1 pb-2 pt-0">
             <div className="grid gap-1">
             <CardTitle className="text-2xl sm:text-3xl flex items-baseline gap-1">
-                {formatCurrency(totalBalance)}
+                {formatCurrency(overallCumulativeNetProfit)}
                 <span className="text-sm font-normal text-muted-foreground">
-                Total Balance
+                Total Balance (All Time)
                 </span>
             </CardTitle>
             <div className="flex items-center gap-1 text-sm">
@@ -91,44 +83,48 @@ export function MonthlyRevenueExpensesChart({ data: rawData }: MonthlyRevenueExp
                 {formatCurrencyWithDecimals(latestMonthNetChange)}
                 </span>
                 <span className="text-muted-foreground">
-                {latestMonthData.month.split(" ")[0]} {/* Display only month name */}
+                in {latestMonthLabel}
                 </span>
             </div>
             </div>
         </div>
       <ResponsiveContainer width="100%" height="80%">
-        <AreaChart // Changed from ComposedChart to AreaChart for simplicity with areas
+        <AreaChart
             accessibilityLayer
             data={processedData}
             margin={{
-            left: -10, 
-            right: 12,
-            top: 5,
+                left: -10, 
+                right: 12,
+                top: 5,
+                bottom: 5,
             }}
         >
             <defs>
-                <linearGradient id="fillRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--color-revenue)" stopOpacity={0.8}/>
+                <linearGradient id="fillRevenueDaily" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-revenue)" stopOpacity={0.7}/>
                     <stop offset="95%" stopColor="var(--color-revenue)" stopOpacity={0.1}/>
                 </linearGradient>
-                <linearGradient id="fillExpenses" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--color-expenses)" stopOpacity={0.8}/>
+                <linearGradient id="fillExpensesDaily" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-expenses)" stopOpacity={0.6}/>
                     <stop offset="95%" stopColor="var(--color-expenses)" stopOpacity={0.1}/>
                 </linearGradient>
             </defs>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis
-            dataKey="month"
-            tickLine={true}
-            axisLine={false}
-            tickMargin={8}
-            tickFormatter={(value) => value.slice(0, 3)} // Already "Jan", "Feb", etc.
+              dataKey="day"
+              tickLine={true}
+              axisLine={false}
+              tickMargin={8}
+              className="text-xs"
+              // Smart tick display for daily data if too dense
+              interval={processedData.length > 15 ? Math.floor(processedData.length / 7) : 0} 
             />
             <YAxis
-            tickLine={true}
-            axisLine={false}
-            tickMargin={8}
-            tickFormatter={(value) => formatCurrency(value as number)}
+              tickLine={true}
+              axisLine={false}
+              tickMargin={8}
+              tickFormatter={(value) => formatCurrency(value as number)}
+              className="text-xs"
             />
             <Tooltip
                 cursor={{ stroke: "hsl(var(--border))", strokeWidth: 1, strokeDasharray: "3 3" }}
@@ -154,30 +150,30 @@ export function MonthlyRevenueExpensesChart({ data: rawData }: MonthlyRevenueExp
                     }}
                 />}
             />
-            <Legend verticalAlign="top" height={40}/>
-            <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="3 3" strokeWidth={1.5}/>
+            <Legend verticalAlign="top" height={40} iconSize={10} wrapperStyle={{fontSize: "12px"}}/>
+            <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeWidth={1.5} strokeOpacity={0.5}/>
             <Area 
                 dataKey="revenue" 
                 type="monotone" 
-                fill="url(#fillRevenue)"
+                fill="url(#fillRevenueDaily)"
                 stroke="var(--color-revenue)" 
-                strokeWidth={2.5} 
-                dot={{ r: 3, fill: "var(--color-revenue)", strokeWidth:0 }}
-                activeDot={{ r: 5, strokeWidth: 1, stroke: "var(--background)" }}
-                stackId="1" // Optional: if you want to stack, but for overlap this is fine
+                strokeWidth={2} 
+                dot={{ r: 2, fill: "var(--color-revenue)", strokeWidth:0 }}
+                activeDot={{ r: 4, strokeWidth: 1, stroke: "var(--background)" }}
             />
             <Area 
                 dataKey="expenses" 
                 type="monotone" 
-                fill="url(#fillExpenses)"
+                fill="url(#fillExpensesDaily)"
                 stroke="var(--color-expenses)" 
-                strokeWidth={2.5} 
-                dot={{ r: 3, fill: "var(--color-expenses)", strokeWidth:0 }}
-                activeDot={{ r: 5, strokeWidth: 1, stroke: "var(--background)" }}
-                stackId="2" // Optional
+                strokeWidth={2} 
+                dot={{ r: 2, fill: "var(--color-expenses)", strokeWidth:0 }}
+                activeDot={{ r: 4, strokeWidth: 1, stroke: "var(--background)" }}
             />
         </AreaChart>
       </ResponsiveContainer>
     </ChartContainer>
   )
 }
+
+    
