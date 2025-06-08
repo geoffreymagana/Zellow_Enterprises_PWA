@@ -24,7 +24,7 @@ import {
   LayoutDashboard, Users, Package, ShoppingCart, Layers, DollarSign,
   Truck, Settings as SettingsIcon, UserCircle, LogOutIcon, Menu, Bell,
   FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIconLucide, ListChecks,
-  Aperture, Coins, Warehouse, PackageSearch
+  Aperture, Coins, Warehouse, PackageSearch, BarChart2
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
@@ -56,8 +56,9 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/shipping', label: 'Shipping', icon: Ship, roles: ['Admin'] },
     { href: '/admin/approvals', label: 'General Approvals', icon: ClipboardCheck, roles: ['Admin'] }, 
     { href: '/finance/approvals', label: 'Stock Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] }, 
+    { href: '/finance/reports', label: 'Financial Reports', icon: BarChart2, roles: ['Admin', 'FinanceManager'] },
     { href: '/admin/notifications', label: 'Notifications', icon: Bell, roles: ['Admin'] },
-    { href: '/admin/reports', label: 'Reports', icon: FileArchive, roles: ['Admin'] },
+    { href: '/admin/reports', label: 'System Reports', icon: FileArchive, roles: ['Admin'] },
   ];
 
   const footerAdminNavItems = [
@@ -106,7 +107,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                           return false; 
                         }
                         if (item.href === '/inventory' && pathname.startsWith('/admin/products/edit')) {
-                          return false; // Ensure /inventory is not active when editing a product
+                          return false; 
                         }
                         return item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
                       })();
@@ -330,6 +331,10 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
                                 <Link href="/inventory" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/inventory" ? "bg-muted text-primary font-semibold" : ""}`}><Package className="mr-2 h-4 w-4" />Inventory</Link>
                                 <Link href="/inventory/receivership" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/inventory/receivership") ? "bg-muted text-primary font-semibold" : ""}`}><PackageSearch className="mr-2 h-4 w-4" />Receive Stock</Link>
                               </>)}
+                               {role === 'FinanceManager' && (<>
+                                <Link href="/invoices" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/invoices") ? "bg-muted text-primary font-semibold" : ""}`}><FileText className="mr-2 h-4 w-4" />Invoices</Link>
+                                <Link href="/finance/reports" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/finance/reports") ? "bg-muted text-primary font-semibold" : ""}`}><BarChart2 className="mr-2 h-4 w-4" />Reports</Link>
+                              </>)}
                               <Link href="/profile" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/profile" ? "bg-muted text-primary font-semibold" : ""}`}><UserCircle className="mr-2 h-4 w-4" />Profile</Link>
                           </nav>
                         </ScrollArea>
@@ -380,3 +385,4 @@ export default function AppGroupLayout({ children }: LayoutProps) {
 
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
+

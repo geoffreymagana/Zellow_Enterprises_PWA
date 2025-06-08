@@ -38,6 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const formatKsh = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -265,7 +266,7 @@ export default function InvoicesPage() {
         <CardHeader className="p-4 border-b">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
             <div className="relative w-full sm:w-auto sm:flex-grow sm:max-w-xs">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search by Invoice # or Supplier..."
                 value={searchTerm}
@@ -274,13 +275,15 @@ export default function InvoicesPage() {
               />
             </div>
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="w-full sm:w-auto">
-              <TabsList className="grid grid-cols-3 sm:flex w-full sm:w-auto">
-                {(role === 'Supplier' ? supplierTabsConfig : TABS_CONFIG).map(tab => (
-                    <TabsTrigger key={tab.value} value={tab.value} className="text-xs px-2.5 py-1.5 h-auto sm:flex-grow-0">
-                    {tab.icon && <tab.icon className="mr-1.5 h-3.5 w-3.5 hidden sm:inline-block"/>} {tab.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+             <ScrollArea orientation="horizontal" className="w-full whitespace-nowrap pb-2.5">
+                <TabsList className="inline-flex h-auto">
+                    {(role === 'Supplier' ? supplierTabsConfig : TABS_CONFIG).map(tab => (
+                        <TabsTrigger key={tab.value} value={tab.value} className="text-xs px-2.5 py-1.5 h-auto sm:flex-grow-0">
+                        {tab.icon && <tab.icon className="mr-1.5 h-3.5 w-3.5 hidden sm:inline-block"/>} {tab.label}
+                        </TabsTrigger>
+                    ))}
+                </TabsList>
+              </ScrollArea>
             </Tabs>
           </div>
         </CardHeader>
@@ -383,8 +386,8 @@ export default function InvoicesPage() {
       </Dialog>
 
       {/* Approve/Reject Dialog */}
-      <Dialog open={isActionModalOpen} onOpenChange={(isOpen) => { if (!isOpen) setActionableInvoice(null); setIsActionModalOpen(isOpen); }}>
-        {actionableInvoice && isActionModalOpen && (
+      {actionableInvoice && isActionModalOpen && (
+          <Dialog open={isActionModalOpen} onOpenChange={(isOpen) => { if (!isOpen) setActionableInvoice(null); setIsActionModalOpen(isOpen); }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle className="capitalize">{actionType} Invoice {actionableInvoice.invoiceNumber}</DialogTitle>
@@ -416,8 +419,8 @@ export default function InvoicesPage() {
               </Button>
             </DialogFooter>
           </DialogContent>
-        )}
-      </Dialog>
+        </Dialog>
+      )}
 
     </div>
   );

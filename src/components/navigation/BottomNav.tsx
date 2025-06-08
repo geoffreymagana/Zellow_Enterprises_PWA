@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ListChecks, UserCircle, Package, Truck, FileText, DollarSign, Warehouse, SlidersHorizontal, Gift, ShoppingCart, PackageSearch } from 'lucide-react';
+import { Home, ListChecks, UserCircle, Package, Truck, FileText, DollarSign, Warehouse, SlidersHorizontal, Gift, ShoppingCart, PackageSearch, BarChart2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import type { UserRole } from '@/types';
 import { cn } from '@/lib/utils';
@@ -29,6 +29,7 @@ const navItems: NavItem[] = [
   { href: '/admin/dispatch', label: 'Dispatch', icon: SlidersHorizontal, roles: ['DispatchManager', 'Admin'] },
   { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['Supplier', 'FinanceManager'] },
   { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['FinanceManager', 'Admin'] }, 
+  { href: '/finance/reports', label: 'Fin. Reports', icon: BarChart2, roles: ['FinanceManager'] },
   { href: '/inventory', label: 'Inventory', icon: Warehouse, roles: ['InventoryManager'] },
   { href: '/inventory/receivership', label: 'Receive Stock', icon: PackageSearch, roles: ['InventoryManager'] },
   { href: '/supplier/stock-requests', label: 'Stock Requests', icon: Warehouse, roles: ['Supplier'] },
@@ -64,6 +65,13 @@ export function BottomNav() {
       const priorityHrefs = ['/dashboard', '/profile'];
       let prioritizedItems = displayItems.filter(item => priorityHrefs.includes(item.href));
       let otherItems = displayItems.filter(item => !priorityHrefs.includes(item.href));
+      // Special handling for FinanceManager to ensure Reports is included if space
+      if (role === 'FinanceManager') {
+        const reportsItem = navItems.find(item => item.href === '/finance/reports');
+        if (reportsItem && !prioritizedItems.some(p => p.href === reportsItem.href) && !otherItems.some(o => o.href === reportsItem.href)) {
+           otherItems.unshift(reportsItem); // Add to beginning of other items
+        }
+      }
       displayItems = [...prioritizedItems, ...otherItems].slice(0, 5);
     }
   }
@@ -76,36 +84,29 @@ export function BottomNav() {
             const currentPath = pathname;
             const targetHref = item.href;
           
-            // Handle /inventory and /inventory/receivership specifically
             if (targetHref === '/inventory') {
-              // Active if currentPath is exactly /inventory, OR if role is InventoryManager and currentPath is /dashboard (acting as home)
-              // but NOT if currentPath is /inventory/receivership
               if (currentPath === '/inventory') return true;
-              if (role === 'InventoryManager' && currentPath === '/dashboard' && !pathname.startsWith('/inventory/receivership')) return true; // InventoryManager home is /inventory, map /dashboard to it
+              if (role === 'InventoryManager' && currentPath === '/dashboard' && !pathname.startsWith('/inventory/receivership')) return true;
               return false;
             }
             if (targetHref === '/inventory/receivership') {
               return currentPath.startsWith('/inventory/receivership');
             }
           
-            // Logic for Customer home page
             if (role === 'Customer') {
               if ((targetHref === '/products' || targetHref === '/dashboard') && (currentPath === '/products' || currentPath === '/dashboard' || currentPath.startsWith('/products/'))) {
                 return true;
               }
             }
             
-            // Logic for non-Customer dashboard (home)
             if (role !== 'Customer' && targetHref === '/dashboard') {
-              // For InventoryManager, if they are on /inventory, the /dashboard (Home) link should not be active.
               if (role === 'InventoryManager' && currentPath.startsWith('/inventory')) return false;
+              if (role === 'FinanceManager' && (currentPath.startsWith('/invoices') || currentPath.startsWith('/finance/reports'))) return false;
               return currentPath === '/dashboard';
             }
             
-            // General startsWith for other items, ensuring it's not a base path already handled differently
             if (targetHref !== '/dashboard' && targetHref !== '/products' && targetHref !== '/inventory' && targetHref !== '/inventory/receivership') {
               if (currentPath === targetHref || currentPath.startsWith(targetHref + '/')) {
-                 // Check if another, more specific item is active
                  const moreSpecificActiveItem = displayItems.find(other => 
                     other.href !== targetHref &&
                     currentPath.startsWith(other.href) &&
@@ -116,7 +117,7 @@ export function BottomNav() {
               }
             }
             
-            return currentPath === targetHref; // Exact match for anything not covered
+            return currentPath === targetHref; 
           })();
 
           return (
@@ -140,3 +141,4 @@ export function BottomNav() {
     </nav>
   );
 }
+

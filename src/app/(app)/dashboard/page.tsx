@@ -4,7 +4,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon, BadgeHelp, MailWarning, Banknote, CheckCircle2, Warehouse, ListChecks, PackageX, PackageSearch, FileText, Coins, Hourglass } from 'lucide-react';
+import { BarChart2, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon, BadgeHelp, MailWarning, Banknote, CheckCircle2, Warehouse, ListChecks, PackageX, PackageSearch, FileText, Coins, Hourglass } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState, useCallback } from 'react';
@@ -356,7 +356,7 @@ export default function DashboardPage() {
         const endOfDay = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999));
 
         const qNewStockRequests = query(stockRequestsCol,
-          where('status', '==', 'pending_supplier_fulfillment'), // Suppliers see all pending fulfillment requests
+          where('status', '==', 'pending_supplier_fulfillment'), 
           where('createdAt', '>=', startOfDay),
           where('createdAt', '<=', endOfDay)
         );
@@ -370,7 +370,7 @@ export default function DashboardPage() {
 
         const qFulfilled = query(stockRequestsCol,
           where('supplierId', '==', user.uid),
-          where('status', 'in', ['awaiting_receipt', 'received']) // Fulfilled means IM is awaiting or has received
+          where('status', 'in', ['awaiting_receipt', 'received']) 
         );
         const unsubFulfilled = onSnapshot(qFulfilled, (snapshot) => {
           setSupplierFulfilledRequests(snapshot.size);
@@ -382,7 +382,7 @@ export default function DashboardPage() {
 
         const qPendingInvoices = query(invoicesCol,
           where('supplierId', '==', user.uid),
-          where('status', 'in', ['pending_approval', 'approved_for_payment']) // Invoices awaiting action by Zellow
+          where('status', 'in', ['pending_approval', 'approved_for_payment']) 
         );
         const unsubPendingInvoices = onSnapshot(qPendingInvoices, (snapshot) => {
           setSupplierPendingInvoices(snapshot.size);
@@ -438,6 +438,7 @@ export default function DashboardPage() {
             <DashboardItem title="Pending Invoice Approvals" value={pendingInvoiceApprovalsCount} icon={Hourglass} link="/invoices" description="Supplier invoices needing approval." isLoadingValue={isLoadingPendingInvoiceApprovals}/>
             <DashboardItem title="General Approvals" value={pendingApprovalsCount} icon={BadgeHelp} link="/admin/approvals" isLoadingValue={isLoadingPendingApprovals}/>
             <DashboardItem title="Unread Notifications" value={unreadNotificationsCount} icon={MailWarning} link="/admin/notifications" isLoadingValue={isLoadingUnreadNotifications}/>
+            <DashboardItem title="Financial Reports" icon={BarChart2} link="/finance/reports" description="View financial summaries."/>
             <DashboardItem title="System Reports" icon={FileArchive} link="/admin/reports" />
             <DashboardItem title="Customization Hub" icon={Layers} link="/admin/customizations" />
             <DashboardItem title="Shipping Config" icon={Ship} link="/admin/shipping" />
@@ -451,6 +452,7 @@ export default function DashboardPage() {
             <DashboardItem title="All Payments" icon={DollarSign} link="/admin/payments" />
             <DashboardItem title="Supplier Invoices" value={pendingInvoiceApprovalsCount} icon={FileText} link="/invoices" description="Manage supplier invoices." isLoadingValue={isLoadingPendingInvoiceApprovals} />
             <DashboardItem title="Stock Request Approvals" value={pendingStockRequestsCount} icon={ListChecks} link="/finance/approvals" description="Approve/reject stock requests." isLoadingValue={isLoadingPendingStockRequests} />
+            <DashboardItem title="Financial Reports" icon={BarChart2} link="/finance/reports" description="View financial summaries."/>
           </>
         );
       case 'DispatchManager':
@@ -513,7 +515,7 @@ export default function DashboardPage() {
       
       {role !== 'Admin' && role !== 'DispatchManager' && role !== 'FinanceManager' && role !== 'InventoryManager' && role !== 'Supplier' && (
         <Alert>
-          <BarChart className="h-4 w-4 mr-2" />
+          <BarChart2 className="h-4 w-4 mr-2" />
           <AlertTitle>Data Overview</AlertTitle>
           <AlertDescription>
             This dashboard provides key metrics and quick access to your tasks. Data may be placeholder for some items.
@@ -590,7 +592,11 @@ export default function DashboardPage() {
             {(role === 'Technician' || role === 'ServiceManager') && <Link href="/tasks"><Button>View Tasks</Button></Link>}
             {(role === 'Rider') && <Link href="/deliveries"><Button>Manage Deliveries</Button></Link>}
              {role === 'DispatchManager' && <Link href="/admin/dispatch"><Button><Component className="mr-2 h-4 w-4" />Open Dispatch Center</Button></Link>}
-             {role === 'FinanceManager' && <Link href="/admin/payments"><Button><DollarSign className="mr-2 h-4 w-4" />View Payments</Button></Link>}
+             {role === 'FinanceManager' && (<>
+                <Link href="/admin/payments"><Button><DollarSign className="mr-2 h-4 w-4" />View Payments</Button></Link>
+                <Link href="/invoices"><Button variant="outline"><FileText className="mr-2 h-4 w-4" />Supplier Invoices</Button></Link>
+                <Link href="/finance/reports"><Button variant="outline"><BarChart2 className="mr-2 h-4 w-4" />Financial Reports</Button></Link>
+             </>)}
              {role === 'InventoryManager' && <Link href="/inventory"><Button><Warehouse className="mr-2 h-4 w-4" />Manage Inventory</Button></Link>}
           </CardContent>
         </Card>
@@ -607,3 +613,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
