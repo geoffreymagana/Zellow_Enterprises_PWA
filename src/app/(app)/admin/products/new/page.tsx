@@ -44,7 +44,7 @@ const productFormSchema = z.object({
 
 type ProductFormValues = z.infer<typeof productFormSchema>;
 
-const CLOUDINARY_COLLECTION_URL = "https://collection.cloudinary.com/dwqwwb2fh/6376c18334415e9e66450df7af51e5a0";
+const CLOUDINARY_COLLECTION_URL = "https://console.cloudinary.com/app/c-b0aff9f01c42acba8cd2f71d8ab350/assets/media_library/search?sortDirection=desc&sortField=_score&search_id=my_uploads&view_mode=mosaic&q=%7B%22createdByUsers%22%3A%5B%224153138de4c02e36cbf183277adc96%22%5D%7D";
 const NONE_GROUP_SENTINEL_VALUE = "__NONE_GROUP_SENTINEL__";
 
 export default function CreateProductPage() {
@@ -238,5 +238,6 @@ export default function CreateProductPage() {
     </div>
   );
 }
+    
 
     
