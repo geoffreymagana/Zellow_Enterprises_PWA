@@ -275,8 +275,8 @@ export default function InvoicesPage() {
               />
             </div>
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="w-full sm:w-auto">
-             <ScrollArea orientation="horizontal" className="w-full whitespace-nowrap pb-2.5">
-                <TabsList className="inline-flex h-auto">
+             <ScrollArea orientation="horizontal" className="w-full pb-2.5">
+                <TabsList className="inline-flex h-auto whitespace-nowrap">
                     {(role === 'Supplier' ? supplierTabsConfig : TABS_CONFIG).map(tab => (
                         <TabsTrigger key={tab.value} value={tab.value} className="text-xs px-2.5 py-1.5 h-auto sm:flex-grow-0">
                         {tab.icon && <tab.icon className="mr-1.5 h-3.5 w-3.5 hidden sm:inline-block"/>} {tab.label}
@@ -385,7 +385,7 @@ export default function InvoicesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Approve/Reject Dialog */}
+      {/* Action Dialog for Approve/Reject */}
       {actionableInvoice && isActionModalOpen && (
           <Dialog open={isActionModalOpen} onOpenChange={(isOpen) => { if (!isOpen) setActionableInvoice(null); setIsActionModalOpen(isOpen); }}>
           <DialogContent>
@@ -425,4 +425,3 @@ export default function InvoicesPage() {
     </div>
   );
 }
-

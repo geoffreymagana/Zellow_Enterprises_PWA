@@ -438,7 +438,7 @@ export default function DashboardPage() {
             <DashboardItem title="Pending Invoice Approvals" value={pendingInvoiceApprovalsCount} icon={Hourglass} link="/invoices" description="Supplier invoices needing approval." isLoadingValue={isLoadingPendingInvoiceApprovals}/>
             <DashboardItem title="General Approvals" value={pendingApprovalsCount} icon={BadgeHelp} link="/admin/approvals" isLoadingValue={isLoadingPendingApprovals}/>
             <DashboardItem title="Unread Notifications" value={unreadNotificationsCount} icon={MailWarning} link="/admin/notifications" isLoadingValue={isLoadingUnreadNotifications}/>
-            <DashboardItem title="Financial Reports" icon={BarChart2} link="/finance/reports" description="View financial summaries."/>
+            <DashboardItem title="Financials" icon={BarChart2} link="/finance/financials" description="View financial summaries."/>
             <DashboardItem title="System Reports" icon={FileArchive} link="/admin/reports" />
             <DashboardItem title="Customization Hub" icon={Layers} link="/admin/customizations" />
             <DashboardItem title="Shipping Config" icon={Ship} link="/admin/shipping" />
@@ -452,7 +452,7 @@ export default function DashboardPage() {
             <DashboardItem title="All Payments" icon={DollarSign} link="/admin/payments" />
             <DashboardItem title="Supplier Invoices" value={pendingInvoiceApprovalsCount} icon={FileText} link="/invoices" description="Manage supplier invoices." isLoadingValue={isLoadingPendingInvoiceApprovals} />
             <DashboardItem title="Stock Request Approvals" value={pendingStockRequestsCount} icon={ListChecks} link="/finance/approvals" description="Approve/reject stock requests." isLoadingValue={isLoadingPendingStockRequests} />
-            <DashboardItem title="Financial Reports" icon={BarChart2} link="/finance/reports" description="View financial summaries."/>
+            <DashboardItem title="Financials" icon={BarChart2} link="/finance/financials" description="View financial summaries."/>
           </>
         );
       case 'DispatchManager':
@@ -595,7 +595,7 @@ export default function DashboardPage() {
              {role === 'FinanceManager' && (<>
                 <Link href="/admin/payments"><Button><DollarSign className="mr-2 h-4 w-4" />View Payments</Button></Link>
                 <Link href="/invoices"><Button variant="outline"><FileText className="mr-2 h-4 w-4" />Supplier Invoices</Button></Link>
-                <Link href="/finance/reports"><Button variant="outline"><BarChart2 className="mr-2 h-4 w-4" />Financial Reports</Button></Link>
+                <Link href="/finance/financials"><Button variant="outline"><BarChart2 className="mr-2 h-4 w-4" />Financials</Button></Link>
              </>)}
              {role === 'InventoryManager' && <Link href="/inventory"><Button><Warehouse className="mr-2 h-4 w-4" />Manage Inventory</Button></Link>}
           </CardContent>
@@ -613,4 +613,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

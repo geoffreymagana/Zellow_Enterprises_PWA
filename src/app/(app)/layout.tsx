@@ -56,7 +56,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/shipping', label: 'Shipping', icon: Ship, roles: ['Admin'] },
     { href: '/admin/approvals', label: 'General Approvals', icon: ClipboardCheck, roles: ['Admin'] }, 
     { href: '/finance/approvals', label: 'Stock Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] }, 
-    { href: '/finance/reports', label: 'Financial Reports', icon: BarChart2, roles: ['Admin', 'FinanceManager'] },
+    { href: '/finance/financials', label: 'Financials', icon: BarChart2, roles: ['Admin', 'FinanceManager'] },
     { href: '/admin/notifications', label: 'Notifications', icon: Bell, roles: ['Admin'] },
     { href: '/admin/reports', label: 'System Reports', icon: FileArchive, roles: ['Admin'] },
   ];
@@ -333,7 +333,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
                               </>)}
                                {role === 'FinanceManager' && (<>
                                 <Link href="/invoices" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/invoices") ? "bg-muted text-primary font-semibold" : ""}`}><FileText className="mr-2 h-4 w-4" />Invoices</Link>
-                                <Link href="/finance/reports" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/finance/reports") ? "bg-muted text-primary font-semibold" : ""}`}><BarChart2 className="mr-2 h-4 w-4" />Reports</Link>
+                                <Link href="/finance/financials" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/finance/financials") ? "bg-muted text-primary font-semibold" : ""}`}><BarChart2 className="mr-2 h-4 w-4" />Financials</Link>
                               </>)}
                               <Link href="/profile" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/profile" ? "bg-muted text-primary font-semibold" : ""}`}><UserCircle className="mr-2 h-4 w-4" />Profile</Link>
                           </nav>
@@ -385,4 +385,3 @@ export default function AppGroupLayout({ children }: LayoutProps) {
 
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
-

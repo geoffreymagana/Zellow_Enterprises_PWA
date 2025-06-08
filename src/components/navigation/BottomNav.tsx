@@ -29,7 +29,7 @@ const navItems: NavItem[] = [
   { href: '/admin/dispatch', label: 'Dispatch', icon: SlidersHorizontal, roles: ['DispatchManager', 'Admin'] },
   { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['Supplier', 'FinanceManager'] },
   { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['FinanceManager', 'Admin'] }, 
-  { href: '/finance/reports', label: 'Fin. Reports', icon: BarChart2, roles: ['FinanceManager'] },
+  { href: '/finance/financials', label: 'Financials', icon: BarChart2, roles: ['FinanceManager'] },
   { href: '/inventory', label: 'Inventory', icon: Warehouse, roles: ['InventoryManager'] },
   { href: '/inventory/receivership', label: 'Receive Stock', icon: PackageSearch, roles: ['InventoryManager'] },
   { href: '/supplier/stock-requests', label: 'Stock Requests', icon: Warehouse, roles: ['Supplier'] },
@@ -65,11 +65,11 @@ export function BottomNav() {
       const priorityHrefs = ['/dashboard', '/profile'];
       let prioritizedItems = displayItems.filter(item => priorityHrefs.includes(item.href));
       let otherItems = displayItems.filter(item => !priorityHrefs.includes(item.href));
-      // Special handling for FinanceManager to ensure Reports is included if space
+      // Special handling for FinanceManager to ensure Financials is included if space
       if (role === 'FinanceManager') {
-        const reportsItem = navItems.find(item => item.href === '/finance/reports');
-        if (reportsItem && !prioritizedItems.some(p => p.href === reportsItem.href) && !otherItems.some(o => o.href === reportsItem.href)) {
-           otherItems.unshift(reportsItem); // Add to beginning of other items
+        const financialsItem = navItems.find(item => item.href === '/finance/financials');
+        if (financialsItem && !prioritizedItems.some(p => p.href === financialsItem.href) && !otherItems.some(o => o.href === financialsItem.href)) {
+           otherItems.unshift(financialsItem); // Add to beginning of other items
         }
       }
       displayItems = [...prioritizedItems, ...otherItems].slice(0, 5);
@@ -92,6 +92,9 @@ export function BottomNav() {
             if (targetHref === '/inventory/receivership') {
               return currentPath.startsWith('/inventory/receivership');
             }
+             if (targetHref === '/finance/financials') {
+              return currentPath.startsWith('/finance/financials');
+            }
           
             if (role === 'Customer') {
               if ((targetHref === '/products' || targetHref === '/dashboard') && (currentPath === '/products' || currentPath === '/dashboard' || currentPath.startsWith('/products/'))) {
@@ -101,11 +104,11 @@ export function BottomNav() {
             
             if (role !== 'Customer' && targetHref === '/dashboard') {
               if (role === 'InventoryManager' && currentPath.startsWith('/inventory')) return false;
-              if (role === 'FinanceManager' && (currentPath.startsWith('/invoices') || currentPath.startsWith('/finance/reports'))) return false;
+              if (role === 'FinanceManager' && (currentPath.startsWith('/invoices') || currentPath.startsWith('/finance/financials'))) return false;
               return currentPath === '/dashboard';
             }
             
-            if (targetHref !== '/dashboard' && targetHref !== '/products' && targetHref !== '/inventory' && targetHref !== '/inventory/receivership') {
+            if (targetHref !== '/dashboard' && targetHref !== '/products' && targetHref !== '/inventory' && targetHref !== '/inventory/receivership' && targetHref !== '/finance/financials') {
               if (currentPath === targetHref || currentPath.startsWith(targetHref + '/')) {
                  const moreSpecificActiveItem = displayItems.find(other => 
                     other.href !== targetHref &&
@@ -141,4 +144,3 @@ export function BottomNav() {
     </nav>
   );
 }
-
