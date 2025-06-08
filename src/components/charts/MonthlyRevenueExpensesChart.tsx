@@ -2,14 +2,16 @@
 "use client"
 
 import { TrendingUp, ArrowDownRight, ArrowUpRight, DollarSign } from "lucide-react"
-import { AreaChart, Area, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis, ReferenceLine } from "recharts"
+import { AreaChart, Area, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis, ReferenceLine, Text } from "recharts" // Added Text for custom tick
 import { CardTitle } from "@/components/ui/card"
-import { cn } from "@/lib/utils" // For cn utility if needed for custom tooltip
+import { cn } from "@/lib/utils"
+import { format, isSameDay, startOfMonth, endOfMonth, isToday as dateIsToday } from 'date-fns'; // Added date-fns functions
 
 export interface DailyDataPoint {
-  day: string; 
+  day: string; // Format "MMM dd"
   revenue: number;
   expenses: number;
+  dateObject: Date; // Store the actual date object for comparisons
 }
 
 interface MonthlyRevenueExpensesChartProps {
@@ -17,9 +19,9 @@ interface MonthlyRevenueExpensesChartProps {
   overallCumulativeNetProfit: number;
   latestMonthNetChange: number;
   latestMonthLabel: string;
+  targetMonthDate: Date; // Date object representing the month being displayed
 }
 
-// Define chartConfig locally since ChartContainer is removed
 const chartConfig = {
   revenue: {
     label: "Monthly Revenue",
@@ -38,7 +40,7 @@ const formatCurrencyWithDecimals = (value: number) => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(value);
 };
 
-// Simplified Custom Tooltip Content
+// Custom Tooltip Content
 const CustomTooltipContent = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
@@ -64,8 +66,42 @@ const CustomTooltipContent = ({ active, payload, label }: any) => {
   return null;
 };
 
+// Custom XAxis Tick Component
+const CustomizedXAxisTick = (props: any) => {
+  const { x, y, payload, dailyData, targetMonthDate } = props;
+  const tickDateStr = payload.value; // This is "MMM dd"
 
-export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetProfit, latestMonthNetChange, latestMonthLabel }: MonthlyRevenueExpensesChartProps) {
+  // Find the corresponding dateObject for the current tick
+  const currentTickDataPoint = dailyData.find((data: DailyDataPoint) => data.day === tickDateStr);
+  if (!currentTickDataPoint) return null; // Should not happen if dataKey="day"
+
+  const tickDate = currentTickDataPoint.dateObject;
+
+  const firstDayOfMonth = startOfMonth(targetMonthDate);
+  const lastDayOfData = dailyData[dailyData.length - 1]?.dateObject;
+  const isCurrentCalendarDay = dateIsToday(tickDate);
+  const isTargetMonthCurrentCalendarMonth = dateIsToday(targetMonthDate) || (targetMonthDate.getFullYear() === new Date().getFullYear() && targetMonthDate.getMonth() === new Date().getMonth());
+  
+  const hasData = currentTickDataPoint.revenue > 0 || currentTickDataPoint.expenses > 0;
+
+  const shouldRender = 
+    isSameDay(tickDate, firstDayOfMonth) ||
+    (lastDayOfData && isSameDay(tickDate, lastDayOfData)) ||
+    (isCurrentCalendarDay && isTargetMonthCurrentCalendarMonth) ||
+    hasData;
+
+  if (shouldRender) {
+    return (
+      <Text x={x} y={y} dy={16} textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize={10}>
+        {tickDateStr.split(' ')[1]} {/* Show only day number */}
+      </Text>
+    );
+  }
+  return null;
+};
+
+
+export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetProfit, latestMonthNetChange, latestMonthLabel, targetMonthDate }: MonthlyRevenueExpensesChartProps) {
   if (!dailyData || dailyData.length === 0) {
     return (
         <div className="flex items-center justify-center h-full text-muted-foreground p-4">
@@ -75,18 +111,26 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
   }
 
   let processedData = [...dailyData];
+  // Ensure the chart can draw even with one data point or for a full month with sparse data
   if (dailyData.length === 1) {
+    const singleDate = dailyData[0].dateObject;
+    const dayBefore = new Date(singleDate); dayBefore.setDate(singleDate.getDate() -1);
+    const dayAfter = new Date(singleDate); dayAfter.setDate(singleDate.getDate() + 1);
     processedData = [
-      { day: "Start", revenue: 0, expenses: 0 }, 
+      { day: format(dayBefore, "MMM dd"), dateObject: dayBefore, revenue: 0, expenses: 0 },
       ...dailyData,
+      { day: format(dayAfter, "MMM dd"), dateObject: dayAfter, revenue: 0, expenses: 0 },
     ];
+  } else if (dailyData.length > 1) {
+     // To ensure lines connect to axis from start/end if first/last day has no data but intermediate days do.
+     // This logic might need more refinement if the "dailyData" prop already guarantees full month coverage.
+     // For now, assuming `dailyData` passed in is what we work with for plotting.
   }
 
 
   return (
-    <div className="flex flex-col h-full w-full"> {/* Root div with flex-col and h-full */}
-        {/* Header Section */}
-        <div className="flex-shrink-0 px-1 pb-2 pt-0"> {/* Header takes its own space */}
+    <div className="flex flex-col h-full w-full">
+        <div className="flex-shrink-0 px-1 pb-2 pt-0">
             <div className="flex items-start justify-between gap-4">
                 <div className="grid gap-1">
                     <CardTitle className="text-2xl sm:text-3xl flex items-baseline gap-1">
@@ -112,44 +156,43 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
             </div>
         </div>
 
-        {/* Chart Section */}
-        <div className="flex-1 min-h-0 w-full"> {/* Chart container takes remaining space */}
+        <div className="flex-1 min-h-0 w-full">
             <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                     accessibilityLayer
                     data={processedData}
                     margin={{
-                        left: 10, // Increased left margin for Y-axis labels
+                        left: 10,
                         right: 15, 
                         top: 5,
                         bottom: 5,
                     }}
                 >
                     <defs>
-                        <linearGradient id="fillRevenueDaily" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="fillRevenueDailyChart" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={chartConfig.revenue.color} stopOpacity={0.7}/>
                             <stop offset="95%" stopColor={chartConfig.revenue.color} stopOpacity={0.1}/>
                         </linearGradient>
-                        <linearGradient id="fillExpensesDaily" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="fillExpensesDailyChart" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={chartConfig.expenses.color} stopOpacity={0.6}/>
                             <stop offset="95%" stopColor={chartConfig.expenses.color} stopOpacity={0.1}/>
                         </linearGradient>
                     </defs>
                     <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border/50" />
                     <XAxis
-                    dataKey="day"
-                    tickLine={true}
-                    axisLine={false}
-                    tickMargin={5}
-                    className="text-xs fill-muted-foreground"
-                    interval={Math.max(0, Math.floor(processedData.length / 7) -1)} 
+                        dataKey="day"
+                        tickLine={true}
+                        axisLine={false}
+                        tickMargin={5}
+                        interval={0} // Let custom tick component decide rendering
+                        tick={<CustomizedXAxisTick dailyData={dailyData} targetMonthDate={targetMonthDate} />}
                     />
                     <YAxis
-                    tickLine={true}
-                    axisLine={false}
-                    tickMargin={8}
-                    tickFormatter={(value) => formatCurrency(value as number)}
-                    className="text-xs fill-muted-foreground"
+                        tickLine={true}
+                        axisLine={false}
+                        tickMargin={8}
+                        tickFormatter={(value) => formatCurrency(value as number)}
+                        className="text-xs fill-muted-foreground"
                     />
                     <Tooltip
                         cursor={{ stroke: "hsl(var(--border))", strokeWidth: 1, strokeDasharray: "3 3" }}
@@ -160,7 +203,7 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
                     <Area 
                         dataKey="revenue" 
                         type="monotone" 
-                        fill="url(#fillRevenueDaily)"
+                        fill="url(#fillRevenueDailyChart)"
                         stroke={chartConfig.revenue.color} 
                         strokeWidth={2} 
                         dot={{ r: 2, fill: chartConfig.revenue.color, strokeWidth:0 }}
@@ -170,7 +213,7 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
                     <Area 
                         dataKey="expenses" 
                         type="monotone" 
-                        fill="url(#fillExpensesDaily)"
+                        fill="url(#fillExpensesDailyChart)"
                         stroke={chartConfig.expenses.color} 
                         strokeWidth={2} 
                         dot={{ r: 2, fill: chartConfig.expenses.color, strokeWidth:0 }}
