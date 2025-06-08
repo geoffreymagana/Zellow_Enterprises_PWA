@@ -5,13 +5,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, DollarSign, ShoppingCart, TrendingUp, Coins, BarChart2 as BarChart2Icon, PackageIcon } from 'lucide-react';
+import { Loader2, DollarSign, ShoppingCart, TrendingUp, Coins, PackageIcon } from 'lucide-react'; // BarChart2Icon was used before, keeping for consistency if it was intended for a different use
 import Image from 'next/image';
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, Invoice, OrderItem } from '@/types';
-import { format } from 'date-fns';
-import { CumulativeNetProfitChart, type MonthlyDataPoint } from '@/components/charts/CumulativeNetProfitChart';
+import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from 'date-fns';
+import { MonthlyRevenueExpensesChart, type MonthlyDataPoint } from '@/components/charts/MonthlyRevenueExpensesChart';
 import { TopSellingProductsChart, type ProductSalesData } from '@/components/charts/TopSellingProductsChart';
 
 const formatPrice = (price: number): string => {
@@ -51,20 +51,28 @@ export default function FinancialsPage() {
       let productSales: Record<string, { name: string; totalRevenue: number; totalQuantity: number }> = {};
       let salesCount = 0;
       let allTimeRevenue = 0;
+      let firstTransactionDate = new Date();
+      let lastTransactionDate = new Date(1970, 0, 1);
+
 
       ordersSnapshot.forEach((doc) => {
         const order = doc.data() as Order;
         allTimeRevenue += order.totalAmount;
         salesCount++;
+        
+        const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date();
+        if (orderDate < firstTransactionDate) firstTransactionDate = orderDate;
+        if (orderDate > lastTransactionDate) lastTransactionDate = orderDate;
 
-        const monthYear = order.createdAt?.toDate ? format(order.createdAt.toDate(), 'MMM yyyy') : 'Unknown Date';
+        const monthYear = format(orderDate, 'MMM yyyy');
         revenueByMonth[monthYear] = (revenueByMonth[monthYear] || 0) + order.totalAmount;
 
         order.items.forEach((item: OrderItem) => {
           if (!productSales[item.productId]) {
             productSales[item.productId] = { name: item.name, totalRevenue: 0, totalQuantity: 0 };
           }
-          productSales[item.productId].totalRevenue += (item.price * item.quantity); // Assuming item.price is the final price per unit
+          // Assuming item.price is the final price per unit for this order item
+          productSales[item.productId].totalRevenue += (item.price); 
           productSales[item.productId].totalQuantity += item.quantity;
         });
       });
@@ -74,7 +82,12 @@ export default function FinancialsPage() {
       invoicesSnapshot.forEach((doc) => {
         const invoice = doc.data() as Invoice;
         allTimeExpenses += invoice.totalAmount;
-        const monthYear = invoice.invoiceDate?.toDate ? format(invoice.invoiceDate.toDate(), 'MMM yyyy') : 'Unknown Date';
+
+        const invoiceDate = invoice.invoiceDate?.toDate ? invoice.invoiceDate.toDate() : new Date();
+        if (invoiceDate < firstTransactionDate) firstTransactionDate = invoiceDate;
+        if (invoiceDate > lastTransactionDate) lastTransactionDate = invoiceDate;
+
+        const monthYear = format(invoiceDate, 'MMM yyyy');
         expensesByMonth[monthYear] = (expensesByMonth[monthYear] || 0) + invoice.totalAmount;
       });
 
@@ -83,22 +96,25 @@ export default function FinancialsPage() {
       setTotalExpensesAllTime(allTimeExpenses);
       setNetProfitAllTime(allTimeRevenue - allTimeExpenses);
 
-      const allMonths = new Set([...Object.keys(revenueByMonth), ...Object.keys(expensesByMonth)]);
-      const sortedMonths = Array.from(allMonths).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+      // Determine the range of months to display, e.g., last 12 months or all available
+      const dateRangeMonths = (firstTransactionDate.getFullYear() === new Date(1970,0,1).getFullYear() && lastTransactionDate.getFullYear() === new Date(1970,0,1).getFullYear())
+        ? eachMonthOfInterval({ start: subMonths(new Date(), 11), end: new Date()})
+        : eachMonthOfInterval({ start: startOfMonth(firstTransactionDate), end: endOfMonth(lastTransactionDate) });
       
       let cumulativeProfit = 0;
-      const chartData: MonthlyDataPoint[] = sortedMonths.map(month => {
-        const revenue = revenueByMonth[month] || 0;
-        const expenses = expensesByMonth[month] || 0;
+      const chartData: MonthlyDataPoint[] = dateRangeMonths.map(monthStart => {
+        const monthKey = format(monthStart, 'MMM yyyy');
+        const revenue = revenueByMonth[monthKey] || 0;
+        const expenses = expensesByMonth[monthKey] || 0;
         const netProfit = revenue - expenses;
         cumulativeProfit += netProfit;
-        return { month, revenue, expenses, netProfit, cumulativeNetProfit: cumulativeProfit };
+        return { month: format(monthStart, 'MMM'), revenue, expenses, netProfit, cumulativeNetProfit: cumulativeProfit };
       });
       setMonthlyData(chartData);
 
       const topProductsArray = Object.values(productSales)
         .sort((a,b) => b.totalRevenue - a.totalRevenue)
-        .slice(0, 7); // Top 7 products
+        .slice(0, 7); 
       setTopProductsData(topProductsArray);
 
     } catch (error) {
@@ -180,12 +196,12 @@ export default function FinancialsPage() {
 
       <Card>
           <CardHeader>
-            <CardTitle className="font-headline text-lg">Cumulative Net Profit Over Time</CardTitle>
-            <CardDescription>Monthly financial health trend.</CardDescription>
+            <CardTitle className="font-headline text-lg">Monthly Revenue vs Expenses</CardTitle>
+            <CardDescription>Financial health trend with monthly revenue and expenses.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[450px] pb-0"> {/* Increased height and removed bottom padding for chart */}
+          <CardContent className="h-[400px] sm:h-[450px] pb-0">
            {monthlyData.length > 0 ? (
-              <CumulativeNetProfitChart data={monthlyData} />
+              <MonthlyRevenueExpensesChart data={monthlyData} />
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 No monthly data available to display chart.
@@ -198,9 +214,9 @@ export default function FinancialsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline text-lg">Top Selling Products (by Revenue)</CardTitle>
-            <CardDescription>Performance of best-selling items.</CardDescription>
+            <CardDescription>Performance of best-selling items based on revenue from paid orders.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[350px] pb-0">
+          <CardContent className="h-[350px] sm:h-[400px] pb-0">
              {topProductsData.length > 0 ? (
                 <TopSellingProductsChart data={topProductsData} />
              ) : (
@@ -213,19 +229,10 @@ export default function FinancialsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline text-lg">Revenue Breakdown by Source</CardTitle>
-            <CardDescription>Contribution of different revenue streams.</CardDescription>
+            <CardDescription>Contribution of different revenue streams. (Placeholder)</CardDescription>
           </CardHeader>
-          <CardContent className="h-[350px] flex items-center justify-center bg-muted/50 rounded-md">
-            <Image src="https://placehold.co/600x300.png?text=Revenue+Sources+Chart" alt="Revenue Sources Chart Placeholder" width={600} height={300} className="opacity-50" data-ai-hint="revenue breakdown chart" />
-          </CardContent>
-        </Card>
-         <Card>
-          <CardHeader>
-            <CardTitle className="font-headline text-lg">Expense Breakdown by Category</CardTitle>
-            <CardDescription>Spending across different expense categories.</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[350px] flex items-center justify-center bg-muted/50 rounded-md">
-             <Image src="https://placehold.co/600x300.png?text=Expense+Categories+Chart" alt="Expense Categories Chart Placeholder" width={600} height={300} className="opacity-50" data-ai-hint="expense breakdown chart" />
+          <CardContent className="h-[350px] sm:h-[400px] flex items-center justify-center bg-muted/50 rounded-md">
+            <Image src="https://placehold.co/600x300.png?text=Revenue+Sources+Chart" alt="Revenue Sources Chart Placeholder" width={600} height={300} className="opacity-50" data-ai-hint="revenue sources chart" />
           </CardContent>
         </Card>
       </div>
