@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { doc, getDoc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Product } from '@/types';
+import type { Product, ProductCustomizationOption, CustomizationGroupDefinition } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
@@ -53,7 +53,32 @@ export default function ProductDetailsPage() {
       const productDoc = await getDoc(productDocRef);
 
       if (productDoc.exists()) {
-        setProduct({ id: productDoc.id, ...productDoc.data() } as Product);
+        let fetchedProductData = { id: productDoc.id, ...productDoc.data() } as Product;
+
+        // If product has a customizationGroupId and no direct customizationOptions (or empty array),
+        // fetch the group and use its options.
+        if (fetchedProductData.customizationGroupId && (!fetchedProductData.customizationOptions || fetchedProductData.customizationOptions.length === 0)) {
+          try {
+            const groupDocRef = doc(db, 'customizationGroupDefinitions', fetchedProductData.customizationGroupId);
+            const groupDoc = await getDoc(groupDocRef);
+            if (groupDoc.exists()) {
+              const groupData = groupDoc.data() as CustomizationGroupDefinition;
+              fetchedProductData.customizationOptions = groupData.options as ProductCustomizationOption[];
+            } else {
+              console.warn(`Customization group ${fetchedProductData.customizationGroupId} not found for product ${fetchedProductData.id}`);
+              // Ensure customizationOptions is an empty array if group not found, to avoid issues with .length later
+              fetchedProductData.customizationOptions = [];
+            }
+          } catch (groupError) {
+            console.error(`Error fetching customization group ${fetchedProductData.customizationGroupId}:`, groupError);
+            fetchedProductData.customizationOptions = [];
+          }
+        } else if (!fetchedProductData.customizationOptions) {
+          // Ensure customizationOptions is an empty array if null/undefined and no group ID
+          fetchedProductData.customizationOptions = [];
+        }
+        setProduct(fetchedProductData);
+
       } else {
         setError("Item not found.");
         toast({ title: "Not Found", description: "The item you're looking for doesn't exist.", variant: "destructive" });
@@ -76,8 +101,8 @@ export default function ProductDetailsPage() {
     try {
       const q = query(
         collection(db, "products"),
-        where("categories", "array-contains", product.categories[0]),
-        where("id", "!=", product.id),
+        where("categories", "array-contains", product.categories[0]), // Use first category for suggestions
+        where("id", "!=", product.id), // Exclude current product
         orderBy("createdAt", "desc"),
         limit(5)
       );
@@ -89,10 +114,11 @@ export default function ProductDetailsPage() {
       setFbtSuggestions(suggestions);
     } catch (err) {
       console.error("Error fetching FBT suggestions:", err);
+      // Optionally set an error state for FBT if needed
     } finally {
       setIsLoadingFbt(false);
     }
-  }, [product]);
+  }, [product]); // Depends on product state
 
   useEffect(() => {
     if (authLoading) return;
@@ -109,6 +135,7 @@ export default function ProductDetailsPage() {
   }, [authLoading, user, productId, router, fetchProduct]);
 
   useEffect(() => {
+    // Fetch FBT suggestions only after product data (and its categories) is available
     if (product && product.categories && product.categories.length > 0) {
       fetchFBTSuggestions();
     }
@@ -131,15 +158,13 @@ export default function ProductDetailsPage() {
     if (!product) return;
     setIsAddingToCart(true);
 
-    // Add main product (non-customized version if it has customizations)
-    addToCart(product, 1);
+    addToCart(product, 1, undefined, product.price); // Add main product (base price, no customizations)
 
-    // Add selected FBT items
     let fbtAddedCount = 0;
     selectedFbtItems.forEach(fbtId => {
       const fbtProduct = fbtSuggestions.find(p => p.id === fbtId);
       if (fbtProduct && fbtProduct.stock > 0) {
-        addToCart(fbtProduct, 1); 
+        addToCart(fbtProduct, 1, undefined, fbtProduct.price); 
         fbtAddedCount++;
       }
     });
@@ -150,9 +175,8 @@ export default function ProductDetailsPage() {
     }
 
     toast({ title: "Items Added", description });
-    setSelectedFbtItems(new Set()); // Clear FBT selection
+    setSelectedFbtItems(new Set()); 
     
-    // Navigate to cart page after a slight delay to allow toast to be seen
     setTimeout(() => {
         setIsAddingToCart(false);
         router.push('/orders/cart'); 
@@ -197,7 +221,7 @@ export default function ProductDetailsPage() {
   const hasCustomizations = product.customizationOptions && product.customizationOptions.length > 0;
 
   return (
-    <div className="container mx-auto px-0 sm:px-4 py-8 pb-28"> {/* Added pb-28 for sticky footer */}
+    <div className="container mx-auto px-0 sm:px-4 py-8 pb-28">
       <Card className="overflow-hidden shadow-none sm:shadow-lg rounded-none sm:rounded-lg">
         <div className="md:flex">
           <div className="md:w-1/2">
@@ -229,12 +253,10 @@ export default function ProductDetailsPage() {
                 <p className="text-sm text-destructive mt-1 font-semibold">Out of stock</p>
               )}
             </CardContent>
-            {/* Removed original CardFooter with buttons as they are moved to sticky footer */}
           </div>
         </div>
       </Card>
 
-      {/* Frequently Bought Together Section */}
       {isLoadingFbt ? (
         <div className="mt-8 text-center">
             <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
@@ -281,8 +303,7 @@ export default function ProductDetailsPage() {
         </Card>
       )}
 
-      {/* Sticky Footer for Actions */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border p-3 shadow-lg z-20 md:hidden"> {/* Hide on md and larger since BottomNav will take over */}
+      <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border p-3 shadow-lg z-20 md:hidden">
         <div className="container mx-auto px-4 flex gap-3 items-center justify-center sm:justify-end">
           {hasCustomizations && (
             <Link href={`/products/${product.id}/customize`} passHref className="flex-1 sm:flex-none">
@@ -303,7 +324,6 @@ export default function ProductDetailsPage() {
           </Button>
         </div>
       </div>
-       {/* Non-sticky buttons for larger screens (md and up), placed where footer would normally be if content is short */}
       <div className="hidden md:flex mt-8 pt-6 border-t justify-end gap-3">
         {hasCustomizations && (
             <Link href={`/products/${product.id}/customize`} passHref>
