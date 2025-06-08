@@ -40,9 +40,6 @@ export function BottomNav() {
   const { role, user } = useAuth();
   const { cartTotalItems } = useCart();
 
-  // Do not render BottomNav for Admins using AdminLayout, as they have sidebar + sheet.
-  // This condition is now primarily handled by where BottomNav is included in AppGroupLayout.
-  // However, adding a direct check here is a safeguard.
   if (!user || role === 'Admin') return null;
 
   let displayItems: NavItem[] = [];
@@ -64,7 +61,6 @@ export function BottomNav() {
   } else {
     displayItems = navItems.filter(item => item.roles.includes(role));
     if (displayItems.length > 5) {
-      // Simple priority for managers, ensuring dashboard and profile are likely shown
       const priorityHrefs = ['/dashboard', '/profile'];
       let prioritizedItems = displayItems.filter(item => priorityHrefs.includes(item.href));
       let otherItems = displayItems.filter(item => !priorityHrefs.includes(item.href));
@@ -76,13 +72,52 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-lg md:hidden">
       <div className="flex justify-around max-w-md mx-auto">
         {displayItems.map((item) => {
-          const isActivePath = (currentPath: string, targetHref: string) => {
-            if (targetHref === '/dashboard' || targetHref === '/products') {
-              return currentPath === targetHref || (currentPath === '/dashboard' && targetHref === '/products' && role === 'Customer') || (currentPath === '/products' && targetHref === '/dashboard' && role !== 'Customer');
+          const isActive = (() => {
+            const currentPath = pathname;
+            const targetHref = item.href;
+          
+            // Handle /inventory and /inventory/receivership specifically
+            if (targetHref === '/inventory') {
+              // Active if currentPath is exactly /inventory, OR if role is InventoryManager and currentPath is /dashboard (acting as home)
+              // but NOT if currentPath is /inventory/receivership
+              if (currentPath === '/inventory') return true;
+              if (role === 'InventoryManager' && currentPath === '/dashboard' && !pathname.startsWith('/inventory/receivership')) return true; // InventoryManager home is /inventory, map /dashboard to it
+              return false;
             }
-            return currentPath.startsWith(targetHref);
-          };
-          const isActive = isActivePath(pathname, item.href);
+            if (targetHref === '/inventory/receivership') {
+              return currentPath.startsWith('/inventory/receivership');
+            }
+          
+            // Logic for Customer home page
+            if (role === 'Customer') {
+              if ((targetHref === '/products' || targetHref === '/dashboard') && (currentPath === '/products' || currentPath === '/dashboard' || currentPath.startsWith('/products/'))) {
+                return true;
+              }
+            }
+            
+            // Logic for non-Customer dashboard (home)
+            if (role !== 'Customer' && targetHref === '/dashboard') {
+              // For InventoryManager, if they are on /inventory, the /dashboard (Home) link should not be active.
+              if (role === 'InventoryManager' && currentPath.startsWith('/inventory')) return false;
+              return currentPath === '/dashboard';
+            }
+            
+            // General startsWith for other items, ensuring it's not a base path already handled differently
+            if (targetHref !== '/dashboard' && targetHref !== '/products' && targetHref !== '/inventory' && targetHref !== '/inventory/receivership') {
+              if (currentPath === targetHref || currentPath.startsWith(targetHref + '/')) {
+                 // Check if another, more specific item is active
+                 const moreSpecificActiveItem = displayItems.find(other => 
+                    other.href !== targetHref &&
+                    currentPath.startsWith(other.href) &&
+                    other.href.length > targetHref.length
+                 );
+                 if (moreSpecificActiveItem) return false;
+                 return true;
+              }
+            }
+            
+            return currentPath === targetHref; // Exact match for anything not covered
+          })();
 
           return (
             <Link key={item.label} href={item.href} legacyBehavior>

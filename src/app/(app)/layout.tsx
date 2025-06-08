@@ -48,8 +48,8 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager'] },
     { href: '/admin/users', label: 'Users', icon: Users, roles: ['Admin'] },
     { href: '/admin/products', label: 'Products', icon: Package, roles: ['Admin'] },
-    { href: '/inventory', label: 'Inventory Mgt', icon: Warehouse, roles: ['Admin', 'InventoryManager'] }, // Admin can oversee
-    { href: '/inventory/receivership', label: 'Receive Stock', icon: PackageSearch, roles: ['Admin', 'InventoryManager'] }, // Admin can oversee
+    { href: '/inventory', label: 'Inventory Mgt', icon: Warehouse, roles: ['Admin', 'InventoryManager'] },
+    { href: '/inventory/receivership', label: 'Receive Stock', icon: PackageSearch, roles: ['Admin', 'InventoryManager'] },
     { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, roles: ['Admin', 'ServiceManager'] },
     { href: '/admin/customizations', label: 'Customizations', icon: Layers, roles: ['Admin'] },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'] },
@@ -101,7 +101,15 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                 <ScrollArea className="flex-1">
                   <SidebarMenu className="p-2">
                     {mainAdminNavItems.map((item) => {
-                       const isActive = item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                       const isActive = (() => {
+                        if (item.href === '/inventory' && pathname.startsWith('/inventory/receivership')) {
+                          return false; 
+                        }
+                        if (item.href === '/inventory' && pathname.startsWith('/admin/products/edit')) {
+                          return false; // Ensure /inventory is not active when editing a product
+                        }
+                        return item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                      })();
                       return (
                       <SidebarMenuItem key={item.label}>
                         <Link href={item.href} passHref legacyBehavior>
@@ -121,7 +129,9 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                 </ScrollArea>
                 <SidebarFooter className="p-2 border-t border-sidebar">
                   <SidebarMenu className="p-0">
-                    {filteredFooterAdminNavItems.map((item) => ( 
+                    {filteredFooterAdminNavItems.map((item) => {
+                      const isActive = item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                      return (
                       <SidebarMenuItem key={item.label}>
                         <Link href={item.href} passHref legacyBehavior>
                           <SidebarMenuButton
@@ -129,13 +139,13 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                             className="w-full justify-start"
                             variant="ghost"
                             onClick={() => setOpenMobile(false)}
-                            isActive={item.href === pathname}
+                            isActive={isActive}
                           >
                             <a><item.icon className="mr-2 h-4 w-4" /><span>{item.label}</span></a>
                           </SidebarMenuButton>
                         </Link>
                       </SidebarMenuItem>
-                    ))}
+                    )})}
                   </SidebarMenu>
                   <div className="p-2 mt-1"><ThemeToggle /></div>
                   <div className="mt-1 p-2">
@@ -181,7 +191,15 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
               {filteredMainAdminNavItems.length > 0 ? (
                 <SidebarMenu className="p-2">
                   {filteredMainAdminNavItems.map((item) => {
-                    const isActive = item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                    const isActive = (() => {
+                      if (item.href === '/inventory' && pathname.startsWith('/inventory/receivership')) {
+                        return false; 
+                      }
+                      if (item.href === '/inventory' && pathname.startsWith('/admin/products/edit')) {
+                        return false;
+                      }
+                      return item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                    })();
                     return (
                     <SidebarMenuItem key={item.label}>
                       <Link href={item.href!} passHref legacyBehavior>
@@ -211,7 +229,9 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
           <SidebarFooter className="p-2 border-t border-sidebar flex-shrink-0">
             {filteredFooterAdminNavItems.length > 0 && (
               <SidebarMenu className="p-0">
-                {filteredFooterAdminNavItems.map((item) => (
+                {filteredFooterAdminNavItems.map((item) => {
+                 const isActive = item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                  return (
                   <SidebarMenuItem key={item.label}>
                     <Link href={item.href} passHref legacyBehavior>
                       <SidebarMenuButton
@@ -219,7 +239,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                         tooltip={item.label}
                         className="w-full justify-start"
                         variant="ghost"
-                        isActive={item.href === pathname}
+                        isActive={isActive}
                       >
                         <a>
                           <item.icon className="mr-2 h-4 w-4" />
@@ -228,7 +248,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                       </SidebarMenuButton>
                     </Link>
                   </SidebarMenuItem>
-                ))}
+                )})}
               </SidebarMenu>
             )}
             <div className="mt-1 p-2">
@@ -307,7 +327,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
                               {role === 'Rider' && <Link href="/deliveries" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/deliveries") ? "bg-muted text-primary font-semibold" : ""}`}><Truck className="mr-2 h-4 w-4" />Deliveries</Link>}
                               {role === 'Supplier' && <Link href="/supplier/stock-requests" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/supplier/stock-requests") ? "bg-muted text-primary font-semibold" : ""}`}><Warehouse className="mr-2 h-4 w-4" />Stock Requests</Link>}
                               {role === 'InventoryManager' && (<>
-                                <Link href="/inventory" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/inventory") && !pathname.startsWith("/inventory/receivership") ? "bg-muted text-primary font-semibold" : ""}`}><Package className="mr-2 h-4 w-4" />Inventory</Link>
+                                <Link href="/inventory" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/inventory" ? "bg-muted text-primary font-semibold" : ""}`}><Package className="mr-2 h-4 w-4" />Inventory</Link>
                                 <Link href="/inventory/receivership" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/inventory/receivership") ? "bg-muted text-primary font-semibold" : ""}`}><PackageSearch className="mr-2 h-4 w-4" />Receive Stock</Link>
                               </>)}
                               <Link href="/profile" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/profile" ? "bg-muted text-primary font-semibold" : ""}`}><UserCircle className="mr-2 h-4 w-4" />Profile</Link>
