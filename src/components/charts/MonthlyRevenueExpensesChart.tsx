@@ -28,11 +28,11 @@ interface MonthlyRevenueExpensesChartProps {
 
 const chartConfig = {
   revenue: {
-    label: "Daily Revenue",
+    label: "Monthly Revenue",
     color: "hsl(var(--chart-2))", // Greenish accent
   },
   expenses: {
-    label: "Daily Expenses",
+    label: "Monthly Expenses",
     color: "hsl(var(--destructive))", // Red
   },
 } satisfies ChartConfig
@@ -53,8 +53,9 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
     );
   }
 
+  // Prepend a "Previous Month" data point if only one actual month's data is present,
+  // so the line/area has a starting point from zero or the previous month's end.
   let processedData = [...dailyData];
-  // If only one actual data point, prepend a zero-value point for the previous conceptual day to draw a line from zero
   if (dailyData.length === 1) {
     processedData = [
       { day: "Start", revenue: 0, expenses: 0 }, // Dummy point
@@ -64,13 +65,13 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
 
 
   return (
-    <ChartContainer config={chartConfig} className="aspect-auto h-full w-full">
-        <div className="flex items-start justify-between gap-4 px-1 pb-2 pt-0">
+    <ChartContainer config={chartConfig} className="flex flex-col h-full w-full">
+        <div className="flex items-start justify-between gap-4 px-1 pb-2 pt-0 flex-shrink-0">
             <div className="grid gap-1">
             <CardTitle className="text-2xl sm:text-3xl flex items-baseline gap-1">
                 {formatCurrency(overallCumulativeNetProfit)}
                 <span className="text-sm font-normal text-muted-foreground">
-                Total Balance (All Time)
+                Total Balance
                 </span>
             </CardTitle>
             <div className="flex items-center gap-1 text-sm">
@@ -88,13 +89,13 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
             </div>
             </div>
         </div>
-      <ResponsiveContainer width="100%" height="80%">
+      <ResponsiveContainer width="100%" className="flex-grow">
         <AreaChart
             accessibilityLayer
             data={processedData}
             margin={{
                 left: -10, 
-                right: 12,
+                right: 15, // Increased right margin slightly for labels
                 top: 5,
                 bottom: 5,
             }}
@@ -117,7 +118,7 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
               tickMargin={8}
               className="text-xs"
               // Smart tick display for daily data if too dense
-              interval={processedData.length > 15 ? Math.floor(processedData.length / 7) : 0} 
+              interval={processedData.length > 15 ? Math.floor(processedData.length / 10) : (processedData.length > 7 ? 1 : 0) } 
             />
             <YAxis
               tickLine={true}
@@ -175,5 +176,3 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
     </ChartContainer>
   )
 }
-
-    
