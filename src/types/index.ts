@@ -335,4 +335,6 @@ export interface Invoice {
     transactionId?: string;
     paidAt?: any; // Firestore Timestamp
   };
+  financeManagerId?: string; // UID of Finance Manager who actioned
+  financeManagerName?: string; // Name of Finance Manager
 }

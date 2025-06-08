@@ -4,13 +4,13 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon, BadgeHelp, MailWarning, Banknote, CheckCircle2, Warehouse, ListChecks, PackageX, PackageSearch, FileText, Coins } from 'lucide-react';
+import { BarChart, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon, BadgeHelp, MailWarning, Banknote, CheckCircle2, Warehouse, ListChecks, PackageX, PackageSearch, FileText, Coins, Hourglass } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState, useCallback } from 'react';
 import { collection, getDocs, query, where, onSnapshot, Unsubscribe, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { User, Order, OrderStatus, Product, StockRequest, Invoice } from '@/types';
+import type { User, Order, OrderStatus, Product, StockRequest, Invoice, InvoiceStatus } from '@/types';
 import { useRouter } from 'next/navigation'; 
 
 const formatPrice = (price: number): string => {
@@ -65,11 +65,13 @@ export default function DashboardPage() {
   
   const [paymentsTodayCount, setPaymentsTodayCount] = useState<number | string>("..."); // Admin & Finance Manager
   const [isLoadingPaymentsToday, setIsLoadingPaymentsToday] = useState(true);
+  const [pendingInvoiceApprovalsCount, setPendingInvoiceApprovalsCount] = useState<number | string>("..."); // Finance Manager & Admin
+  const [isLoadingPendingInvoiceApprovals, setIsLoadingPendingInvoiceApprovals] = useState(true);
   
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number | string>("..."); // Admin only
   const [isLoadingUnreadNotifications, setIsLoadingUnreadNotifications] = useState(true);
 
-  const [pendingStockRequestsCount, setPendingStockRequestsCount] = useState<number | string>("..."); // Admin & InventoryManager
+  const [pendingStockRequestsCount, setPendingStockRequestsCount] = useState<number | string>("..."); // Admin & InventoryManager (for FinanceManager this is stock requests they need to approve)
   const [isLoadingPendingStockRequests, setIsLoadingPendingStockRequests] = useState(true);
   
   const [itemsAwaitingReceiptCount, setItemsAwaitingReceiptCount] = useState<number | string>("..."); // Admin & InventoryManager
@@ -148,15 +150,16 @@ export default function DashboardPage() {
         setIsLoadingItemsAwaitingReceipt(false);
       }
       
-      // Fetch pending stock requests for Admin and Inventory Manager (requests they initiated or need to action)
-      if (role === 'Admin' || role === 'InventoryManager') {
+      if (role === 'Admin' || role === 'InventoryManager' || role === 'FinanceManager') {
         setIsLoadingPendingStockRequests(true);
         let qPendingStockRequests;
-        if (role === 'InventoryManager') { // IM sees requests they initiated
+        if (role === 'InventoryManager') { 
             qPendingStockRequests = query(stockRequestsCol, 
                 where("requesterId", "==", user.uid), 
-                where("status", "in", ["pending_finance_approval", "pending_supplier_fulfillment"]) // Added awaiting_receipt here if IM needs to track them through
+                where("status", "in", ["pending_finance_approval", "pending_supplier_fulfillment"])
             );
+        } else if (role === 'FinanceManager') { // Finance Manager sees requests needing their approval
+            qPendingStockRequests = query(stockRequestsCol, where("status", "==", "pending_finance_approval"));
         } else { // Admin sees ALL requests that need some form of approval/action
              qPendingStockRequests = query(stockRequestsCol, 
                 where("status", "in", ["pending_finance_approval", "pending_supplier_fulfillment", "awaiting_receipt"])
@@ -192,8 +195,21 @@ export default function DashboardPage() {
             console.error("Error fetching payments today count:", error); setPaymentsTodayCount("Error"); setIsLoadingPaymentsToday(false);
         });
         unsubscribers.push(unsubPaymentsToday);
+
+        // Fetch pending invoice approvals for Finance Manager and Admin
+        setIsLoadingPendingInvoiceApprovals(true);
+        const qPendingInvoiceApprovals = query(invoicesCol, where("status", "==", "pending_approval"));
+        const unsubPendingInvoiceApprovals = onSnapshot(qPendingInvoiceApprovals, (snapshot) => {
+            setPendingInvoiceApprovalsCount(snapshot.size);
+            setIsLoadingPendingInvoiceApprovals(false);
+        }, (error) => {
+            console.error("Error fetching pending invoice approvals count:", error); setPendingInvoiceApprovalsCount("Error"); setIsLoadingPendingInvoiceApprovals(false);
+        });
+        unsubscribers.push(unsubPendingInvoiceApprovals);
+
       } else {
         setIsLoadingPaymentsToday(false);
+        setIsLoadingPendingInvoiceApprovals(false);
       }
 
 
@@ -340,7 +356,7 @@ export default function DashboardPage() {
         const endOfDay = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999));
 
         const qNewStockRequests = query(stockRequestsCol,
-          where('status', '==', 'pending_supplier_fulfillment'),
+          where('status', '==', 'pending_supplier_fulfillment'), // Suppliers see all pending fulfillment requests
           where('createdAt', '>=', startOfDay),
           where('createdAt', '<=', endOfDay)
         );
@@ -354,7 +370,7 @@ export default function DashboardPage() {
 
         const qFulfilled = query(stockRequestsCol,
           where('supplierId', '==', user.uid),
-          where('status', 'in', ['awaiting_receipt', 'received'])
+          where('status', 'in', ['awaiting_receipt', 'received']) // Fulfilled means IM is awaiting or has received
         );
         const unsubFulfilled = onSnapshot(qFulfilled, (snapshot) => {
           setSupplierFulfilledRequests(snapshot.size);
@@ -366,7 +382,7 @@ export default function DashboardPage() {
 
         const qPendingInvoices = query(invoicesCol,
           where('supplierId', '==', user.uid),
-          where('status', 'in', ['pending_approval', 'approved_for_payment'])
+          where('status', 'in', ['pending_approval', 'approved_for_payment']) // Invoices awaiting action by Zellow
         );
         const unsubPendingInvoices = onSnapshot(qPendingInvoices, (snapshot) => {
           setSupplierPendingInvoices(snapshot.size);
@@ -411,7 +427,7 @@ export default function DashboardPage() {
           <>
             <DashboardItem title="Active Users" value={activeUserCount} icon={UserCog} link="/admin/users" description="Total active users." isLoadingValue={isLoadingUserCount} />
             <DashboardItem title="Total Products" value={totalProductCount} icon={Package} link="/admin/products" description="Products in catalog." isLoadingValue={isLoadingAllProductsForStats} />
-            <DashboardItem title="Low Stock Items" value={lowStockItemsCount} icon={AlertTriangle} link="/inventory?filter=lowstock" description="Items with <10 stock." isLoadingValue={isLoadingAllProductsForStats} />
+            <DashboardItem title="Low Stock Items" value={lowStockItemsCount} icon={AlertTriangle} link="/inventory?filter=lowstock" description="Items with &lt;10 stock." isLoadingValue={isLoadingAllProductsForStats} />
             <DashboardItem title="Out of Stock Items" value={outOfStockItemsCount} icon={PackageX} link="/inventory?filter=outofstock" description="Items with 0 stock." isLoadingValue={isLoadingAllProductsForStats} />
             <DashboardItem title="Inventory Value" value={totalInventoryValue} icon={DollarSign} link="/inventory" description="Total value of stock." isLoadingValue={isLoadingAllProductsForStats} isPrice />
             <DashboardItem title="Pending Stock Requests" value={pendingStockRequestsCount} icon={ListChecks} link="/finance/approvals" description="Stock requests needing action." isLoadingValue={isLoadingPendingStockRequests} />
@@ -419,6 +435,7 @@ export default function DashboardPage() {
             <DashboardItem title="Total Orders" value={totalOrderCount} icon={ShoppingCart} link="/admin/orders" description="All customer orders." isLoadingValue={isLoadingOrderCount} />
             <DashboardItem title="Active Deliveries" value={activeDeliveriesCountAdmin} icon={Truck} link="/admin/deliveries" description="Ongoing deliveries." isLoadingValue={isLoadingActiveDeliveriesAdmin} />
             <DashboardItem title="Payments Today" value={paymentsTodayCount} icon={Banknote} link="/admin/payments" description="Orders marked paid today." isLoadingValue={isLoadingPaymentsToday}/>
+            <DashboardItem title="Pending Invoice Approvals" value={pendingInvoiceApprovalsCount} icon={Hourglass} link="/invoices" description="Supplier invoices needing approval." isLoadingValue={isLoadingPendingInvoiceApprovals}/>
             <DashboardItem title="General Approvals" value={pendingApprovalsCount} icon={BadgeHelp} link="/admin/approvals" isLoadingValue={isLoadingPendingApprovals}/>
             <DashboardItem title="Unread Notifications" value={unreadNotificationsCount} icon={MailWarning} link="/admin/notifications" isLoadingValue={isLoadingUnreadNotifications}/>
             <DashboardItem title="System Reports" icon={FileArchive} link="/admin/reports" />
@@ -432,7 +449,7 @@ export default function DashboardPage() {
           <>
             <DashboardItem title="Payments Today" value={paymentsTodayCount} icon={Banknote} link="/admin/payments" description="Orders marked paid today." isLoadingValue={isLoadingPaymentsToday}/>
             <DashboardItem title="All Payments" icon={DollarSign} link="/admin/payments" />
-            <DashboardItem title="Supplier Invoices" icon={FileText} link="/invoices" description="Review and manage supplier invoices." />
+            <DashboardItem title="Supplier Invoices" value={pendingInvoiceApprovalsCount} icon={FileText} link="/invoices" description="Manage supplier invoices." isLoadingValue={isLoadingPendingInvoiceApprovals} />
             <DashboardItem title="Stock Request Approvals" value={pendingStockRequestsCount} icon={ListChecks} link="/finance/approvals" description="Approve/reject stock requests." isLoadingValue={isLoadingPendingStockRequests} />
           </>
         );
@@ -449,7 +466,7 @@ export default function DashboardPage() {
         return (
           <>
             <DashboardItem title="Total Products" value={totalProductCount} icon={Package} link="/inventory" description="Products in catalog." isLoadingValue={isLoadingAllProductsForStats} />
-            <DashboardItem title="Low Stock Items" value={lowStockItemsCount} icon={AlertTriangle} link="/inventory?filter=lowstock" description="Items with <10 stock." isLoadingValue={isLoadingAllProductsForStats} />
+            <DashboardItem title="Low Stock Items" value={lowStockItemsCount} icon={AlertTriangle} link="/inventory?filter=lowstock" description="Items with &lt;10 stock." isLoadingValue={isLoadingAllProductsForStats} />
             <DashboardItem title="Out of Stock Items" value={outOfStockItemsCount} icon={PackageX} link="/inventory?filter=outofstock" description="Items with 0 stock." isLoadingValue={isLoadingAllProductsForStats} />
             <DashboardItem title="Total Inventory Value" value={totalInventoryValue} icon={DollarSign} link="/inventory" description="Estimated value of current stock." isLoadingValue={isLoadingAllProductsForStats} isPrice />
             <DashboardItem title="My Pending Stock Requests" value={pendingStockRequestsCount} icon={ShoppingCart} link="/inventory#requests" description="Track your requests." isLoadingValue={isLoadingPendingStockRequests} />
@@ -590,4 +607,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
