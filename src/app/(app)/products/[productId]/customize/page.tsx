@@ -43,16 +43,16 @@ export default function CustomizeProductPage() {
   const [currentPrice, setCurrentPrice] = useState<number>(0);
 
   const [customizationSchema, setCustomizationSchema] = useState<z.ZodObject<any> | null>(null);
+  const [defaultFormValues, setDefaultFormValues] = useState<Record<string, any>>({});
   
   const form = useForm<Record<string, any>>({
     resolver: customizationSchema ? zodResolver(customizationSchema) : undefined,
+    defaultValues: defaultFormValues,
   });
 
   const calculatePrice = useCallback(() => {
-    if (!product || resolvedOptions.length === 0) {
-      setCurrentPrice(product?.price || 0);
-      return;
-    }
+    if (!product) return;
+    
     let calculatedPrice = product.price;
     const formValues = form.getValues();
 
@@ -64,14 +64,13 @@ export default function CustomizeProductPage() {
           calculatedPrice += choice.priceAdjustment;
         }
       }
-      // For checkbox, priceAdjustmentIfChecked is on the option itself if it's a simple checkbox,
-      // or on its single 'choice' if structured that way. Let's assume it's on the option.
       if (opt.type === 'checkbox' && selectedValue === true && (opt as any).priceAdjustmentIfChecked) {
         calculatedPrice += (opt as any).priceAdjustmentIfChecked;
       }
     });
     setCurrentPrice(calculatedPrice);
   }, [product, resolvedOptions, form]);
+
 
   const fetchProductAndOptions = useCallback(async () => {
     if (!productId || !db) {
@@ -81,6 +80,9 @@ export default function CustomizeProductPage() {
     }
     setIsLoading(true);
     setError(null);
+    setCustomizationSchema(null); // Reset schema on new fetch
+    setDefaultFormValues({});
+
     try {
       const productDocRef = doc(db, 'products', productId);
       const productDoc = await getDoc(productDocRef);
@@ -92,21 +94,29 @@ export default function CustomizeProductPage() {
 
         let finalOptions: ProductCustomizationOption[] = [];
         if (fetchedProduct.customizationGroupId) {
-          const groupDocRef = doc(db, 'customizationGroupDefinitions', fetchedProduct.customizationGroupId);
-          const groupDoc = await getDoc(groupDocRef);
-          if (groupDoc.exists()) {
-            finalOptions = (groupDoc.data() as CustomizationGroupDefinition).options as ProductCustomizationOption[];
-          } else {
-            console.warn(`Customization group ${fetchedProduct.customizationGroupId} not found.`);
-          }
+            const groupDocRef = doc(db, 'customizationGroupDefinitions', fetchedProduct.customizationGroupId);
+            const groupDoc = await getDoc(groupDocRef);
+            if (groupDoc.exists()) {
+                const groupData = groupDoc.data() as CustomizationGroupDefinition;
+                finalOptions = (groupData.options || []).filter(opt => opt.showToCustomerByDefault !== false) as ProductCustomizationOption[];
+            } else {
+                console.warn(`Customization group ${fetchedProduct.customizationGroupId} not found for product ${productId}. Checking direct product options.`);
+                if (fetchedProduct.customizationOptions && fetchedProduct.customizationOptions.length > 0) {
+                    finalOptions = fetchedProduct.customizationOptions.filter(opt => opt.showToCustomerByDefault !== false);
+                } else {
+                    finalOptions = [];
+                }
+            }
         } else if (fetchedProduct.customizationOptions && fetchedProduct.customizationOptions.length > 0) {
-          finalOptions = fetchedProduct.customizationOptions;
+            finalOptions = fetchedProduct.customizationOptions.filter(opt => opt.showToCustomerByDefault !== false);
+        } else {
+            finalOptions = [];
         }
         setResolvedOptions(finalOptions);
 
         if (finalOptions.length > 0) {
           const shape: Record<string, z.ZodTypeAny> = {};
-          const defaultValues: Record<string, any> = {};
+          const newDefaultValues: Record<string, any> = {};
 
           finalOptions.forEach(opt => {
             let fieldSchema: z.ZodTypeAny;
@@ -115,35 +125,35 @@ export default function CustomizeProductPage() {
                 fieldSchema = z.string();
                 if (opt.required) fieldSchema = fieldSchema.min(1, `${opt.label} is required.`);
                 else fieldSchema = fieldSchema.optional().nullable();
-                defaultValues[opt.id] = opt.choices?.[0]?.value || "";
+                newDefaultValues[opt.id] = opt.defaultValue ?? (opt.choices?.[0]?.value || null);
                 break;
               case 'text':
                 fieldSchema = z.string();
                 if (opt.required) fieldSchema = fieldSchema.min(1, `${opt.label} is required.`);
                 else fieldSchema = fieldSchema.optional().nullable();
                 if (opt.maxLength) fieldSchema = fieldSchema.max(opt.maxLength, `${opt.label} cannot exceed ${opt.maxLength} characters.`);
-                defaultValues[opt.id] = "";
+                newDefaultValues[opt.id] = opt.defaultValue ?? "";
                 break;
               case 'checkbox':
                 fieldSchema = z.boolean().optional();
-                defaultValues[opt.id] = false;
+                newDefaultValues[opt.id] = typeof opt.defaultValue === 'boolean' ? opt.defaultValue : false;
                 break;
-              case 'image_upload': // Simple text input for URL for now
+              case 'image_upload':
                 fieldSchema = z.string().url({ message: "Please enter a valid image URL." }).optional().or(z.literal(''));
-                defaultValues[opt.id] = "";
+                newDefaultValues[opt.id] = opt.defaultValue ?? "";
                 break;
               default:
                 fieldSchema = z.any().optional();
+                newDefaultValues[opt.id] = opt.defaultValue ?? null;
             }
             shape[opt.id] = fieldSchema;
           });
           
-          const newSchema = z.object(shape);
-          setCustomizationSchema(newSchema);
-          form.reset(defaultValues);
-          setTimeout(() => calculatePrice(), 0); // Initial price calculation
+          setCustomizationSchema(z.object(shape));
+          setDefaultFormValues(newDefaultValues);
         } else {
           setCustomizationSchema(z.object({})); // No options, empty schema
+          setDefaultFormValues({});
         }
       } else {
         setError("Item not found.");
@@ -156,12 +166,12 @@ export default function CustomizeProductPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [productId, toast, form, calculatePrice]);
+  }, [productId, toast]);
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      router.replace('/login');
+      router.replace('/login?redirect=/products/' + productId + '/customize');
       return;
     }
     if (productId) {
@@ -171,14 +181,25 @@ export default function CustomizeProductPage() {
       setIsLoading(false);
     }
   }, [authLoading, user, productId, router, fetchProductAndOptions]);
+  
+  useEffect(() => {
+    // This effect ensures the form is re-initialized with new defaultValues
+    // and resolver when the schema changes.
+    if (customizationSchema) {
+      form.reset(defaultFormValues, {
+        // @ts-ignore zodResolver is compatible
+        resolver: zodResolver(customizationSchema),
+      });
+    }
+  }, [customizationSchema, defaultFormValues, form]);
+
 
   useEffect(() => {
-    if (product && form && resolvedOptions.length > 0) {
+    if (product && form.formState.isDirty) { // Only subscribe if form is initialized
         const subscription = form.watch(() => calculatePrice());
         return () => subscription.unsubscribe();
     }
-  }, [form, product, resolvedOptions, calculatePrice]);
-
+  }, [form, product, calculatePrice]); // Removed resolvedOptions dependency, calculatePrice now uses it internally
 
   const onSubmit: SubmitHandler<Record<string, any>> = async (data) => {
     if (!product) return;
@@ -186,8 +207,12 @@ export default function CustomizeProductPage() {
     
     const customizationsToSave: Record<string, any> = {};
     resolvedOptions.forEach(opt => {
-      if (data[opt.id] !== undefined && data[opt.id] !== '' && data[opt.id] !== false) { // Only save if valued
+      // Only include if value exists and is not just an un-touched default for non-required optional fields.
+      if (data[opt.id] !== undefined && data[opt.id] !== '' && data[opt.id] !== false) {
         customizationsToSave[opt.id] = data[opt.id];
+      } else if (opt.required && (data[opt.id] === undefined || data[opt.id] === '' || data[opt.id] === false)) {
+        // This case should be caught by Zod validation, but as a safeguard:
+        console.warn(`Required field ${opt.id} missing value during submission.`);
       }
     });
 
@@ -197,7 +222,7 @@ export default function CustomizeProductPage() {
     setIsSubmitting(false);
   };
 
-  if (isLoading || authLoading || (product && resolvedOptions.length > 0 && !customizationSchema && !error)) {
+  if (authLoading || isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -212,36 +237,26 @@ export default function CustomizeProductPage() {
         <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
         <h2 className="text-xl font-semibold mb-2">Error</h2>
         <p className="text-muted-foreground mb-4">{error}</p>
-        <Button onClick={() => router.push(`/products/${productId}`)} variant="outline">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Item Details
+        <Button onClick={() => router.push(productId ? `/products/${productId}` : '/products')} variant="outline">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Item
         </Button>
       </div>
     );
   }
 
   if (!product) {
-    return ( <div className="text-center p-4">Item data could not be loaded.</div> );
-  }
-  
-  if (resolvedOptions.length === 0) {
-    return (
-      <div className="container mx-auto px-0 sm:px-4 py-8 text-center">
-        <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4 mx-auto" />
-        <h2 className="text-xl font-semibold mb-2">No Customizations Available</h2>
-        <p className="text-muted-foreground mb-4">This item does not have any customization options.</p>
-        <Button onClick={() => router.push(`/products/${productId}`)} variant="outline" className="mr-2">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Item Details
-        </Button>
-        <Button size="lg" disabled={product.stock === 0} onClick={() => { addToCart(product, 1, undefined, product.price); router.push('/orders/cart'); }}>
-            <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
-        </Button>
+    return ( 
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))] text-center p-4">
+        <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
+        <p className="text-muted-foreground mb-6">Item data could not be loaded or does not exist.</p>
+        <Button onClick={() => router.push('/products')} variant="outline">Back to Products</Button>
       </div>
     );
   }
-
+  
   return (
     <div className="container mx-auto px-0 sm:px-4 py-8">
-      <Button onClick={() => router.push(`/products/${productId}`)} variant="outline" size="sm" className="mb-6">
+      <Button onClick={() => router.push(productId ? `/products/${productId}` : '/products')} variant="outline" size="sm" className="mb-6">
         <ArrowLeft className="mr-2 h-4 w-4" /> Back to Item Details
       </Button>
 
@@ -270,82 +285,117 @@ export default function CustomizeProductPage() {
               <CardDescription>Make it uniquely yours by selecting the options below.</CardDescription>
             </CardHeader>
             
-            {customizationSchema && resolvedOptions.length > 0 && (
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <CardContent className="p-0 space-y-5">
-                  {resolvedOptions.map((option) => (
-                    <FormField
-                      key={option.id}
-                      control={form.control}
-                      name={option.id}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base font-medium">{option.label} {option.required && <span className="text-destructive">*</span>}</FormLabel>
-                          {option.type === 'select' && option.choices && (
-                            <Select onValueChange={field.onChange} value={String(field.value ?? "")} defaultValue={String(field.value ?? "")}>
-                              <FormControl><SelectTrigger><SelectValue placeholder={`Select ${option.label.toLowerCase()}`} /></SelectTrigger></FormControl>
-                              <SelectContent>
-                                {option.choices.map(choice => (
-                                  <SelectItem key={choice.value} value={choice.value}>
-                                    {choice.label} 
-                                    {choice.priceAdjustment ? ` (${choice.priceAdjustment > 0 ? '+' : ''}${formatPrice(choice.priceAdjustment)})` : ''}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                          {option.type === 'text' && (
-                            <Textarea 
-                              {...field} 
-                              value={String(field.value ?? "")}
-                              placeholder={option.placeholder || `Enter ${option.label.toLowerCase()}`} 
-                              maxLength={option.maxLength}
-                              rows={option.maxLength && option.maxLength > 100 ? 4 : 2} 
-                            />
-                          )}
-                          {option.type === 'checkbox' && (
-                            <div className="flex items-center space-x-2 p-3 border rounded-md hover:border-primary transition-colors">
-                               <Checkbox
-                                id={option.id}
-                                checked={field.value === true}
-                                onCheckedChange={field.onChange}
-                               />
-                               <label htmlFor={option.id} className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-grow cursor-pointer">
-                                 {option.checkboxLabel || option.label}
-                                 {(option as any).priceAdjustmentIfChecked ? ` (+${formatPrice((option as any).priceAdjustmentIfChecked)})` : ''}
-                               </label>
-                            </div>
-                          )}
-                           {option.type === 'image_upload' && ( // Simple URL input for now
-                              <Input 
-                                type="text"
-                                {...field}
-                                value={String(field.value ?? "")}
-                                placeholder={option.placeholder || "Paste image URL here"}
-                              />
-                           )}
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  ))}
-                </CardContent>
-
-                <CardFooter className="p-0 mt-8 pt-6 border-t flex flex-col items-stretch gap-3">
+            {resolvedOptions.length === 0 ? (
+              <div className="text-center py-6">
+                <AlertTriangle className="h-10 w-10 text-muted-foreground mb-3 mx-auto" />
+                <p className="text-muted-foreground">This item does not have specific customization options.</p>
+                <p className="text-sm text-muted-foreground mt-1">You can add it to your cart as is.</p>
+                 <CardFooter className="p-0 mt-8 pt-6 border-t flex flex-col items-stretch gap-3">
                     <div className="text-2xl font-bold text-right mb-2">
                         Total Price: {formatPrice(currentPrice)}
                     </div>
                     {product.stock === 0 && (
                          <p className="text-destructive text-center font-semibold">This item is currently out of stock.</p>
                     )}
-                  <Button type="submit" size="lg" className="w-full" disabled={isSubmitting || product.stock === 0}>
+                  <Button type="button" size="lg" className="w-full" 
+                    onClick={() => {
+                        addToCart(product, 1, undefined, product.price);
+                        router.push('/orders/cart');
+                    }} 
+                    disabled={isSubmitting || product.stock === 0}
+                  >
                     {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ShoppingCart className="mr-2 h-5 w-5" /> }
-                    Save Customizations & Add to Cart
+                    Add to Cart
                   </Button>
                 </CardFooter>
-              </form>
-            </Form>
+              </div>
+            ) : customizationSchema ? (
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  <CardContent className="p-0 space-y-5">
+                    {resolvedOptions.map((option) => (
+                      <FormField
+                        key={option.id}
+                        control={form.control}
+                        name={option.id}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base font-medium">{option.label} {option.required && <span className="text-destructive">*</span>}</FormLabel>
+                            {option.type === 'select' && option.choices && (
+                              <Select 
+                                onValueChange={(value) => { field.onChange(value); calculatePrice(); }} 
+                                value={String(field.value ?? "")} 
+                                defaultValue={String(field.value ?? "")}
+                              >
+                                <FormControl><SelectTrigger><SelectValue placeholder={`Select ${option.label.toLowerCase()}`} /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                  {option.choices.map(choice => (
+                                    <SelectItem key={choice.value} value={choice.value}>
+                                      {choice.label} 
+                                      {choice.priceAdjustment ? ` (${choice.priceAdjustment > 0 ? '+' : ''}${formatPrice(choice.priceAdjustment)})` : ''}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                            {option.type === 'text' && (
+                              <Textarea 
+                                {...field} 
+                                value={String(field.value ?? "")}
+                                onChange={(e) => {field.onChange(e); setTimeout(calculatePrice, 0);}}
+                                placeholder={option.placeholder || `Enter ${option.label.toLowerCase()}`} 
+                                maxLength={option.maxLength}
+                                rows={option.maxLength && option.maxLength > 100 ? 4 : 2} 
+                              />
+                            )}
+                            {option.type === 'checkbox' && (
+                              <div className="flex items-center space-x-2 p-3 border rounded-md hover:border-primary transition-colors">
+                                 <Checkbox
+                                  id={option.id}
+                                  checked={field.value === true}
+                                  onCheckedChange={(checked) => {field.onChange(checked); setTimeout(calculatePrice, 0);}}
+                                 />
+                                 <label htmlFor={option.id} className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-grow cursor-pointer">
+                                   {option.checkboxLabel || option.label}
+                                   {(option as any).priceAdjustmentIfChecked ? ` (+${formatPrice((option as any).priceAdjustmentIfChecked)})` : ''}
+                                 </label>
+                              </div>
+                            )}
+                             {option.type === 'image_upload' && ( 
+                                <Input 
+                                  type="text"
+                                  {...field}
+                                  value={String(field.value ?? "")}
+                                  onChange={(e) => {field.onChange(e); setTimeout(calculatePrice, 0);}}
+                                  placeholder={option.placeholder || "Paste image URL here"}
+                                />
+                             )}
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </CardContent>
+
+                  <CardFooter className="p-0 mt-8 pt-6 border-t flex flex-col items-stretch gap-3">
+                      <div className="text-2xl font-bold text-right mb-2">
+                          Total Price: {formatPrice(currentPrice)}
+                      </div>
+                      {product.stock === 0 && (
+                           <p className="text-destructive text-center font-semibold">This item is currently out of stock.</p>
+                      )}
+                    <Button type="submit" size="lg" className="w-full" disabled={isSubmitting || product.stock === 0}>
+                      {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ShoppingCart className="mr-2 h-5 w-5" /> }
+                      Save Customizations & Add to Cart
+                    </Button>
+                  </CardFooter>
+                </form>
+              </Form>
+            ) : (
+                 <div className="flex flex-col items-center justify-center py-10">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="mt-2 text-muted-foreground">Preparing customization form...</p>
+                 </div>
             )}
           </div>
         </div>
