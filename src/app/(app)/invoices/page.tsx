@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import type { Invoice, InvoiceStatus } from "@/types"; 
-import { FileText, Search, Download, Eye, Loader2, CheckCircle, XCircle, CalendarDays, FileClock, AlertCircle, CheckCircle2 as PaidIcon, Hourglass, FileX, FileDiff, PlusCircle } from "lucide-react";
+import { FileText, Search, Download, Eye, Loader2, CheckCircle, XCircle, CalendarDays, FileClock, AlertCircle, CheckCircle2 as PaidIcon, Hourglass, FileX, FileDiff, PlusCircle, Filter } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
@@ -34,11 +34,10 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 const formatKsh = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -67,6 +66,18 @@ const isInvoiceOverdue = (invoice: Invoice): boolean => {
   return isPast(dueDate) && !isToday(dueDate);
 };
 
+// Define filter options for the Select component
+const FILTER_OPTIONS: {value: InvoiceStatus | "all" | "overdue" | "approved_unpaid", label: string, icon?: React.ElementType}[] = [
+    { value: "all", label: "All Invoices", icon: FileDiff },
+    { value: "pending_approval", label: "Pending Approval", icon: Hourglass },
+    { value: "approved_unpaid", label: "Approved (Unpaid)", icon: CheckCircle },
+    { value: "overdue", label: "Overdue", icon: AlertCircle },
+    { value: "paid", label: "Paid", icon: PaidIcon },
+    { value: "rejected", label: "Rejected", icon: FileX},
+  ];
+
+const supplierFilterOptions = FILTER_OPTIONS.filter(t => !["pending_approval", "approved_unpaid"].includes(t.value));
+
 
 export default function InvoicesPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -76,7 +87,7 @@ export default function InvoicesPage() {
   const [allInvoices, setAllInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState<InvoiceStatus | "all" | "overdue" | "approved_unpaid">("pending_approval");
+  const [activeFilter, setActiveFilter] = useState<InvoiceStatus | "all" | "overdue" | "approved_unpaid">("pending_approval");
   
   const [summaryCounts, setSummaryCounts] = useState({
     today: 0,
@@ -131,6 +142,12 @@ export default function InvoicesPage() {
       router.replace('/dashboard');
       return;
     }
+    // Set initial filter based on role
+    if (role === 'Supplier') {
+        setActiveFilter('all'); 
+    } else {
+        setActiveFilter('pending_approval');
+    }
     const unsubscribe = fetchInvoices();
     return () => unsubscribe();
   }, [authLoading, user, role, router, fetchInvoices]);
@@ -150,19 +167,19 @@ export default function InvoicesPage() {
 
   const filteredInvoices = useMemo(() => {
     let invoicesToFilter = allInvoices;
-    if (activeTab === 'overdue') {
+    if (activeFilter === 'overdue') {
       invoicesToFilter = allInvoices.filter(inv => isInvoiceOverdue(inv));
-    } else if (activeTab === 'approved_unpaid') {
+    } else if (activeFilter === 'approved_unpaid') {
       invoicesToFilter = allInvoices.filter(inv => inv.status === 'approved_for_payment');
-    } else if (activeTab !== 'all') {
-      invoicesToFilter = allInvoices.filter(inv => inv.status === activeTab);
+    } else if (activeFilter !== 'all') {
+      invoicesToFilter = allInvoices.filter(inv => inv.status === activeFilter);
     }
     
     return invoicesToFilter.filter(inv =>
       inv.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (role !== 'Supplier' && inv.supplierName?.toLowerCase().includes(searchTerm.toLowerCase()))
     );
-  }, [allInvoices, activeTab, searchTerm, role]);
+  }, [allInvoices, activeFilter, searchTerm, role]);
   
   const handleOpenActionModal = (invoice: Invoice, type: "approve" | "reject") => {
     setActionableInvoice(invoice);
@@ -230,16 +247,7 @@ export default function InvoicesPage() {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
-  const TABS_CONFIG: {value: InvoiceStatus | "all" | "overdue" | "approved_unpaid", label: string, icon?: React.ElementType}[] = [
-    { value: "all", label: "All Invoices", icon: FileDiff },
-    { value: "pending_approval", label: "Pending Approval", icon: Hourglass },
-    { value: "approved_unpaid", label: "Approved (Unpaid)", icon: CheckCircle },
-    { value: "overdue", label: "Overdue", icon: AlertCircle },
-    { value: "paid", label: "Paid", icon: PaidIcon },
-    { value: "rejected", label: "Rejected", icon: FileX},
-  ];
-  const supplierTabsConfig = TABS_CONFIG.filter(t => !["pending_approval", "approved_unpaid"].includes(t.value));
-
+  const currentFilterOptions = role === 'Supplier' ? supplierFilterOptions : FILTER_OPTIONS;
 
   return (
     <div className="space-y-6">
@@ -274,17 +282,24 @@ export default function InvoicesPage() {
                 className="pl-8 h-9"
               />
             </div>
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="w-full sm:w-auto">
-             <ScrollArea orientation="horizontal" className="w-full pb-2.5">
-                <TabsList className="inline-flex h-auto whitespace-nowrap">
-                    {(role === 'Supplier' ? supplierTabsConfig : TABS_CONFIG).map(tab => (
-                        <TabsTrigger key={tab.value} value={tab.value} className="text-xs px-2.5 py-1.5 h-auto sm:flex-grow-0">
-                        {tab.icon && <tab.icon className="mr-1.5 h-3.5 w-3.5 hidden sm:inline-block"/>} {tab.label}
-                        </TabsTrigger>
-                    ))}
-                </TabsList>
-              </ScrollArea>
-            </Tabs>
+            <Select 
+              value={activeFilter} 
+              onValueChange={(value) => setActiveFilter(value as any)}
+            >
+              <SelectTrigger className="w-full sm:w-auto sm:min-w-[200px] h-9">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                {currentFilterOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    <div className="flex items-center gap-2">
+                      {option.icon && <option.icon className="h-4 w-4 text-muted-foreground" />}
+                      {option.label}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -324,12 +339,13 @@ export default function InvoicesPage() {
         </CardContent>
         {filteredInvoices.length > 0 && (
             <CardFooter className="pt-4 text-xs text-muted-foreground">
-                Showing {filteredInvoices.length} of {allInvoices.length} total invoices {activeTab !== 'all' && `(filtered by ${activeTab.replace(/_/g, ' ')})`}.
+                Showing {filteredInvoices.length} of {allInvoices.length} total invoices {activeFilter !== 'all' && `(filtered by ${activeFilter.replace(/_/g, ' ')})`}.
             </CardFooter>
         )}
       </Card>
 
       {/* Invoice Details Dialog */}
+      {viewingInvoice && (
       <Dialog open={!!viewingInvoice} onOpenChange={(isOpen) => { if (!isOpen) setViewingInvoice(null); }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -338,7 +354,6 @@ export default function InvoicesPage() {
               Supplier: {viewingInvoice?.supplierName || 'N/A'} | Status: <Badge variant={getInvoiceStatusBadgeVariant(viewingInvoice?.status || 'draft')} className="capitalize text-xs">{viewingInvoice?.status.replace(/_/g, ' ')}</Badge>
             </DialogDescription>
           </DialogHeader>
-          {viewingInvoice && (
             <div className="space-y-3 py-2 max-h-[60vh] overflow-y-auto pr-2">
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                 <p><strong>Invoice Date:</strong> {formatDate(viewingInvoice.invoiceDate)}</p>
@@ -365,7 +380,6 @@ export default function InvoicesPage() {
               {viewingInvoice.notes && <p className="text-xs text-muted-foreground"><strong>Notes:</strong> {viewingInvoice.notes}</p>}
               {viewingInvoice.paymentDetails?.paidAt && <p className="text-xs text-green-600"><strong>Paid on:</strong> {formatDate(viewingInvoice.paymentDetails.paidAt)}</p>}
             </div>
-          )}
           <DialogFooter className="sm:justify-between gap-2">
             <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
             <div className="flex gap-2">
@@ -384,6 +398,7 @@ export default function InvoicesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
 
       {/* Action Dialog for Approve/Reject */}
       {actionableInvoice && isActionModalOpen && (
@@ -425,3 +440,4 @@ export default function InvoicesPage() {
     </div>
   );
 }
+
