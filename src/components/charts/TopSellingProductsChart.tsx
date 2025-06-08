@@ -43,7 +43,7 @@ export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) 
         </div>
     );
   }
-  // Sort data by revenue for display if not already sorted
+  
   const sortedData = [...data].sort((a,b) => a.totalRevenue - b.totalRevenue);
 
 
@@ -77,7 +77,7 @@ export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) 
             tickLine={false}
             axisLine={false}
             tickMargin={5}
-            width={120} // Increased width for longer product names
+            width={100} 
             className="text-xs truncate"
             interval={0} 
             />
@@ -104,7 +104,7 @@ export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) 
                 dataKey="totalRevenue"
                 position="right"
                 offset={8}
-                className="fill-foreground text-xs"
+                className="fill-foreground text-[10px]"
                 formatter={(value: number) => formatCurrency(value)}
             />
             </Bar>
@@ -113,5 +113,7 @@ export function TopSellingProductsChart({ data }: TopSellingProductsChartProps) 
     </ChartContainer>
   )
 }
+
+    
 
     

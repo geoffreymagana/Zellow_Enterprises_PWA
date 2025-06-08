@@ -62,8 +62,8 @@ export default function FinancialsPage() {
       let revenueFromCustomizations = 0;
       let revenueFromDeliveryFees = 0;
 
-      let firstTransactionDate = new Date(2999, 0, 1); // Start with a far future date
-      let lastTransactionDate = new Date(1970, 0, 1); // Start with a far past date
+      let firstTransactionDate = new Date(2999, 0, 1); 
+      let lastTransactionDate = new Date(1970, 0, 1); 
       
       const monthlyRevenue: Record<string, number> = {};
       const monthlyExpenses: Record<string, number> = {};
@@ -81,12 +81,14 @@ export default function FinancialsPage() {
 
         order.items.forEach((item: FirestoreOrderItem) => {
           const product = productsMap.get(item.productId);
-          const baseProductPrice = product ? product.price : (item.price / item.quantity); // Fallback to item's unit price if product not found
+          // Use product's base price if available, otherwise fallback to item's unit price (which might include customizations)
+          const baseProductPrice = product ? product.price : (item.price / item.quantity); 
 
           revenueFromProductSales += baseProductPrice * item.quantity;
           
-          const itemUnitCustomizedPrice = item.price / item.quantity;
-          const customizationRevenueForItem = (itemUnitCustomizedPrice - baseProductPrice) * item.quantity;
+          // Calculate customization revenue: total item price - (base product price * quantity)
+          const itemTotalBasePrice = baseProductPrice * item.quantity;
+          const customizationRevenueForItem = item.price - itemTotalBasePrice; // item.price is already total for that line item
           if (customizationRevenueForItem > 0) {
             revenueFromCustomizations += customizationRevenueForItem;
           }
@@ -121,7 +123,7 @@ export default function FinancialsPage() {
       if (lastTransactionDate.getFullYear() === 1970 && firstTransactionDate.getFullYear() !== new Date().getFullYear() + 50 && firstTransactionDate.getFullYear() !== 2999) { 
          targetMonthDate = firstTransactionDate; 
       }
-      if (targetMonthDate.getFullYear() === 1970 || targetMonthDate.getFullYear() === 2999) { // No transactions or only future transactions
+      if (targetMonthDate.getFullYear() === 1970 || targetMonthDate.getFullYear() === 2999) { 
         targetMonthDate = new Date(); 
       }
       
@@ -170,7 +172,6 @@ export default function FinancialsPage() {
       setDailyChartData(dailyDataForMonthChart);
       setLatestMonthNetChange(currentMonthRevenue - currentMonthExpenses);
       
-      // Calculate cumulative net profit using all months
       const allMonthKeys = Array.from(new Set([...Object.keys(monthlyRevenue), ...Object.keys(monthlyExpenses)])).sort();
       let cumulativeProfit = 0;
       allMonthKeys.forEach(monthKey => {
@@ -232,7 +233,7 @@ export default function FinancialsPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -280,7 +281,7 @@ export default function FinancialsPage() {
             <CardTitle className="font-headline text-lg">Monthly Revenue vs Expenses</CardTitle>
             <CardDescription>Daily trend for the latest active month.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[480px] sm:h-[520px] pb-0">
+          <CardContent className="h-[360px] sm:h-[420px] md:h-[480px] lg:h-[520px] pb-0">
            {dailyChartData.length > 0 ? (
               <MonthlyRevenueExpensesChart 
                 dailyData={dailyChartData} 
@@ -302,7 +303,7 @@ export default function FinancialsPage() {
             <CardTitle className="font-headline text-lg">Revenue Breakdown by Source</CardTitle>
             <CardDescription>Contribution of different revenue streams.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[400px] w-full pb-0">
+          <CardContent className="h-[320px] sm:h-[360px] md:h-[400px] w-full pb-0">
              {revenueBreakdownData.length > 0 ? (
                 <RevenueBreakdownChart data={revenueBreakdownData} />
              ) : (
@@ -318,7 +319,7 @@ export default function FinancialsPage() {
             <CardTitle className="font-headline text-lg">Top Selling Products (by Revenue)</CardTitle>
             <CardDescription>Performance of best-selling items based on revenue from paid orders.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[400px] w-full pb-0">
+          <CardContent className="h-[320px] sm:h-[360px] md:h-[400px] w-full pb-0">
              {topProductsData.length > 0 ? (
                 <TopSellingProductsChart data={topProductsData} />
              ) : (
@@ -345,3 +346,4 @@ export default function FinancialsPage() {
 }
     
 
+    

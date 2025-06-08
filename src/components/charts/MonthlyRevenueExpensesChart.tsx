@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/chart"
 
 export interface DailyDataPoint {
-  day: string; // e.g., "Jun 01"
+  day: string; 
   revenue: number;
   expenses: number;
 }
@@ -53,12 +53,10 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
     );
   }
 
-  // Prepend a "Previous Month" data point if only one actual month's data is present,
-  // so the line/area has a starting point from zero or the previous month's end.
   let processedData = [...dailyData];
   if (dailyData.length === 1) {
     processedData = [
-      { day: "Start", revenue: 0, expenses: 0 }, // Dummy point
+      { day: "Start", revenue: 0, expenses: 0 }, 
       ...dailyData,
     ];
   }
@@ -94,7 +92,7 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
             accessibilityLayer
             data={processedData}
             margin={{
-                left: 10, // Adjusted left margin
+                left: 5, 
                 right: 15, 
                 top: 5,
                 bottom: 5,
@@ -115,9 +113,9 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
               dataKey="day"
               tickLine={true}
               axisLine={false}
-              tickMargin={8}
+              tickMargin={5}
               className="text-xs"
-              interval={processedData.length > 15 ? Math.floor(processedData.length / 10) : (processedData.length > 7 ? 1 : 0) } 
+              interval={Math.max(0, Math.floor(processedData.length / 7) -1)} // Show fewer ticks on smaller screens
             />
             <YAxis
               tickLine={true}
@@ -150,7 +148,7 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
                     }}
                 />}
             />
-            <Legend verticalAlign="top" height={40} iconSize={10} wrapperStyle={{fontSize: "12px"}}/>
+            <Legend verticalAlign="top" height={30} iconSize={10} wrapperStyle={{fontSize: "10px"}}/>
             <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeWidth={1.5} strokeOpacity={0.5}/>
             <Area 
                 dataKey="revenue" 
@@ -176,3 +174,5 @@ export function MonthlyRevenueExpensesChart({ dailyData, overallCumulativeNetPro
   )
 }
 
+
+    

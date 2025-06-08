@@ -53,7 +53,7 @@ export function RevenueBreakdownChart({ data }: RevenueBreakdownChartProps) {
   return (
     <ChartContainer
       config={chartConfig}
-      className="mx-auto aspect-square max-h-[300px] sm:max-h-[350px]" // Keeps the donut relatively square and sized
+      className="mx-auto aspect-square max-h-[280px] sm:max-h-[320px] md:max-h-[350px]" 
     >
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
@@ -82,8 +82,8 @@ export function RevenueBreakdownChart({ data }: RevenueBreakdownChartProps) {
             data={data}
             dataKey="value"
             nameKey="name"
-            innerRadius="30%" // Makes it a donut chart
-            outerRadius="70%" // Control size of the pie itself
+            innerRadius="30%" 
+            outerRadius="70%" 
             strokeWidth={2}
             labelLine={false}
             label={({
@@ -97,19 +97,19 @@ export function RevenueBreakdownChart({ data }: RevenueBreakdownChartProps) {
               percent
             }) => {
               const RADIAN = Math.PI / 180
-              // Adjust radius for label position to be slightly outside the pie
+              
               const radius = outerRadius + 15 
               const x = cx + radius * Math.cos(-midAngle * RADIAN)
               const y = cy + radius * Math.sin(-midAngle * RADIAN)
 
-              // Hide small labels to prevent overlap
+              
               if (percent < 0.05) return null; 
 
               return (
                 <text
                   x={x}
                   y={y}
-                  className="fill-muted-foreground text-[10px] sm:text-xs" // Smaller text for labels
+                  className="fill-muted-foreground text-[9px] sm:text-[10px]" 
                   textAnchor={x > cx ? "start" : "end"}
                   dominantBaseline="central"
                 >
@@ -126,7 +126,7 @@ export function RevenueBreakdownChart({ data }: RevenueBreakdownChartProps) {
             layout="vertical"
             verticalAlign="middle"
             align="right"
-            wrapperStyle={{ paddingLeft: "10px", fontSize: "12px" }} // Add padding and control font size
+            wrapperStyle={{ paddingLeft: "10px", fontSize: "10px" }} 
             iconSize={10}
             content={({ payload }) => {
               return (
@@ -150,3 +150,5 @@ export function RevenueBreakdownChart({ data }: RevenueBreakdownChartProps) {
   )
 }
 
+
+    
