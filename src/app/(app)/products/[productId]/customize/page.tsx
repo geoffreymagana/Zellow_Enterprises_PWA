@@ -15,13 +15,13 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from "zod";
 import { Loader2, AlertTriangle, ArrowLeft, ShoppingCart, UploadCloud, ImagePlus, CheckCircleIcon, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 
 const formatPrice = (price: number): string => {
@@ -49,7 +49,6 @@ export default function CustomizeProductPage() {
 
   const [customizationSchema, setCustomizationSchema] = useState<z.ZodObject<any> | null>(null);
   const [defaultFormValues, setDefaultFormValues] = useState<Record<string, any>>({});
-
   const [uploadStates, setUploadStates] = useState<Record<string, { progress: number; error?: string; uploading: boolean; url?: string }>>({});
 
   const form = useForm<Record<string, any>>({
@@ -65,21 +64,24 @@ export default function CustomizeProductPage() {
 
     resolvedOptions.forEach(opt => {
       const selectedValue = formValues[opt.id];
-      if (opt.type === 'dropdown' && opt.choices && selectedValue) {
+      if (!selectedValue) return;
+
+      if (opt.type === 'dropdown' && opt.choices) {
         const choice = opt.choices.find(c => c.value === selectedValue);
         if (choice && choice.priceAdjustment) {
           calculatedPrice += choice.priceAdjustment;
         }
-      }
-      if (opt.type === 'checkbox' && selectedValue === true && opt.priceAdjustmentIfChecked) {
+      } else if (opt.type === 'checkbox' && selectedValue === true && opt.priceAdjustmentIfChecked) {
         calculatedPrice += opt.priceAdjustmentIfChecked;
+      } else if (opt.type === 'color_picker' && opt.choices) {
+        const choice = opt.choices.find(c => c.value === selectedValue);
+        if (choice && choice.priceAdjustment) {
+          calculatedPrice += choice.priceAdjustment; // Add this if color choices can have price adjustments
+        }
       }
-      // Note: Price adjustments for 'color_picker' choices are not implemented yet.
-      // If they were, logic would go here to check opt.type === 'color_picker', find the selected choice, and add its priceAdjustment.
     });
     setCurrentPrice(calculatedPrice);
   }, [product, resolvedOptions, form]);
-
 
   const fetchProductAndOptions = useCallback(async () => {
     if (!productId || !db) {
@@ -107,19 +109,15 @@ export default function CustomizeProductPage() {
             const groupDoc = await getDoc(groupDocRef);
             if (groupDoc.exists()) {
                 const groupData = groupDoc.data() as CustomizationGroupDefinition;
-                finalOptions = (groupData.options || []).filter(opt => opt.showToCustomerByDefault !== false) as ProductCustomizationOption[];
+                finalOptions = (groupData.options || []).filter(opt => opt.showToCustomerByDefault !== false);
             } else {
                 console.warn(`Customization group ${fetchedProduct.customizationGroupId} not found for product ${productId}. Checking direct product options.`);
                 if (fetchedProduct.customizationOptions && fetchedProduct.customizationOptions.length > 0) {
                     finalOptions = fetchedProduct.customizationOptions.filter(opt => opt.showToCustomerByDefault !== false);
-                } else {
-                    finalOptions = [];
                 }
             }
         } else if (fetchedProduct.customizationOptions && fetchedProduct.customizationOptions.length > 0) {
             finalOptions = fetchedProduct.customizationOptions.filter(opt => opt.showToCustomerByDefault !== false);
-        } else {
-            finalOptions = [];
         }
         setResolvedOptions(finalOptions);
 
@@ -130,41 +128,43 @@ export default function CustomizeProductPage() {
 
           finalOptions.forEach(opt => {
             let fieldSchema: z.ZodTypeAny;
+            let defaultValue: any = opt.defaultValue;
+
             switch (opt.type) {
               case 'dropdown':
                 fieldSchema = z.string();
                 if (opt.required) fieldSchema = fieldSchema.min(1, `${opt.label} is required.`);
                 else fieldSchema = fieldSchema.optional().nullable();
-                newDefaultValues[opt.id] = opt.defaultValue ?? (opt.choices?.[0]?.value || null);
+                defaultValue = defaultValue ?? (opt.choices?.[0]?.value || null);
                 break;
               case 'text':
                 fieldSchema = z.string();
                 if (opt.required) fieldSchema = fieldSchema.min(1, `${opt.label} is required.`);
                 else fieldSchema = fieldSchema.optional().nullable();
                 if (opt.maxLength) fieldSchema = fieldSchema.max(opt.maxLength, `${opt.label} cannot exceed ${opt.maxLength} characters.`);
-                newDefaultValues[opt.id] = opt.defaultValue ?? "";
+                defaultValue = defaultValue ?? "";
                 break;
               case 'checkbox':
                 fieldSchema = z.boolean().optional();
-                newDefaultValues[opt.id] = typeof opt.defaultValue === 'boolean' ? opt.defaultValue : false;
+                defaultValue = typeof defaultValue === 'boolean' ? defaultValue : false;
                 break;
               case 'image_upload':
                 fieldSchema = z.string().url({ message: "A valid image URL is required after upload." }).optional().or(z.literal(''));
                 if (opt.required) fieldSchema = z.string().url({message: "Image upload is required."}).min(1, `${opt.label} is required.`);
-                newDefaultValues[opt.id] = opt.defaultValue ?? ""; 
-                initialUploadStates[opt.id] = { progress: 0, error: undefined, uploading: false, url: newDefaultValues[opt.id] || undefined };
+                defaultValue = defaultValue ?? ""; 
+                initialUploadStates[opt.id] = { progress: 0, error: undefined, uploading: false, url: defaultValue || undefined };
                 break;
               case 'color_picker':
                 fieldSchema = z.string().regex(/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/i, `${opt.label} must be a valid hex color.`);
                 if (opt.required) fieldSchema = fieldSchema.min(1, `${opt.label} is required.`);
                 else fieldSchema = fieldSchema.optional().nullable();
-                newDefaultValues[opt.id] = opt.defaultValue ?? (opt.choices?.[0]?.value || null); // Default to first admin-defined color if any
+                defaultValue = defaultValue ?? (opt.choices?.[0]?.value || null);
                 break;
               default:
                 fieldSchema = z.any().optional();
-                newDefaultValues[opt.id] = opt.defaultValue ?? null;
             }
             shape[opt.id] = fieldSchema;
+            newDefaultValues[opt.id] = defaultValue;
           });
           
           setCustomizationSchema(z.object(shape));
@@ -173,7 +173,6 @@ export default function CustomizeProductPage() {
         } else {
           setCustomizationSchema(z.object({}));
           setDefaultFormValues({});
-          setUploadStates({});
         }
       } else {
         setError("Item not found.");
@@ -203,17 +202,17 @@ export default function CustomizeProductPage() {
   }, [authLoading, user, productId, router, fetchProductAndOptions]);
   
   useEffect(() => {
-    if (customizationSchema) {
+    if (customizationSchema && Object.keys(defaultFormValues).length > 0) {
       form.reset(defaultFormValues);
       if(product && resolvedOptions.length > 0) {
           calculatePrice();
       }
     }
-  }, [customizationSchema, defaultFormValues, form, product, resolvedOptions, calculatePrice]);
-
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customizationSchema, defaultFormValues, product, resolvedOptions]);
 
   useEffect(() => {
-    if (product && form.formState.isDirty && resolvedOptions.length > 0) { 
+    if (product && resolvedOptions.length > 0) { 
         const subscription = form.watch(() => calculatePrice());
         return () => subscription.unsubscribe();
     }
@@ -380,143 +379,154 @@ export default function CustomizeProductPage() {
                 </CardFooter>
               </div>
             ) : customizationSchema ? (
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  <CardContent className="p-0 space-y-5">
-                    {resolvedOptions.map((option) => (
-                      <FormField
-                        key={option.id}
-                        control={form.control}
-                        name={option.id}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-base font-medium">{option.label} {option.required && <span className="text-destructive">*</span>}</FormLabel>
-                            {option.type === 'dropdown' && option.choices && (
-                              <Select 
-                                onValueChange={(value) => { field.onChange(value); calculatePrice(); }} 
-                                value={String(field.value ?? "")} 
-                                defaultValue={String(field.value ?? "")}
-                              >
-                                <FormControl><SelectTrigger><SelectValue placeholder={`Select ${option.label.toLowerCase()}`} /></SelectTrigger></FormControl>
-                                <SelectContent>
-                                  {option.choices.map(choice => (
-                                    <SelectItem key={choice.value} value={choice.value}>
-                                      {choice.label} 
-                                      {choice.priceAdjustment ? ` (${choice.priceAdjustment > 0 ? '+' : ''}${formatPrice(choice.priceAdjustment)})` : ''}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            )}
-                            {option.type === 'text' && (
-                              <Textarea 
-                                {...field} 
-                                value={String(field.value ?? "")}
-                                onChange={(e) => {field.onChange(e); setTimeout(calculatePrice, 0);}}
-                                placeholder={option.placeholder || `Enter ${option.label.toLowerCase()}`} 
-                                maxLength={option.maxLength}
-                                rows={option.maxLength && option.maxLength > 100 ? 4 : 2} 
-                              />
-                            )}
-                            {option.type === 'checkbox' && (
-                              <div className="flex items-center space-x-2 p-3 border rounded-md hover:border-primary transition-colors">
-                                 <Checkbox
-                                  id={option.id}
-                                  checked={field.value === true}
-                                  onCheckedChange={(checked) => {field.onChange(checked); setTimeout(calculatePrice, 0);}}
-                                 />
-                                 <label htmlFor={option.id} className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-grow cursor-pointer">
-                                   {option.checkboxLabel || option.label}
-                                   {option.priceAdjustmentIfChecked ? ` (+${formatPrice(option.priceAdjustmentIfChecked)})` : ''}
-                                 </label>
-                              </div>
-                            )}
-                            {option.type === 'image_upload' && (
-                              <div className="space-y-2">
-                                <Input
-                                  id={option.id}
-                                  type="file"
-                                  accept={option.acceptedFileTypes || "image/*"}
-                                  onChange={(e) => handleImageUpload(e, option)}
-                                  className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                                  disabled={uploadStates[option.id]?.uploading}
+              <TooltipProvider>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <CardContent className="p-0 space-y-5">
+                      {resolvedOptions.map((option) => (
+                        <FormField
+                          key={option.id}
+                          control={form.control}
+                          name={option.id}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-medium">{option.label} {option.required && <span className="text-destructive">*</span>}</FormLabel>
+                              {option.type === 'dropdown' && option.choices && (
+                                <Select 
+                                  onValueChange={(value) => { field.onChange(value); calculatePrice(); }} 
+                                  value={String(field.value ?? "")} 
+                                  defaultValue={String(field.value ?? "")}
+                                >
+                                  <FormControl><SelectTrigger><SelectValue placeholder={`Select ${option.label.toLowerCase()}`} /></SelectTrigger></FormControl>
+                                  <SelectContent>
+                                    {option.choices.map(choice => (
+                                      <SelectItem key={choice.value} value={choice.value}>
+                                        {choice.label} 
+                                        {choice.priceAdjustment && choice.priceAdjustment !== 0 ? ` (${choice.priceAdjustment > 0 ? '+' : ''}${formatPrice(choice.priceAdjustment)})` : ''}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                              {option.type === 'text' && (
+                                <Textarea 
+                                  {...field} 
+                                  value={String(field.value ?? "")}
+                                  onChange={(e) => {field.onChange(e); setTimeout(calculatePrice, 0);}}
+                                  placeholder={option.placeholder || `Enter ${option.label.toLowerCase()}`} 
+                                  maxLength={option.maxLength}
+                                  rows={option.maxLength && option.maxLength > 100 ? 4 : 2} 
                                 />
-                                {uploadStates[option.id]?.uploading && (
-                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <Loader2 className="h-4 w-4 animate-spin"/> Uploading...
-                                  </div>
-                                )}
-                                {uploadStates[option.id]?.error && <p className="text-xs text-destructive">{uploadStates[option.id]?.error}</p>}
-                                {field.value && !uploadStates[option.id]?.uploading && (
-                                  <div className="mt-2 p-2 border rounded-md bg-muted/50 relative w-32 h-32 group">
-                                    <Image src={field.value} alt="Upload preview" layout="fill" objectFit="cover" className="rounded-md" data-ai-hint="customized image" />
-                                    <Button 
-                                      type="button" 
-                                      variant="destructive" 
-                                      size="icon" 
-                                      className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                      onClick={() => {
-                                        form.setValue(option.id, "");
-                                        setUploadStates(prev => ({ ...prev, [option.id]: { ...prev[option.id], url: undefined, error: undefined }}));
-                                      }}
-                                    > X </Button>
-                                  </div>
-                                )}
-                                {!field.value && !uploadStates[option.id]?.uploading && (
-                                  <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground p-2 border rounded-md border-dashed justify-center h-24">
-                                      <ImagePlus className="h-5 w-5"/> <span>Upload Image</span>
-                                  </div>
-                                )}
-                              </div>
-                             )}
-                             {option.type === 'color_picker' && (
-                                <div className="flex flex-wrap gap-2 items-center">
-                                  {option.choices && option.choices.length > 0 ? (
-                                    option.choices.map(choice => (
-                                      <button
-                                        type="button"
-                                        key={choice.value}
-                                        className={cn(
-                                          "h-8 w-8 rounded-full border-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 flex items-center justify-center transition-all",
-                                          field.value === choice.value ? 'ring-2 ring-offset-2 ring-primary border-primary scale-110' : 'border-transparent hover:border-muted-foreground'
-                                        )}
-                                        style={{ backgroundColor: choice.value }}
+                              )}
+                              {option.type === 'checkbox' && (
+                                <div className="flex items-center space-x-2 p-3 border rounded-md hover:border-primary transition-colors">
+                                  <Checkbox
+                                    id={option.id}
+                                    checked={field.value === true}
+                                    onCheckedChange={(checked) => {field.onChange(checked); setTimeout(calculatePrice, 0);}}
+                                  />
+                                  <label htmlFor={option.id} className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-grow cursor-pointer">
+                                    {option.checkboxLabel || option.label}
+                                    {option.priceAdjustmentIfChecked && option.priceAdjustmentIfChecked !== 0 ? ` (+${formatPrice(option.priceAdjustmentIfChecked)})` : ''}
+                                  </label>
+                                </div>
+                              )}
+                              {option.type === 'image_upload' && (
+                                <div className="space-y-2">
+                                  <Input
+                                    id={option.id}
+                                    type="file"
+                                    accept={option.acceptedFileTypes || "image/*"}
+                                    onChange={(e) => handleImageUpload(e, option)}
+                                    className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                                    disabled={uploadStates[option.id]?.uploading}
+                                  />
+                                  {uploadStates[option.id]?.uploading && (
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      <Loader2 className="h-4 w-4 animate-spin"/> Uploading...
+                                    </div>
+                                  )}
+                                  {uploadStates[option.id]?.error && <p className="text-xs text-destructive">{uploadStates[option.id]?.error}</p>}
+                                  {field.value && uploadStates[option.id]?.url && !uploadStates[option.id]?.uploading && (
+                                    <div className="mt-2 p-2 border rounded-md bg-muted/50 relative w-32 h-32 group">
+                                      <Image src={field.value} alt="Upload preview" layout="fill" objectFit="cover" className="rounded-md" data-ai-hint="customized image" />
+                                      <Button 
+                                        type="button" 
+                                        variant="destructive" 
+                                        size="icon" 
+                                        className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                                         onClick={() => {
-                                          field.onChange(choice.value);
-                                          calculatePrice(); 
+                                          form.setValue(option.id, "");
+                                          setUploadStates(prev => ({ ...prev, [option.id]: { ...prev[option.id], url: undefined, error: undefined }}));
                                         }}
-                                        title={choice.label || choice.value}
-                                      >
-                                        {field.value === choice.value && <Check className="h-4 w-4 text-white mix-blend-difference" />}
-                                        <span className="sr-only">{choice.label || choice.value}</span>
-                                      </button>
-                                    ))
-                                  ) : (
-                                    <p className="text-xs text-muted-foreground">No color options defined by admin.</p>
+                                      > X </Button>
+                                    </div>
+                                  )}
+                                  {(!field.value || !uploadStates[option.id]?.url) && !uploadStates[option.id]?.uploading && (
+                                    <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground p-2 border rounded-md border-dashed justify-center h-24">
+                                        <ImagePlus className="h-5 w-5"/> <span>Upload Image</span>
+                                    </div>
                                   )}
                                 </div>
-                             )}
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    ))}
-                  </CardContent>
+                              )}
+                              {option.type === 'color_picker' && (
+                                  <div className="flex flex-wrap gap-2 items-center pt-1">
+                                    {option.choices && option.choices.length > 0 ? (
+                                      option.choices.map(choice => (
+                                        <TooltipTrigger key={choice.value} asChild>
+                                          <button
+                                            type="button"
+                                            className={cn(
+                                              "h-8 w-8 rounded-full border-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 flex items-center justify-center transition-all",
+                                              field.value === choice.value ? 'ring-2 ring-offset-2 ring-primary border-primary scale-110 shadow-md' : 'border-muted hover:border-muted-foreground'
+                                            )}
+                                            style={{ backgroundColor: choice.value }}
+                                            onClick={() => {
+                                              field.onChange(choice.value);
+                                              calculatePrice(); 
+                                            }}
+                                            aria-label={choice.label || choice.value}
+                                          >
+                                            {field.value === choice.value && <Check className="h-4 w-4 text-white mix-blend-difference" />}
+                                            <span className="sr-only">{choice.label || choice.value}</span>
+                                          </button>
+                                        </TooltipTrigger>
+                                      ))
+                                    ) : (
+                                      <p className="text-xs text-muted-foreground">No color options defined.</p>
+                                    )}
+                                  </div>
+                                )}
+                                {option.type === 'color_picker' && option.choices && option.choices.map(choice => (
+                                  choice.label ? 
+                                  <TooltipContent key={`${choice.value}-tooltip`} side="bottom">
+                                      <p>{choice.label} ({choice.value})</p>
+                                      {choice.priceAdjustment && choice.priceAdjustment !== 0 ? <p>({choice.priceAdjustment > 0 ? '+' : ''}{formatPrice(choice.priceAdjustment)})</p> : null}
+                                  </TooltipContent> 
+                                  : null
+                                ))}
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ))}
+                    </CardContent>
 
-                  <CardFooter className="p-0 mt-8 pt-6 border-t flex flex-col items-stretch gap-3">
-                      <div className="text-2xl font-bold text-right mb-2">
-                          Total Price: {formatPrice(currentPrice)}
-                      </div>
-                      {product.stock === 0 && (
-                           <p className="text-destructive text-center font-semibold">This item is currently out of stock.</p>
-                      )}
-                    <Button type="submit" size="lg" className="w-full" disabled={isSubmitting || product.stock === 0 || Object.values(uploadStates).some(s => s.uploading)}>
-                      {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ShoppingCart className="mr-2 h-5 w-5" /> }
-                      Save Customizations & Add to Cart
-                    </Button>
-                  </CardFooter>
-                </form>
-              </Form>
+                    <CardFooter className="p-0 mt-8 pt-6 border-t flex flex-col items-stretch gap-3">
+                        <div className="text-2xl font-bold text-right mb-2">
+                            Total Price: {formatPrice(currentPrice)}
+                        </div>
+                        {product.stock === 0 && (
+                            <p className="text-destructive text-center font-semibold">This item is currently out of stock.</p>
+                        )}
+                      <Button type="submit" size="lg" className="w-full" disabled={isSubmitting || product.stock === 0 || Object.values(uploadStates).some(s => s.uploading)}>
+                        {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ShoppingCart className="mr-2 h-5 w-5" /> }
+                        Save Customizations & Add to Cart
+                      </Button>
+                    </CardFooter>
+                  </form>
+                </Form>
+              </TooltipProvider>
             ) : (
                  <div className="flex flex-col items-center justify-center py-10">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -529,5 +539,3 @@ export default function CustomizeProductPage() {
     </div>
   );
 }
-
-    
