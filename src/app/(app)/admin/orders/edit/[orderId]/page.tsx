@@ -13,8 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ArrowLeft, Save, AlertTriangle, Package, User, Settings2, Truck, CreditCard, GiftIcon, PlusCircle, Edit, Users } from 'lucide-react';
-import type { Order, OrderStatus, Task, User as AppUser, DeliveryHistoryEntry, OrderItem as OrderItemType, PaymentStatus } from '@/types';
+import { Loader2, ArrowLeft, Save, AlertTriangle, Package, User, Settings2, Truck, CreditCard, GiftIcon, PlusCircle, Edit, Users, Image as ImageIconPlaceholder, Palette } from 'lucide-react';
+import type { Order, OrderStatus, Task, User as AppUser, DeliveryHistoryEntry, OrderItem as OrderItemType, PaymentStatus, Product, CustomizationGroupDefinition, ProductCustomizationOption } from '@/types';
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
@@ -70,15 +70,21 @@ const getPaymentStatusBadgeVariant = (status: PaymentStatus): BadgeProps['varian
   }
 };
 
+interface ResolvedOptionDetails {
+  label: string;
+  value: string;
+  isColor?: boolean;
+  colorHex?: string;
+}
+
 function OrderTaskItem({ task }: { task: Task }) {
   const formatDateTaskItem = (timestamp: any) => {
     if (!timestamp) return 'N/A';
     if (timestamp && typeof timestamp.toDate === 'function') {
       return format(timestamp.toDate(), 'PPp');
     }
-    // Attempt to parse if it's a string or number, though serverTimestamp might be an object before write
     const date = new Date(timestamp);
-    if (isNaN(date.getTime())) return 'Invalid Date'; // Or handle differently
+    if (isNaN(date.getTime())) return 'Invalid Date';
     return format(date, 'PPp');
   };
 
@@ -116,6 +122,9 @@ export default function AdminOrderDetailPage() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [currentItemForTask, setCurrentItemForTask] = useState<OrderItemType | null>(null);
+  
+  const [resolvedOrderItemOptionsMap, setResolvedOrderItemOptionsMap] = useState<Map<string, ProductCustomizationOption[]>>(new Map());
+  const [isLoadingItemOptions, setIsLoadingItemOptions] = useState(false);
   
   const taskForm = useForm<TaskFormValues>({ resolver: zodResolver(taskFormSchema) });
   const statusForm = useForm<OrderStatusFormValues>({ resolver: zodResolver(orderStatusFormSchema) });
@@ -170,6 +179,46 @@ export default function AdminOrderDetailPage() {
     }
   }, [toast]);
 
+  const fetchAndResolveOrderItemOptions = useCallback(async () => {
+    if (!db || !order || order.items.length === 0) {
+      setResolvedOrderItemOptionsMap(new Map());
+      return;
+    }
+    setIsLoadingItemOptions(true);
+    const newMap = new Map<string, ProductCustomizationOption[]>();
+    const promises = order.items.map(async (item, index) => {
+      if (item.customizations && Object.keys(item.customizations).length > 0) {
+        try {
+          const productDocRef = doc(db, 'products', item.productId);
+          const productDoc = await getDoc(productDocRef);
+          if (productDoc.exists()) {
+            const productData = productDoc.data() as Product;
+            let optionsToUse: ProductCustomizationOption[] = productData.customizationOptions || [];
+            if (productData.customizationGroupId) {
+              const groupDocRef = doc(db, 'customizationGroupDefinitions', productData.customizationGroupId);
+              const groupDoc = await getDoc(groupDocRef);
+              if (groupDoc.exists()) {
+                optionsToUse = (groupDoc.data() as CustomizationGroupDefinition).options || [];
+              }
+            }
+            newMap.set(`${item.productId}_${index}`, optionsToUse);
+          }
+        } catch (error) {
+          console.error(`Failed to fetch options for product ${item.productId} in order:`, error);
+        }
+      }
+    });
+    await Promise.all(promises);
+    setResolvedOrderItemOptionsMap(newMap);
+    setIsLoadingItemOptions(false);
+  }, [order, db]);
+
+  useEffect(() => {
+    if (order && order.items.length > 0) {
+      fetchAndResolveOrderItemOptions();
+    }
+  }, [order, fetchAndResolveOrderItemOptions]);
+
   useEffect(() => {
     if (!authLoading) {
       if (!user || (role !== 'Admin' && role !== 'ServiceManager')) {
@@ -192,21 +241,20 @@ export default function AdminOrderDetailPage() {
       const orderRef = doc(db, 'orders', orderId);
       const newHistoryEntry: DeliveryHistoryEntry = {
         status: data.status as OrderStatus,
-        timestamp: Timestamp.now(), // Use client-side timestamp for arrayUnion
+        timestamp: Timestamp.now(), 
         notes: `Status updated to ${data.status} by ${user.displayName || user.email}`,
         actorId: user.uid,
       };
       await updateDoc(orderRef, { 
         status: data.status, 
-        updatedAt: serverTimestamp(), // Top-level serverTimestamp is fine
+        updatedAt: serverTimestamp(), 
         deliveryHistory: arrayUnion(newHistoryEntry) 
       });
       
-      // Optimistically update local state
       setOrder(prev => prev ? { 
           ...prev, 
           status: data.status as OrderStatus, 
-          deliveryHistory: [...(prev.deliveryHistory || []), {...newHistoryEntry, timestamp: new Date() }] // Convert to Date for local display
+          deliveryHistory: [...(prev.deliveryHistory || []), {...newHistoryEntry, timestamp: new Date() }] 
       } : null);
       statusForm.reset({ status: data.status as OrderStatus }); 
       toast({ title: "Order Status Updated", description: `Order marked as ${data.status}.` });
@@ -252,8 +300,8 @@ export default function AdminOrderDetailPage() {
       const createdTask: Task = { 
         ...newTaskData, 
         id: docRef.id, 
-        createdAt: new Date(), // Optimistic update with current date for local display
-        updatedAt: new Date()  // Optimistic update
+        createdAt: new Date(), 
+        updatedAt: new Date()
       };
       setOrderTasks(prev => [...prev, createdTask]);
       toast({ title: "Task Created", description: `Task for ${currentItemForTask.name} assigned to ${selectedTechnician.displayName || selectedTechnician.email}.` });
@@ -270,8 +318,42 @@ export default function AdminOrderDetailPage() {
     return orderTasks.some(task => task.itemName === itemName && task.orderId === orderId);
   };
 
+  const getDisplayableCustomizationValueAdmin = (
+    optionId: string, 
+    selectedValue: any, 
+    optionsDefinitions?: ProductCustomizationOption[]
+  ): ResolvedOptionDetails => {
+    const optionDef = optionsDefinitions?.find(opt => opt.id === optionId);
+    if (!optionDef) return { label: optionId, value: String(selectedValue) };
 
-  if (isLoading || authLoading) {
+    let displayValue = String(selectedValue);
+    let isColor = false;
+    let colorHex: string | undefined = undefined;
+
+    switch (optionDef.type) {
+      case 'dropdown':
+        displayValue = optionDef.choices?.find(c => c.value === selectedValue)?.label || String(selectedValue);
+        break;
+      case 'color_picker':
+        const colorChoice = optionDef.choices?.find(c => c.value === selectedValue);
+        displayValue = colorChoice?.label || String(selectedValue);
+        isColor = true;
+        colorHex = colorChoice?.value;
+        break;
+      case 'image_upload':
+        displayValue = selectedValue ? "Uploaded Image" : "No image";
+        break;
+      case 'checkbox':
+        displayValue = selectedValue ? (optionDef.checkboxLabel || 'Selected') : 'Not selected';
+        break;
+      default: // text
+        displayValue = String(selectedValue);
+    }
+    return { label: optionDef.label, value: displayValue, isColor, colorHex };
+  };
+
+
+  if (isLoading || authLoading || isLoadingItemOptions) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
   if (!order) {
@@ -329,33 +411,46 @@ export default function AdminOrderDetailPage() {
               <Table>
                 <TableHeader><TableRow><TableHead>Item</TableHead><TableHead>Qty</TableHead><TableHead className="text-right">Unit Price</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {order.items.map((item, index) => (
-                    <TableRow key={item.productId + index}>
-                      <TableCell>
-                        <div className="font-medium">{item.name}</div>
-                        {item.customizations && Object.keys(item.customizations).length > 0 && (
-                          <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
-                            {Object.entries(item.customizations).map(([key, value]) => (
-                              <div key={key}><span className="capitalize font-medium">{key.replace(/_/g, ' ')}:</span> {String(value)}</div>
-                            ))}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>{item.quantity}</TableCell>
-                      <TableCell className="text-right">{formatPrice(item.price / item.quantity)}</TableCell>
-                      <TableCell className="text-right">{formatPrice(item.price)}</TableCell>
-                      <TableCell className="text-right">
-                        {item.customizations && Object.keys(item.customizations).length > 0 && !itemHasExistingTask(item.name) && (role === 'Admin' || role === 'ServiceManager') && (
-                          <Button variant="outline" size="sm" onClick={() => openTaskDialog(item)}>
-                            <Settings2 className="mr-1 h-3 w-3"/> Create Task
-                          </Button>
-                        )}
-                         {itemHasExistingTask(item.name) && (
-                            <Badge variant="outline" className="text-xs">Task Exists</Badge>
-                         )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {order.items.map((item, index) => {
+                    const itemKey = `${item.productId}_${index}`;
+                    const itemOptionDefinitions = resolvedOrderItemOptionsMap.get(itemKey);
+                    return (
+                      <TableRow key={itemKey}>
+                        <TableCell>
+                          <div className="font-medium">{item.name}</div>
+                          {item.customizations && Object.keys(item.customizations).length > 0 && (
+                            <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                              {Object.entries(item.customizations).map(([optionId, selectedValue]) => {
+                                const details = getDisplayableCustomizationValueAdmin(optionId, selectedValue, itemOptionDefinitions);
+                                return (
+                                  <div key={optionId} className="flex items-center gap-1">
+                                    <span className="font-semibold">{details.label}:</span>
+                                    {details.isColor && details.colorHex && (
+                                        <span style={{ backgroundColor: details.colorHex }} className="inline-block w-3 h-3 rounded-full border border-muted-foreground mr-1"></span>
+                                    )}
+                                    <span>{details.value}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>{item.quantity}</TableCell>
+                        <TableCell className="text-right">{formatPrice(item.price / item.quantity)}</TableCell>
+                        <TableCell className="text-right">{formatPrice(item.price)}</TableCell>
+                        <TableCell className="text-right">
+                          {item.customizations && Object.keys(item.customizations).length > 0 && !itemHasExistingTask(item.name) && (role === 'Admin' || role === 'ServiceManager') && (
+                            <Button variant="outline" size="sm" onClick={() => openTaskDialog(item)}>
+                              <Settings2 className="mr-1 h-3 w-3"/> Create Task
+                            </Button>
+                          )}
+                          {itemHasExistingTask(item.name) && (
+                              <Badge variant="outline" className="text-xs">Task Exists</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -490,5 +585,4 @@ export default function AdminOrderDetailPage() {
     </div>
   );
 }
-
     

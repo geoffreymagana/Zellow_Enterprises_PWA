@@ -8,18 +8,25 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import React, { useEffect, useState, useMemo } from 'react'; // Added React and useMemo
-import { collection, addDoc, serverTimestamp, doc, writeBatch, Timestamp } from 'firebase/firestore';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { collection, addDoc, serverTimestamp, doc, writeBatch, Timestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order, OrderItem, OrderStatus, DeliveryHistoryEntry, GiftDetails } from '@/types';
+import type { Order, OrderItem, OrderStatus, DeliveryHistoryEntry, GiftDetails, Product, CustomizationGroupDefinition, ProductCustomizationOption, CustomizationGroupChoiceDefinition, CartItem as CartItemType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PackageCheck, Gift } from 'lucide-react';
+import { Loader2, PackageCheck, Gift, Image as ImageIconPlaceholder, Palette } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { sendGiftNotification, GiftNotificationInput } from '@/ai/flows/send-gift-notification-flow'; 
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
 };
+
+interface ResolvedOptionDetails {
+  label: string;
+  value: string;
+  isColor?: boolean;
+  colorHex?: string;
+}
 
 export default function ReviewOrderPage() {
   const { user } = useAuth();
@@ -43,6 +50,9 @@ export default function ReviewOrderPage() {
   const { toast } = useToast();
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
+  const [resolvedProductOptionsMap, setResolvedProductOptionsMap] = useState<Map<string, ProductCustomizationOption[]>>(new Map());
+  const [isLoadingOptions, setIsLoadingOptions] = useState(false);
+
   const shippingCost = selectedShippingMethodInfo?.cost || 0;
   const orderTotal = cartSubtotal + shippingCost;
 
@@ -61,6 +71,44 @@ export default function ReviewOrderPage() {
     return null;
   }, [isGiftOrder, giftRecipientName, giftRecipientContactMethod, giftRecipientContactValue, giftMessage, notifyRecipient, showPricesToRecipient, giftRecipientCanViewAndTrack]);
 
+  const fetchAndResolveProductOptions = useCallback(async () => {
+    if (!db || cartItems.length === 0) {
+      setResolvedProductOptionsMap(new Map()); // Clear if no items
+      return;
+    }
+    setIsLoadingOptions(true);
+    const newMap = new Map<string, ProductCustomizationOption[]>();
+    const promises = cartItems.map(async (item) => {
+      if (item.customizations && Object.keys(item.customizations).length > 0) {
+        try {
+          const productDocRef = doc(db, 'products', item.productId);
+          const productDoc = await getDoc(productDocRef);
+          if (productDoc.exists()) {
+            const productData = productDoc.data() as Product;
+            let optionsToUse: ProductCustomizationOption[] = productData.customizationOptions || [];
+            if (productData.customizationGroupId) {
+              const groupDocRef = doc(db, 'customizationGroupDefinitions', productData.customizationGroupId);
+              const groupDoc = await getDoc(groupDocRef);
+              if (groupDoc.exists()) {
+                optionsToUse = (groupDoc.data() as CustomizationGroupDefinition).options || [];
+              }
+            }
+            newMap.set(item.cartItemId, optionsToUse);
+          }
+        } catch (error) {
+          console.error(`Failed to fetch options for product ${item.productId}:`, error);
+        }
+      }
+    });
+    await Promise.all(promises);
+    setResolvedProductOptionsMap(newMap);
+    setIsLoadingOptions(false);
+  }, [cartItems, db]);
+
+  useEffect(() => {
+    fetchAndResolveProductOptions();
+  }, [fetchAndResolveProductOptions]);
+
 
   useEffect(() => {
     if (!shippingAddress || !paymentMethod || !selectedShippingMethodInfo || cartItems.length === 0) {
@@ -71,9 +119,45 @@ export default function ReviewOrderPage() {
       } else if (!selectedShippingMethodInfo || !paymentMethod) {
         router.replace('/checkout/payment');
       }
-      toast({ title: "Missing Information", description: "Please complete all previous steps.", variant: "destructive" });
+      if (!isPlacingOrder && (cartItems.length > 0 || !!shippingAddress)) { // Only toast if not already in order placement and there's something to go back for
+        toast({ title: "Missing Information", description: "Please complete all previous steps.", variant: "destructive" });
+      }
     }
-  }, [shippingAddress, paymentMethod, selectedShippingMethodInfo, cartItems, router, toast]);
+  }, [shippingAddress, paymentMethod, selectedShippingMethodInfo, cartItems, router, toast, isPlacingOrder]);
+
+  const getDisplayableCustomizationValue = (
+    optionId: string, 
+    selectedValue: any, 
+    optionsDefinitions?: ProductCustomizationOption[]
+  ): ResolvedOptionDetails => {
+    const optionDef = optionsDefinitions?.find(opt => opt.id === optionId);
+    if (!optionDef) return { label: optionId, value: String(selectedValue) };
+
+    let displayValue = String(selectedValue);
+    let isColor = false;
+    let colorHex: string | undefined = undefined;
+
+    switch (optionDef.type) {
+      case 'dropdown':
+        displayValue = optionDef.choices?.find(c => c.value === selectedValue)?.label || String(selectedValue);
+        break;
+      case 'color_picker':
+        const colorChoice = optionDef.choices?.find(c => c.value === selectedValue);
+        displayValue = colorChoice?.label || String(selectedValue);
+        isColor = true;
+        colorHex = colorChoice?.value;
+        break;
+      case 'image_upload':
+        displayValue = selectedValue ? "Uploaded Image" : "No image";
+        break;
+      case 'checkbox':
+        displayValue = selectedValue ? (optionDef.checkboxLabel || 'Selected') : 'Not selected';
+        break;
+      default: // text
+        displayValue = String(selectedValue);
+    }
+    return { label: optionDef.label, value: displayValue, isColor, colorHex };
+  };
 
   const handlePlaceOrder = async () => {
     if (!user || !shippingAddress || !paymentMethod || cartItems.length === 0 || !selectedShippingMethodInfo) {
@@ -85,7 +169,7 @@ export default function ReviewOrderPage() {
     const orderItems: OrderItem[] = cartItems.map(item => ({
       productId: item.productId,
       name: item.name,
-      price: item.currentPrice,
+      price: item.currentPrice, 
       quantity: item.quantity,
       imageUrl: item.imageUrl || null,
       customizations: item.customizations || null,
@@ -97,22 +181,8 @@ export default function ReviewOrderPage() {
       notes: 'Order placed by customer.',
       actorId: user.uid,
     };
-
+    
     const currentPaymentStatus = (paymentMethod === 'mpesa' || paymentMethod === 'card') ? 'paid' : 'pending';
-
-    // TODO: Implement geocoding here.
-    // Use a geocoding service (e.g., Google Geocoding API, Mapbox Geocoding API)
-    // to convert `shippingAddress` (e.g., shippingAddress.addressLine1, shippingAddress.city)
-    // into latitude and longitude.
-    // Store the result in `deliveryCoordinates`.
-    // Example (conceptual):
-    // let geocodedCoordinates = null;
-    // try {
-    //   geocodedCoordinates = await geocodeAddress(shippingAddress);
-    // } catch (geoError) {
-    //   console.error("Geocoding failed:", geoError);
-    //   // Decide how to handle geocoding failure: proceed with null coordinates, or show an error.
-    // }
 
     const newOrderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> = {
       customerId: user.uid,
@@ -133,7 +203,7 @@ export default function ReviewOrderPage() {
       deliveryId: null,
       riderId: null,
       riderName: null,
-      deliveryCoordinates: null, // Populate this with geocoded coordinates
+      deliveryCoordinates: null, 
       deliveryNotes: shippingAddress.addressLine2 || null,
       color: null,
       estimatedDeliveryTime: null,
@@ -154,7 +224,7 @@ export default function ReviewOrderPage() {
       if (cartItems.some(item => item.stock !== undefined && item.quantity !== undefined)) {
         const batch = writeBatch(db);
         cartItems.forEach(item => {
-          if (item.stock !== undefined && item.quantity !== undefined) {
+          if (item.stock !== undefined && item.quantity !== undefined && item.productId) {
             const productRef = doc(db, 'products', item.productId);
             batch.update(productRef, { stock: item.stock - item.quantity });
           }
@@ -164,7 +234,7 @@ export default function ReviewOrderPage() {
 
       toast({ title: "Order Placed!", description: `Your order #${newOrderRef.id.substring(0, 8)}... has been successfully placed.` });
 
-      if (isGiftOrder && notifyRecipient && giftDetailsToSave && giftDetailsToSave.recipientContactMethod && giftDetailsToSave.recipientContactValue) {
+       if (isGiftOrder && notifyRecipient && giftDetailsToSave && giftDetailsToSave.recipientContactMethod && giftDetailsToSave.recipientContactValue) {
         try {
           const notificationInput: GiftNotificationInput = {
             orderId: newOrderRef.id,
@@ -176,9 +246,7 @@ export default function ReviewOrderPage() {
             canViewAndTrack: giftDetailsToSave.recipientCanViewAndTrack,
             showPricesToRecipient: giftDetailsToSave.showPricesToRecipient,
           };
-          console.log("Attempting to send gift notification with input:", notificationInput);
           const notificationResult = await sendGiftNotification(notificationInput);
-          console.log("Gift notification flow result:", notificationResult);
           if (notificationResult.success) {
             toast({ title: "Gift Notification Update", description: notificationResult.message, variant: "default" });
           } else {
@@ -199,7 +267,7 @@ export default function ReviewOrderPage() {
     }
   };
 
-  if (!shippingAddress || !paymentMethod || !selectedShippingMethodInfo) {
+  if (!shippingAddress || !paymentMethod || !selectedShippingMethodInfo || isLoadingOptions) {
     return (
         <div className="flex items-center justify-center min-h-screen">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -270,32 +338,47 @@ export default function ReviewOrderPage() {
 
           <section>
             <h3 className="text-lg font-semibold mb-3">Items in Your Order:</h3>
-            <ul role="list" className="divide-y divide-border border rounded-md">
-              {cartItems.map((item) => (
-                <li key={item.cartItemId} className="flex py-4 px-4 items-center">
-                  <Image
-                    src={item.imageUrl || 'https://placehold.co/64x64.png'}
-                    alt={item.name}
-                    width={64}
-                    height={64}
-                    className="w-16 h-16 rounded-md object-cover mr-4 bg-muted"
-                    data-ai-hint="checkout review item"
-                  />
-                  <div className="flex-grow">
-                    <p className="font-semibold">{item.name}</p>
-                    <p className="text-sm text-muted-foreground">Qty: {item.quantity} x {formatPrice(item.currentPrice)}</p>
-                    {item.customizations && Object.keys(item.customizations).length > 0 && (
-                        <div className="mt-1 text-xs text-muted-foreground">
-                        {Object.entries(item.customizations).map(([key, value]) => (
-                            <span key={key} className="block capitalize">{key.replace(/_/g, ' ')}: {String(value)}</span>
-                        ))}
-                        </div>
-                    )}
-                  </div>
-                  <p className="font-semibold">{formatPrice(item.currentPrice * item.quantity)}</p>
-                </li>
-              ))}
-            </ul>
+            {isLoadingOptions && <div className="text-center py-4"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto"/> <p className="text-sm text-muted-foreground">Loading item details...</p></div>}
+            {!isLoadingOptions && (
+              <ul role="list" className="divide-y divide-border border rounded-md">
+                {cartItems.map((item: CartItemType) => {
+                  const itemOptions = resolvedProductOptionsMap.get(item.cartItemId);
+                  return (
+                    <li key={item.cartItemId} className="flex py-4 px-4 items-start sm:items-center flex-col sm:flex-row">
+                      <Image
+                        src={item.imageUrl || 'https://placehold.co/64x64.png'}
+                        alt={item.name}
+                        width={64}
+                        height={64}
+                        className="w-16 h-16 rounded-md object-cover mr-0 sm:mr-4 mb-2 sm:mb-0 bg-muted flex-shrink-0"
+                        data-ai-hint="checkout review item"
+                      />
+                      <div className="flex-grow">
+                        <p className="font-semibold">{item.name}</p>
+                        <p className="text-sm text-muted-foreground">Qty: {item.quantity} x {formatPrice(item.currentPrice)}</p>
+                        {item.customizations && Object.keys(item.customizations).length > 0 && (
+                          <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
+                            {Object.entries(item.customizations).map(([optionId, selectedValue]) => {
+                              const details = getDisplayableCustomizationValue(optionId, selectedValue, itemOptions);
+                              return (
+                                <div key={optionId} className="flex items-center gap-1">
+                                  <span className="font-medium">{details.label}:</span> 
+                                  {details.isColor && details.colorHex && (
+                                    <span style={{ backgroundColor: details.colorHex }} className="inline-block w-3 h-3 rounded-full border border-muted-foreground mr-1"></span>
+                                  )}
+                                  <span>{details.value}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <p className="font-semibold mt-2 sm:mt-0 text-right sm:text-left">{formatPrice(item.currentPrice * item.quantity)}</p>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
              <Link href="/orders/cart" className="text-sm text-primary hover:underline mt-3 inline-block">Edit Cart</Link>
           </section>
 
@@ -320,7 +403,7 @@ export default function ReviewOrderPage() {
 
         </CardContent>
         <CardFooter>
-          <Button size="lg" className="w-full" onClick={handlePlaceOrder} disabled={isPlacingOrder}>
+          <Button size="lg" className="w-full" onClick={handlePlaceOrder} disabled={isPlacingOrder || isLoadingOptions}>
             {isPlacingOrder ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PackageCheck className="mr-2 h-5 w-5" />}
             {isPlacingOrder ? "Placing Order..." : "Place Order & Pay"}
           </Button>
@@ -329,6 +412,4 @@ export default function ReviewOrderPage() {
     </div>
   );
 }
-
-
     
