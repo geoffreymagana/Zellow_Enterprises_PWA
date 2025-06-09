@@ -50,7 +50,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/products', label: 'Products', icon: Package, roles: ['Admin'] },
     { href: '/inventory', label: 'Inventory Mgt', icon: Warehouse, roles: ['Admin', 'InventoryManager'] },
     { href: '/inventory/receivership', label: 'Receive Stock', icon: PackageSearch, roles: ['Admin', 'InventoryManager'] },
-    { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, roles: ['Admin'] }, // Removed ServiceManager
+    { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, roles: ['Admin'] }, 
     { href: '/tasks', label: 'Production Tasks', icon: Wrench, roles: ['Admin', 'ServiceManager'] },
     { href: '/admin/customizations', label: 'Customizations', icon: Layers, roles: ['Admin'] },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'] },
@@ -68,9 +68,26 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/settings', label: 'Settings', icon: SettingsIcon, roles: ['Admin'] },
   ];
 
-  const mainAdminNavItems = baseAdminNavItems.filter(item => role && item.roles.includes(role));
+  let mainAdminNavItemsFilteredByRole = baseAdminNavItems.filter(item => role && item.roles.includes(role));
 
-  const filteredMainAdminNavItems = mainAdminNavItems
+  if (role === 'Admin') {
+    const hiddenForAdminHrefs = [
+      '/inventory',
+      '/inventory/receivership',
+      '/tasks',
+      '/finance/approvals',
+      '/finance/financials',
+      '/invoices'
+    ];
+    mainAdminNavItemsFilteredByRole = mainAdminNavItemsFilteredByRole.filter(item => !hiddenForAdminHrefs.includes(item.href));
+  }
+  
+  if (role === 'ServiceManager') {
+      mainAdminNavItemsFilteredByRole = mainAdminNavItemsFilteredByRole.filter(item => item.href !== '/admin/orders');
+  }
+
+
+  const mainAdminNavItems = mainAdminNavItemsFilteredByRole
     .map(item => {
       if (!searchTerm) return { ...item, isVisible: true };
       const labelMatches = item.label.toLowerCase().includes(searchTerm.toLowerCase());
@@ -103,7 +120,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                 </SheetHeader>
                 <ScrollArea className="flex-1">
                   <SidebarMenu className="p-2">
-                    {mainAdminNavItems.map((item) => {
+                    {mainAdminNavItems.map((item) => { // Use mainAdminNavItems here which has Admin filtering applied
                        const isActive = (() => {
                         if (item.href === '/inventory' && pathname.startsWith('/inventory/receivership')) {
                           return false; 
@@ -191,9 +208,9 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
           <AdminSidebarHeader className="h-[calc(var(--header-height) - 1px)] border-b border-sidebar flex-shrink-0" />
           <SidebarContent className="flex-1 overflow-y-auto">
             <ScrollArea className="h-full">
-              {filteredMainAdminNavItems.length > 0 ? (
+              {mainAdminNavItems.length > 0 ? ( // Use mainAdminNavItems here
                 <SidebarMenu className="p-2">
-                  {filteredMainAdminNavItems.map((item) => {
+                  {mainAdminNavItems.map((item) => { // Use mainAdminNavItems here
                     const isActive = (() => {
                       if (item.href === '/inventory' && pathname.startsWith('/inventory/receivership')) {
                         return false; 
@@ -224,7 +241,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                   })}
                 </SidebarMenu>
               ) : null}
-               {searchTerm && filteredMainAdminNavItems.length === 0 && filteredFooterAdminNavItems.length === 0 && (
+               {searchTerm && mainAdminNavItems.length === 0 && filteredFooterAdminNavItems.length === 0 && (
                 <p className="p-4 text-sm text-muted-foreground">No admin sections found for "{searchTerm}".</p>
               )}
             </ScrollArea>
@@ -377,6 +394,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
                                {role === 'FinanceManager' && (<>
                                 <Link href="/invoices" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/invoices") ? "bg-muted text-primary font-semibold" : ""}`}><FileText className="mr-2 h-4 w-4" />Invoices</Link>
                                 <Link href="/finance/financials" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/finance/financials") ? "bg-muted text-primary font-semibold" : ""}`}><BarChart2 className="mr-2 h-4 w-4" />Financials</Link>
+                                <Link href="/finance/approvals" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/finance/approvals") ? "bg-muted text-primary font-semibold" : ""}`}><Coins className="mr-2 h-4 w-4" />Stock Approvals</Link>
                               </>)}
                               <Link href="/profile" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/profile" ? "bg-muted text-primary font-semibold" : ""}`}><UserCircle className="mr-2 h-4 w-4" />Profile</Link>
                           </nav>
@@ -437,5 +455,3 @@ export default function AppGroupLayout({ children }: LayoutProps) {
 
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
-
-    

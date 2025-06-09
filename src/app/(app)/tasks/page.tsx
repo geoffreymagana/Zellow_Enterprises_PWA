@@ -9,7 +9,7 @@ import type { Task, Order, OrderItem as OrderItemType, Product, ProductCustomiza
 import { Filter, Loader2, Wrench, CheckCircle, AlertTriangle, Eye, Image as ImageIconPlaceholder, Palette, UserCog } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, getDoc, orderBy, getDocs } from 'firebase/firestore'; // Added getDocs
+import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, getDoc, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
@@ -336,7 +336,7 @@ export default function TasksPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-1.5 text-sm py-2">
-                <p className="line-clamp-3 text-xs text-muted-foreground whitespace-pre-line break-words">{task.description}</p>
+                {/* Description removed from card view */}
                 {(role === 'ServiceManager' || role === 'Admin') && <p className="text-xs text-muted-foreground">Assigned: {task.assigneeName || 'Unassigned'}</p>}
                 <p className="text-xs text-muted-foreground">Created: {formatDate(task.createdAt)}</p>
               </CardContent>
@@ -471,4 +471,3 @@ export default function TasksPage() {
     </div>
   );
 }
-
