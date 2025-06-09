@@ -40,7 +40,7 @@ export default function RootLayout({
         <meta name="msapplication-tap-highlight" content="no" />
         <meta name="theme-color" content="#34A7C1" />
 
-        <link rel="manifest" href="/manifest.json" crossOrigin="anonymous" />
+        <link rel="manifest" href="/manifest.json" />
         
         {/* More specific apple touch icons (optional, but good practice) */}
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
