@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { collection, addDoc, serverTimestamp, doc, writeBatch, Timestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order, OrderItem, OrderStatus, DeliveryHistoryEntry, GiftDetails, Product, CustomizationGroupDefinition, ProductCustomizationOption, CustomizationGroupChoiceDefinition, CartItem as CartItemType } from '@/types';
+import type { Order, OrderItem, OrderStatus, DeliveryHistoryEntry, GiftDetails, Product, CustomizationGroupDefinition, ProductCustomizationOption, CartItem as CartItemType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, PackageCheck, Gift, Image as ImageIconPlaceholder, Palette } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
@@ -232,7 +232,8 @@ export default function ReviewOrderPage() {
         await batch.commit();
       }
 
-      toast({ title: "Order Placed!", description: `Your order #${newOrderRef.id.substring(0, 8)}... has been successfully placed.` });
+      // Toast is now handled by the success page
+      // toast({ title: "Order Placed!", description: `Your order #${newOrderRef.id.substring(0, 8)}... has been successfully placed.` });
 
        if (isGiftOrder && notifyRecipient && giftDetailsToSave && giftDetailsToSave.recipientContactMethod && giftDetailsToSave.recipientContactValue) {
         try {
@@ -248,7 +249,8 @@ export default function ReviewOrderPage() {
           };
           const notificationResult = await sendGiftNotification(notificationInput);
           if (notificationResult.success) {
-            toast({ title: "Gift Notification Update", description: notificationResult.message, variant: "default" });
+            // Optional: toast on review page or let success page handle broader success message
+            // toast({ title: "Gift Notification Update", description: notificationResult.message, variant: "default" });
           } else {
             toast({ title: "Gift Notification Issue", description: notificationResult.message, variant: "destructive" });
           }
@@ -259,7 +261,7 @@ export default function ReviewOrderPage() {
       }
 
       clearCart();
-      router.push(`/checkout/success/${newOrderRef.id}`);
+      router.push(`/checkout/success/${newOrderRef.id}`); // Redirect to new success page
     } catch (error: any) {
       console.error("Error placing order:", error);
       toast({ title: "Order Placement Failed", description: error.message || "Could not place your order. Please try again.", variant: "destructive" });

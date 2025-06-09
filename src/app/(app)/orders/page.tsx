@@ -7,17 +7,36 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/hooks/useAuth";
 import type { Order, OrderStatus } from "@/types";
-import { Eye, RefreshCw, FileText } from "lucide-react";
+import { Eye, RefreshCw, FileText, Loader2, ShoppingCart } from "lucide-react"; // Added Loader2 and ShoppingCart
 import Link from "next/link";
-import { useRouter } from "next/navigation"; // Import useRouter
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, useCallback } from "react"; // Added useCallback
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore'; // Added onSnapshot for real-time updates
+import { db } from '@/lib/firebase'; // Ensure db is imported
+import { useToast } from "@/hooks/use-toast"; // For error notifications
+import { format } from 'date-fns'; // For date formatting
 
-const sampleOrders: Order[] = [
-  { id: 'ORD001', customerId: 'cust123', items: [{productId: '1', name: 'Item 1', price: 1599, quantity: 2}], totalAmount: 3198.00, status: 'shipped', createdAt: new Date('2023-10-26'), shippingAddress:{fullName:'User', addressLine1:'123 Street', city:'Nairobi', county:'Nairobi', phone:'0712345678'}, paymentStatus: 'paid', subTotal: 3198, shippingCost: 0, customerName: 'Test Customer', customerEmail: 'test@example.com', customerPhone: '0712345678' },
-  { id: 'ORD002', customerId: 'cust123', items: [{productId: '2', name: 'Item 2', price: 2550, quantity: 1}], totalAmount: 2550.00, status: 'processing', createdAt: new Date('2023-10-28'), shippingAddress:{fullName:'User', addressLine1:'123 Street', city:'Nairobi', county:'Nairobi', phone:'0712345678'}, paymentStatus: 'paid', subTotal: 2550, shippingCost: 0, customerName: 'Test Customer', customerEmail: 'test@example.com', customerPhone: '0712345678' },
-  { id: 'ORD003', customerId: 'cust123', items: [{productId: '3', name: 'Item 3', price: 2000, quantity: 1}], totalAmount: 2000.00, status: 'pending', createdAt: new Date('2023-11-01'), shippingAddress:{fullName:'User', addressLine1:'123 Street', city:'Nairobi', county:'Nairobi', phone:'0712345678'}, paymentStatus: 'pending', subTotal: 2000, shippingCost: 0, customerName: 'Test Customer', customerEmail: 'test@example.com', customerPhone: '0712345678' },
-  { id: 'ORD004', customerId: 'cust123', items: [{productId: '1', name: 'Item 1', price: 1599, quantity: 1}, {productId: '4', name: 'Item 4', price: 999, quantity: 3}], totalAmount: 4596.00, status: 'delivered', createdAt: new Date('2023-09-15'), shippingAddress:{fullName:'User', addressLine1:'123 Street', city:'Nairobi', county:'Nairobi', phone:'0712345678'}, paymentStatus: 'paid', subTotal: 4596, shippingCost: 0, customerName: 'Test Customer', customerEmail: 'test@example.com', customerPhone: '0712345678' },
-];
+const formatPrice = (price: number): string => {
+  return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
+};
+
+const formatDate = (timestamp: any) => {
+    if (!timestamp) return 'N/A';
+    // Check if it's a Firestore Timestamp-like object with a toDate method
+    if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+      return format(timestamp.toDate(), 'PPp');
+    }
+    // Check if it's already a Date object
+    if (timestamp instanceof Date) {
+      return format(timestamp, 'PPp');
+    }
+    // Try to parse it (e.g., if it's a string or number)
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) {
+      return 'Invalid Date';
+    }
+    return format(date, 'PPp');
+  };
 
 
 const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] => {
@@ -36,39 +55,90 @@ const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] 
 };
 
 export default function OrdersPage() {
-  const { user, role } = useAuth(); // Get user and role
+  const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+
+  const fetchOrders = useCallback(() => {
+    if (!user || !db) {
+      setIsLoadingOrders(false);
+      return () => {}; // Return an empty unsubscribe function if no user or db
+    }
+    setIsLoadingOrders(true);
+    const ordersQuery = query(
+      collection(db, 'orders'),
+      where('customerId', '==', user.uid),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(ordersQuery, (querySnapshot) => {
+      const fetchedOrders: Order[] = [];
+      querySnapshot.forEach((doc) => {
+        fetchedOrders.push({ id: doc.id, ...doc.data() } as Order);
+      });
+      setOrders(fetchedOrders);
+      setIsLoadingOrders(false);
+    }, (error) => {
+      console.error("Error fetching orders: ", error);
+      toast({ title: "Error", description: "Could not fetch your orders.", variant: "destructive" });
+      setIsLoadingOrders(false);
+    });
+
+    return unsubscribe; // Return the unsubscribe function for cleanup
+  }, [user, toast]); // Removed db from dependencies as it's unlikely to change
 
   useEffect(() => {
-    // This page could be for Customers or Staff (e.g., Service Manager viewing all orders)
-    // For now, let's assume it's primarily for Customers.
-    // Add more complex role-based data fetching if needed.
-    if (user) {
-      // In a real app, fetch orders for the current user or based on role
-      // For example, if (role === 'Customer'), fetch user.uid's orders
-      // If (role === 'ServiceManager'), fetch all orders or relevant ones
-      setOrders(sampleOrders.filter(o => o.customerId === user.uid || role !== 'Customer')); // Simplified example
-    } else if (!user && role === null) { // If not logged in, redirect
+    if (authLoading) return; 
+
+    if (!user) {
         router.replace('/login');
+        return;
     }
-  }, [user, role, router]);
+    // Only fetch orders if the user is a Customer
+    if (role === 'Customer') {
+      const unsubscribe = fetchOrders();
+      return () => unsubscribe(); // Cleanup subscription on component unmount
+    } else if (role !== null) { // If user has a role but not Customer, redirect to dashboard
+        router.replace('/dashboard');
+    }
+    // If role is null (still loading role or an issue), do nothing yet
+  }, [user, role, authLoading, router, fetchOrders]);
   
+
+  if (authLoading || (isLoadingOrders && role === 'Customer')) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2">Loading your orders...</p>
+      </div>
+    );
+  }
+   if (role !== 'Customer' && !authLoading) {
+    // This state implies the user is logged in but not a customer,
+    // and they somehow landed here. The useEffect should handle redirection.
+    // Showing a loader or a message can be a fallback.
+    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /> Redirecting...</div>;
+  }
+
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-headline font-semibold">My Orders</h1>
-        <Button variant="outline">
-          <RefreshCw className="mr-2 h-4 w-4" /> Refresh Orders
+        <Button variant="outline" onClick={fetchOrders} disabled={isLoadingOrders}>
+          <RefreshCw className={`mr-2 h-4 w-4 ${isLoadingOrders ? 'animate-spin' : ''}`} /> Refresh Orders
         </Button>
       </div>
       
-      {orders.length === 0 ? (
+      {orders.length === 0 && !isLoadingOrders ? (
         <Card>
-          <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground">You have no orders yet.</p>
-            <div className="text-center mt-4">
+          <CardContent className="pt-10 pb-10 text-center">
+            <ShoppingCart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+            <p className="text-xl font-semibold">You have no orders yet.</p>
+            <p className="text-muted-foreground mt-2">Ready to find something special?</p>
+            <div className="text-center mt-6">
               <Link href="/products" passHref>
                 <Button>Start Shopping</Button>
               </Link>
@@ -91,21 +161,18 @@ export default function OrdersPage() {
               <TableBody>
                 {orders.map((order) => (
                   <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.id}</TableCell>
-                    <TableCell>{order.createdAt.toLocaleDateString()}</TableCell>
+                    <TableCell className="font-medium">{order.id.substring(0,8)}...</TableCell>
+                    <TableCell>{formatDate(order.createdAt)}</TableCell>
                     <TableCell>
                       <Badge variant={getOrderStatusBadgeVariant(order.status)} className="capitalize">{order.status.replace(/_/g," ")}</Badge>
                     </TableCell>
-                    <TableCell>Ksh {order.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell>{formatPrice(order.totalAmount)}</TableCell>
                     <TableCell className="text-right">
                       <Link href={`/track/order/${order.id}`} passHref>
-                        <Button variant="ghost" size="icon" aria-label="Track Order">
-                          <Eye className="h-4 w-4" />
+                        <Button variant="outline" size="sm">
+                          <Eye className="mr-1 sm:mr-2 h-4 w-4" /> View Details
                         </Button>
                       </Link>
-                      <Button variant="ghost" size="icon" aria-label="View Invoice (Not implemented)">
-                        <FileText className="h-4 w-4" />
-                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
