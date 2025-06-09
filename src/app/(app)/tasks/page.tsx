@@ -9,7 +9,7 @@ import type { Task } from "@/types";
 import { Filter, Loader2, Wrench, CheckCircle, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, orderBy } from 'firebase/firestore'; // Added orderBy
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
@@ -180,3 +180,4 @@ export default function TasksPage() {
     </div>
   );
 }
+
