@@ -1,5 +1,9 @@
+
 "use client";
 
+// This component is no longer needed as the root layout handles the initial redirect.
+// The logic from here has been moved to /src/app/(app)/layout.tsx's useEffect hook.
+// This file can be safely deleted if the redirect logic in the layout is confirmed to work.
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';

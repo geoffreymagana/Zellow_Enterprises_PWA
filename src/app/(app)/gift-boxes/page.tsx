@@ -8,26 +8,30 @@ import type { Product } from "@/types";
 import { ShoppingCart, Loader2, AlertTriangle, Gift } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation"; // Added useSearchParams
+import { useEffect, useState, useCallback, useMemo } from "react"; // Added useMemo
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
+import { useCart } from "@/contexts/CartContext"; // Added useCart
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
 };
 
-const GIFT_BOX_CATEGORY_KEY = "Gift Boxes"; // Ensure this matches the category string used by admins
+const GIFT_BOX_CATEGORY_KEY = "Gift Boxes"; 
 
 export default function GiftBoxesPage() { 
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const searchParams = useSearchParams(); // Added
+  const { cartTotalItems } = useCart(); // Added
 
-  const [giftBoxes, setGiftBoxes] = useState<Product[]>([]);
+  const [allGiftBoxes, setAllGiftBoxes] = useState<Product[]>([]); // Renamed for clarity
   const [isLoadingGiftBoxes, setIsLoadingGiftBoxes] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const searchTerm = searchParams.get('q') || ""; // Get search term
 
   const fetchGiftBoxes = useCallback(async () => {
     if (!db) {
@@ -39,7 +43,6 @@ export default function GiftBoxesPage() {
     setIsLoadingGiftBoxes(true);
     setFetchError(null);
     try {
-      // Query for products that include "Gift Boxes" in their categories array
       const productsQuery = query(
         collection(db, "products"), 
         where("categories", "array-contains", GIFT_BOX_CATEGORY_KEY),
@@ -50,7 +53,7 @@ export default function GiftBoxesPage() {
       querySnapshot.forEach((doc) => {
         fetchedGiftBoxes.push({ id: doc.id, ...doc.data() } as Product);
       });
-      setGiftBoxes(fetchedGiftBoxes);
+      setAllGiftBoxes(fetchedGiftBoxes); // Set all fetched gift boxes
     } catch (error: any) {
       console.error("Error fetching gift boxes:", error);
       toast({ title: "Error Fetching Gift Boxes", description: error.message || "Could not load gift boxes.", variant: "destructive" });
@@ -69,6 +72,15 @@ export default function GiftBoxesPage() {
     }
     fetchGiftBoxes();
   }, [authLoading, user, router, fetchGiftBoxes]);
+
+  const filteredGiftBoxes = useMemo(() => { // Filtered list based on search term
+    if (!searchTerm) return allGiftBoxes;
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    return allGiftBoxes.filter(product =>
+      product.name.toLowerCase().includes(lowerSearchTerm) ||
+      product.categories?.some(cat => cat.toLowerCase().includes(lowerSearchTerm)) // Also search categories if needed
+    );
+  }, [allGiftBoxes, searchTerm]);
 
   if (authLoading || isLoadingGiftBoxes) {
     return (
@@ -97,25 +109,32 @@ export default function GiftBoxesPage() {
         {role === 'Customer' && (
           <Link href="/orders/cart" passHref className="hidden sm:inline-flex">
             <Button variant="outline">
-              <ShoppingCart className="mr-2 h-4 w-4" /> View Cart (0) {/* TODO: Implement cart count */}
+              <ShoppingCart className="mr-2 h-4 w-4" /> 
+              View Cart {cartTotalItems > 0 && `(${cartTotalItems})`}
             </Button>
           </Link>
         )}
       </div>
       
-      <p className="text-muted-foreground">Beautifully curated gift boxes for every occasion.</p>
+      <p className="text-muted-foreground">
+         {searchTerm ? `Showing results for "${searchTerm}" in Gift Boxes` : "Beautifully curated gift boxes for every occasion."}
+      </p>
 
-      {giftBoxes.length === 0 ? (
+      {filteredGiftBoxes.length === 0 ? (
         <Card>
           <CardContent className="pt-10 pb-10 text-center">
             <Gift className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <p className="text-xl font-semibold mb-2">No Gift Boxes Available Yet</p>
-            <p className="text-muted-foreground">Our special gift box collections will appear here soon. Check back later!</p>
+            <p className="text-xl font-semibold mb-2">
+                {searchTerm ? "No Gift Boxes Match Your Search" : "No Gift Boxes Available Yet"}
+            </p>
+            <p className="text-muted-foreground">
+                {searchTerm ? "Try a different search term or browse all products." : "Our special gift box collections will appear here soon. Check back later!"}
+            </p>
           </CardContent>
         </Card>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
-          {giftBoxes.map((product) => (
+          {filteredGiftBoxes.map((product) => (
             <Link key={product.id} href={`/products/${product.id}`} passHref>
               <Card className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group h-full">
                 <CardHeader className="p-0">
@@ -137,10 +156,10 @@ export default function GiftBoxesPage() {
                   <p className="text-lg md:text-xl font-bold text-primary mt-1">{formatPrice(product.price)}</p>
                 </CardContent>
                  {product.stock > 0 && product.stock < 10 && (
-                  <div className="px-3 pb-2 text-xs text-orange-500">{product.stock} left in stock!</div>
+                  <div className="px-3 pb-2 text-xs text-orange-500 font-medium">{product.stock} left in stock!</div>
                 )}
                 {product.stock === 0 && (
-                  <div className="px-3 pb-2 text-xs text-destructive">Out of stock</div>
+                  <div className="px-3 pb-2 text-xs text-destructive font-semibold">Out of stock</div>
                 )}
               </Card>
             </Link>

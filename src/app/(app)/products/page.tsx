@@ -8,7 +8,7 @@ import type { Product } from "@/types";
 import { ShoppingCart, Loader2, AlertTriangle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, useSearchParams, usePathname } from "next/navigation"; // Added usePathname
+import { useRouter, useSearchParams, usePathname } from "next/navigation"; 
 import { useEffect, useState, useCallback, useMemo } from "react"; 
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -23,7 +23,7 @@ export default function ProductsPage() {
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams(); 
-  const pathname = usePathname(); // Initialize pathname
+  const pathname = usePathname(); 
   const { toast } = useToast();
   const { cartTotalItems } = useCart(); 
 
@@ -66,18 +66,18 @@ export default function ProductsPage() {
     }
     // This redirect logic might be better placed in the dashboard page or a higher-level layout
     // to avoid potential infinite loops if '/products' is the intended customer landing page.
-    // For now, keeping the logic as previously implemented, but with pathname defined.
     if (role === 'Customer' && pathname === '/dashboard') { 
       router.replace('/products'); 
     }
     fetchProducts();
-  }, [authLoading, user, role, router, fetchProducts, pathname]); // Added pathname to dependency array
+  }, [authLoading, user, role, router, fetchProducts, pathname]);
 
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return products;
+    const lowerSearchTerm = searchTerm.toLowerCase();
     return products.filter(product =>
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.categories?.some(cat => cat.toLowerCase().includes(searchTerm.toLowerCase()))
+      product.name.toLowerCase().includes(lowerSearchTerm) ||
+      product.categories?.some(cat => cat.toLowerCase().includes(lowerSearchTerm))
     );
   }, [products, searchTerm]);
 
@@ -115,7 +115,9 @@ export default function ProductsPage() {
         )}
       </div>
       
-      <p className="text-muted-foreground">Browse our selection of customizable items.</p>
+      <p className="text-muted-foreground">
+        {searchTerm ? `Showing results for "${searchTerm}"` : "Browse our selection of customizable items."}
+      </p>
 
       {filteredProducts.length === 0 ? (
         <Card>

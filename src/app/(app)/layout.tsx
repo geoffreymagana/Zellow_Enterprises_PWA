@@ -1,6 +1,6 @@
 
 "use client";
-import { ReactNode, FC } from 'react';
+import { ReactNode, FC, useState, useEffect, useCallback } from 'react'; // Added useState, useEffect, useCallback
 import { useAuth } from '@/hooks/useAuth';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { Button } from '@/components/ui/button';
@@ -19,12 +19,12 @@ import {
 } from "@/components/ui/sidebar";
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'; // Added useRouter, useSearchParams
 import {
   LayoutDashboard, Users, Package, ShoppingCart, Layers, DollarSign,
   Truck, Settings as SettingsIcon, UserCircle, LogOutIcon, Menu, Bell,
   FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIconLucide, ListChecks,
-  Aperture, Coins, Warehouse, PackageSearch, BarChart2
+  Aperture, Coins, Warehouse, PackageSearch, BarChart2, FileText // Added FileText
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
@@ -48,15 +48,16 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager'] },
     { href: '/admin/users', label: 'Users', icon: Users, roles: ['Admin'] },
     { href: '/admin/products', label: 'Products', icon: Package, roles: ['Admin'] },
-    // { href: '/inventory', label: 'Inventory Mgt', icon: Warehouse, roles: ['Admin', 'InventoryManager'] },
-    // { href: '/inventory/receivership', label: 'Receive Stock', icon: PackageSearch, roles: ['Admin', 'InventoryManager'] },
+    { href: '/inventory', label: 'Inventory Mgt', icon: Warehouse, roles: ['Admin', 'InventoryManager'] },
+    { href: '/inventory/receivership', label: 'Receive Stock', icon: PackageSearch, roles: ['Admin', 'InventoryManager'] },
     { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, roles: ['Admin', 'ServiceManager'] },
     { href: '/admin/customizations', label: 'Customizations', icon: Layers, roles: ['Admin'] },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'] },
     { href: '/admin/shipping', label: 'Shipping', icon: Ship, roles: ['Admin'] },
     { href: '/admin/approvals', label: 'General Approvals', icon: ClipboardCheck, roles: ['Admin'] }, 
-    // { href: '/finance/approvals', label: 'Stock Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] }, 
-    // { href: '/finance/financials', label: 'Financials', icon: BarChart2, roles: ['Admin', 'FinanceManager'] },
+    { href: '/finance/approvals', label: 'Stock Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] }, 
+    { href: '/finance/financials', label: 'Financials', icon: BarChart2, roles: ['Admin', 'FinanceManager'] },
+    { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['Admin', 'FinanceManager'] },
     { href: '/admin/notifications', label: 'Notifications', icon: Bell, roles: ['Admin'] },
     { href: '/admin/reports', label: 'System Reports', icon: FileArchive, roles: ['Admin'] },
   ];
@@ -277,6 +278,44 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   const { user, role, logout } = useAuth();
   const { cartTotalItems } = useCart();
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [localSearchTerm, setLocalSearchTerm] = useState(searchParams.get('q') || '');
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const currentQuerySearch = searchParams.get('q') || '';
+    if (currentQuerySearch !== localSearchTerm) {
+      setLocalSearchTerm(currentQuerySearch);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newSearchTerm = event.target.value;
+    setLocalSearchTerm(newSearchTerm);
+
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    debounceTimeoutRef.current = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (newSearchTerm) {
+        params.set('q', newSearchTerm);
+      } else {
+        params.delete('q');
+      }
+      // Only push to /products page for search
+      if (pathname === '/products' || pathname === '/gift-boxes') {
+         router.push(`${pathname}?${params.toString()}`);
+      } else if (newSearchTerm) { 
+        // If on another page and user starts searching, redirect to products page with search
+        router.push(`/products?${params.toString()}`);
+      }
+    }, 500); // 500ms debounce
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -288,6 +327,8 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
               type="search"
               placeholder={role === 'Customer' ? "Search products, gift boxes..." : (role === 'InventoryManager' ? "Search inventory..." : "Search...")}
               className="h-9 w-full pl-10"
+              value={localSearchTerm}
+              onChange={handleSearchChange}
             />
           </div>
 
@@ -358,19 +399,32 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
 export default function AppGroupLayout({ children }: LayoutProps) {
   const { user, role, loading } = useAuth();
   const pathname = usePathname();
+  const router = useRouter(); // Added for initial redirect from '/'
 
-  if (loading) {
+  useEffect(() => {
+    if (!loading) {
+      if (!user && !['/login', '/signup'].includes(pathname)) {
+        router.replace('/login');
+      }
+      // If user is logged in and on '/', redirect to dashboard.
+      // This replaces the functionality of the specific HomePage component.
+      if (user && pathname === '/') {
+          router.replace('/dashboard');
+      }
+    }
+  }, [user, loading, pathname, router]);
+
+
+  if (loading || (!user && !['/login', '/signup'].includes(pathname)) || (user && pathname === '/')) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
-
-  if (!user && !pathname.startsWith('/login') && !pathname.startsWith('/signup')) { 
-    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /> Redirecting...</div>;
-  }
   
-  if (!user && (pathname.startsWith('/login') || pathname.startsWith('/signup'))) {
+  // If on login/signup page and not authenticated, show the page.
+  if (!user && (pathname === '/login' || pathname === '/signup')) {
     return <>{children}</>;
   }
   
+  // If user is somehow null at this point but not on login/signup (should be caught by above)
   if (!user) { 
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /> Awaiting authentication...</div>;
   }
