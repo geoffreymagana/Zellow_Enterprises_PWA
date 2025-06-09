@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, PlusCircle, Edit, Trash2, GripVertical, MinusCircle, Palette } from 'lucide-react';
 import type { CustomizationGroupDefinition, CustomizationGroupOptionDefinition, CustomizationGroupChoiceDefinition } from '@/types';
-import { useForm, Controller, SubmitHandler, useFieldArray } from "react-hook-form";
+import { useForm, Controller, SubmitHandler, useFieldArray, useWatch } from "react-hook-form"; // Added useWatch
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
@@ -34,7 +34,7 @@ const choiceDefinitionSchema = z.object({
 
 const colorChoiceDefinitionSchema = z.object({
   value: z.string().regex(hexColorRegex, "Must be a valid hex color (e.g., #RGB or #RRGGBB)"),
-  label: z.string().optional(),
+  label: z.string().optional(), // Label for color can be optional
   priceAdjustment: z.coerce.number().optional().default(0),
 });
 
@@ -49,9 +49,9 @@ const optionDefinitionSchema = z.object({
   maxLength: z.coerce.number().positive("Max length must be positive").optional(),
   checkboxLabel: z.string().optional(),
   priceAdjustmentIfChecked: z.coerce.number().optional().default(0),
-  acceptedFileTypes: z.string().optional(), 
+  acceptedFileTypes: z.string().optional(),
   maxFileSizeMB: z.coerce.number().positive("Max file size must be positive").optional(),
-}).superRefine((data, ctx) => { 
+}).superRefine((data, ctx) => {
     if (data.type === 'dropdown') {
         if (!data.choices || data.choices.length === 0) {
             ctx.addIssue({ code: z.ZodIssueCode.custom, message: "At least one choice is required for 'Dropdown' type.", path: ["choices"] });
@@ -163,7 +163,7 @@ export default function AdminCustomizationsPage() {
       setIsSubmitting(false);
     }
   };
-  
+
   const handleDeleteGroup = async (groupId: string) => {
     if (!db) return;
     try {
@@ -264,7 +264,7 @@ export default function AdminCustomizationsPage() {
 }
 
 function RenderOptionField({ control, index, removeOption }: { control: any, index: number, removeOption: (index: number) => void }) {
-  const optionType = control.getValues(`options.${index}.type`); // Get current value directly
+  const optionType = useWatch({ control, name: `options.${index}.type` });
 
   return (
     <Card className="p-4 border bg-muted/50 relative">
@@ -296,7 +296,7 @@ function RenderOptionField({ control, index, removeOption }: { control: any, ind
       {optionType === 'text' && <RenderTextConfig control={control} optionIndex={index} />}
       {optionType === 'checkbox' && <RenderCheckboxConfig control={control} optionIndex={index} />}
       {optionType === 'image_upload' && <RenderImageUploadConfig control={control} optionIndex={index} />}
-      
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
         <FormField control={control} name={`options.${index}.required`} render={({ field }) => ( <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="font-normal">Required Option</FormLabel></FormItem> )} />
         <FormField control={control} name={`options.${index}.showToCustomerByDefault`} render={({ field }) => ( <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="font-normal">Show to Customer by Default</FormLabel></FormItem> )} />
@@ -342,8 +342,8 @@ function RenderColorChoicesConfig({ control, optionIndex }: { control: any, opti
             control={control}
             name={`options.${optionIndex}.choices.${choiceIndex}.value`}
             render={({ field }) => (
-              <div 
-                className="w-8 h-8 rounded-md border" 
+              <div
+                className="w-8 h-8 rounded-md border"
                 style={{ backgroundColor: field.value && hexColorRegex.test(field.value) ? field.value : 'transparent' }}
                 title={field.value}
               />
