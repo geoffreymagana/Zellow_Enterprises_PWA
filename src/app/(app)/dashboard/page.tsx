@@ -8,9 +8,9 @@ import { BarChart2, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState, useCallback } from 'react';
-import { collection, getDocs, query, where, onSnapshot, Unsubscribe, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, query, where, onSnapshot, Unsubscribe, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { User, Order, OrderStatus, Product, StockRequest, Invoice, InvoiceStatus } from '@/types';
+import type { User, Order, OrderStatus, Product, StockRequest, Invoice, InvoiceStatus, Task } from '@/types';
 import { useRouter } from 'next/navigation'; 
 
 const formatPrice = (price: number): string => {
@@ -100,6 +100,20 @@ export default function DashboardPage() {
   const [supplierPendingInvoices, setSupplierPendingInvoices] = useState<number | string>("...");
   const [isLoadingSupplierPendingInvoices, setIsLoadingSupplierPendingInvoices] = useState(true);
 
+  // Technician specific state
+  const [technicianActiveTasks, setTechnicianActiveTasks] = useState<number | string>("...");
+  const [isLoadingTechnicianActiveTasks, setIsLoadingTechnicianActiveTasks] = useState(true);
+  const [technicianCompletedToday, setTechnicianCompletedToday] = useState<number | string>("...");
+  const [isLoadingTechnicianCompletedToday, setIsLoadingTechnicianCompletedToday] = useState(true);
+
+  // Service Manager specific state
+  const [smTotalActiveTasks, setSmTotalActiveTasks] = useState<number | string>("...");
+  const [isLoadingSmTotalActiveTasks, setIsLoadingSmTotalActiveTasks] = useState(true);
+  const [smTasksNeedingAction, setSmTasksNeedingAction] = useState<number | string>("...");
+  const [isLoadingSmTasksNeedingAction, setIsLoadingSmTasksNeedingAction] = useState(true);
+  const [smActiveTechnicians, setSmActiveTechnicians] = useState<number | string>("...");
+  const [isLoadingSmActiveTechnicians, setIsLoadingSmActiveTechnicians] = useState(true);
+
 
   useEffect(() => {
     if (!authLoading && role === 'Customer') {
@@ -114,6 +128,8 @@ export default function DashboardPage() {
       const productsCol = collection(db, 'products');
       const stockRequestsCol = collection(db, 'stockRequests');
       const invoicesCol = collection(db, 'invoices');
+      const tasksCol = collection(db, 'tasks');
+      const usersCol = collection(db, 'users');
 
       // Fetch all products for Admin and InventoryManager for detailed stats
       if (role === 'Admin' || role === 'InventoryManager') {
@@ -121,12 +137,10 @@ export default function DashboardPage() {
         const unsubAllProducts = onSnapshot(productsCol, (snapshot) => {
           const fetchedProducts: Product[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
           setAllProductsForStats(fetchedProducts);
-
           setTotalProductCount(fetchedProducts.length);
           setLowStockItemsCount(fetchedProducts.filter(p => p.stock > 0 && p.stock < 10).length);
           setOutOfStockItemsCount(fetchedProducts.filter(p => p.stock === 0).length);
           setTotalInventoryValue(fetchedProducts.reduce((acc, p) => acc + (p.price * p.stock), 0));
-          
           setIsLoadingAllProductsForStats(false);
         }, (error) => {
           console.error("Error fetching all products for stats:", error);
@@ -135,7 +149,6 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubAllProducts);
 
-        // Items Awaiting Receipt (for Inventory Manager & Admin)
         setIsLoadingItemsAwaitingReceipt(true);
         const qItemsAwaitingReceipt = query(stockRequestsCol, where("status", "==", "awaiting_receipt"));
         const unsubItemsAwaitingReceipt = onSnapshot(qItemsAwaitingReceipt, (snapshot) => {
@@ -158,9 +171,9 @@ export default function DashboardPage() {
                 where("requesterId", "==", user.uid), 
                 where("status", "in", ["pending_finance_approval", "pending_supplier_fulfillment"])
             );
-        } else if (role === 'FinanceManager') { // Finance Manager sees requests needing their approval
+        } else if (role === 'FinanceManager') { 
             qPendingStockRequests = query(stockRequestsCol, where("status", "==", "pending_finance_approval"));
-        } else { // Admin sees ALL requests that need some form of approval/action
+        } else { 
              qPendingStockRequests = query(stockRequestsCol, 
                 where("status", "in", ["pending_finance_approval", "pending_supplier_fulfillment", "awaiting_receipt"])
             );
@@ -179,14 +192,13 @@ export default function DashboardPage() {
 
       if (role === 'Admin' || role === 'FinanceManager') {
         setIsLoadingPaymentsToday(true);
-        const today = new Date();
-        const startOfDay = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0));
-        const endOfDay = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999));
+        const todayStart = Timestamp.fromDate(new Date(new Date().setHours(0,0,0,0)));
+        const todayEnd = Timestamp.fromDate(new Date(new Date().setHours(23,59,59,999)));
         
         const qPaymentsToday = query(ordersCol, 
             where("paymentStatus", "==", "paid"),
-            where("updatedAt", ">=", startOfDay),
-            where("updatedAt", "<=", endOfDay)
+            where("updatedAt", ">=", todayStart),
+            where("updatedAt", "<=", todayEnd)
         );
         const unsubPaymentsToday = onSnapshot(qPaymentsToday, (snapshot) => {
             setPaymentsTodayCount(snapshot.size);
@@ -196,7 +208,6 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubPaymentsToday);
 
-        // Fetch pending invoice approvals for Finance Manager and Admin
         setIsLoadingPendingInvoiceApprovals(true);
         const qPendingInvoiceApprovals = query(invoicesCol, where("status", "==", "pending_approval"));
         const unsubPendingInvoiceApprovals = onSnapshot(qPendingInvoiceApprovals, (snapshot) => {
@@ -214,25 +225,19 @@ export default function DashboardPage() {
 
 
       if (role === 'Admin') {
-        setIsLoadingUserCount(true);
-        setIsLoadingOrderCount(true);
-        setIsLoadingActiveDeliveriesAdmin(true);
-        setIsLoadingPendingApprovals(true);
-        setIsLoadingUnreadNotifications(true);
+        setIsLoadingUserCount(true); setIsLoadingOrderCount(true); setIsLoadingActiveDeliveriesAdmin(true);
+        setIsLoadingPendingApprovals(true); setIsLoadingUnreadNotifications(true);
 
-        const usersCol = collection(db, 'users');
         const qAdminUsers = query(usersCol, where("disabled", "==", false));
         const unsubAdminUsers = onSnapshot(qAdminUsers, (snapshot) => {
-          setActiveUserCount(snapshot.size);
-          setIsLoadingUserCount(false);
+          setActiveUserCount(snapshot.size); setIsLoadingUserCount(false);
         }, (error) => {
           console.error("Error fetching active user count:", error); setActiveUserCount("Error"); setIsLoadingUserCount(false);
         });
         unsubscribers.push(unsubAdminUsers);
         
         const unsubOrders = onSnapshot(ordersCol, (snapshot) => { 
-            setTotalOrderCount(snapshot.size);
-            setIsLoadingOrderCount(false);
+            setTotalOrderCount(snapshot.size); setIsLoadingOrderCount(false);
         }, (error) => {
             console.error("Error fetching total order count:", error); setTotalOrderCount("Error"); setIsLoadingOrderCount(false);
         });
@@ -241,19 +246,16 @@ export default function DashboardPage() {
         const activeDeliveryStatusesAdmin: OrderStatus[] = ['assigned', 'out_for_delivery', 'delivery_attempted'];
         const qActiveDeliveriesAdmin = query(ordersCol, where("status", "in", activeDeliveryStatusesAdmin)); 
         const unsubActiveDeliveriesAdmin = onSnapshot(qActiveDeliveriesAdmin, (snapshot) => {
-            setActiveDeliveriesCountAdmin(snapshot.size);
-            setIsLoadingActiveDeliveriesAdmin(false);
+            setActiveDeliveriesCountAdmin(snapshot.size); setIsLoadingActiveDeliveriesAdmin(false);
         }, (error) => {
             console.error("Error fetching active deliveries for admin:", error); setActiveDeliveriesCountAdmin("Error"); setIsLoadingActiveDeliveriesAdmin(false);
         });
         unsubscribers.push(unsubActiveDeliveriesAdmin);
 
-        // This is for general approvals, not stock request approvals (which are handled above)
         const approvalsCol = collection(db, 'approvalRequests'); 
         const qPendingApprovals = query(approvalsCol, where("status", "==", "pending"));
         const unsubPendingApprovals = onSnapshot(qPendingApprovals, (snapshot) => {
-            setPendingApprovalsCount(snapshot.size);
-            setIsLoadingPendingApprovals(false);
+            setPendingApprovalsCount(snapshot.size); setIsLoadingPendingApprovals(false);
         }, (error) => {
             console.error("Error fetching pending approvals count:", error); setPendingApprovalsCount("Error"); setIsLoadingPendingApprovals(false);
         });
@@ -262,8 +264,7 @@ export default function DashboardPage() {
         const notificationsCol = collection(db, 'notifications'); 
         const qUnreadNotifications = query(notificationsCol, where("isRead", "==", false));
         const unsubUnreadNotifications = onSnapshot(qUnreadNotifications, (snapshot) => {
-            setUnreadNotificationsCount(snapshot.size);
-            setIsLoadingUnreadNotifications(false);
+            setUnreadNotificationsCount(snapshot.size); setIsLoadingUnreadNotifications(false);
         }, (error) => {
             console.error("Error fetching unread notifications count:", error); setUnreadNotificationsCount("Error"); setIsLoadingUnreadNotifications(false);
         });
@@ -277,8 +278,7 @@ export default function DashboardPage() {
       if (role === 'DispatchManager' || role === 'Admin') { 
         setIsLoadingActiveRiders(true); setIsLoadingOrdersAwaiting(true); setIsLoadingOngoingDeliveries(true);
 
-        const ridersCol = collection(db, 'users');
-        const qRiders = query(ridersCol, where("role", "==", "Rider"), where("disabled", "==", false));
+        const qRiders = query(usersCol, where("role", "==", "Rider"), where("disabled", "==", false));
         const unsubRiders = onSnapshot(qRiders, (snapshot) => {
           setActiveRidersCount(snapshot.size); setIsLoadingActiveRiders(false);
         }, (error) => {
@@ -302,101 +302,125 @@ export default function DashboardPage() {
             console.error("Error fetching ongoing deliveries:", error); setOngoingDeliveries("Error"); setIsLoadingOngoingDeliveries(false);
         });
         unsubscribers.push(unsubOngoing);
-
       } else { 
         setIsLoadingActiveRiders(false); setIsLoadingOrdersAwaiting(false); setIsLoadingOngoingDeliveries(false);
       }
 
       if (role === 'Rider') {
-        setIsLoadingRiderActiveDeliveries(true);
-        setIsLoadingRiderCompletedToday(true);
-
+        setIsLoadingRiderActiveDeliveries(true); setIsLoadingRiderCompletedToday(true);
         const riderActiveStatuses: OrderStatus[] = ['assigned', 'out_for_delivery', 'delivery_attempted'];
-        const qRiderActive = query(ordersCol, 
-          where('riderId', '==', user.uid), 
-          where('status', 'in', riderActiveStatuses)
-        );
+        const qRiderActive = query(ordersCol, where('riderId', '==', user.uid), where('status', 'in', riderActiveStatuses));
         const unsubRiderActive = onSnapshot(qRiderActive, (snapshot) => {
-          setRiderActiveDeliveriesCount(snapshot.size);
-          setIsLoadingRiderActiveDeliveries(false);
+          setRiderActiveDeliveriesCount(snapshot.size); setIsLoadingRiderActiveDeliveries(false);
         }, (error) => {
           console.error("Error fetching rider active deliveries:", error); setRiderActiveDeliveriesCount("Error"); setIsLoadingRiderActiveDeliveries(false);
         });
         unsubscribers.push(unsubRiderActive);
 
-        const today = new Date();
-        const startOfDay = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0));
-        const endOfDay = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999));
-        
+        const todayStart = Timestamp.fromDate(new Date(new Date().setHours(0,0,0,0)));
+        const todayEnd = Timestamp.fromDate(new Date(new Date().setHours(23,59,59,999)));
         const qRiderCompletedToday = query(ordersCol, 
-          where('riderId', '==', user.uid),
-          where('status', '==', 'delivered'),
-          where('actualDeliveryTime', '>=', startOfDay),
-          where('actualDeliveryTime', '<=', endOfDay)
+          where('riderId', '==', user.uid), where('status', '==', 'delivered'),
+          where('actualDeliveryTime', '>=', todayStart), where('actualDeliveryTime', '<=', todayEnd)
         );
         const unsubRiderCompletedToday = onSnapshot(qRiderCompletedToday, (snapshot) => {
-          setRiderCompletedTodayCount(snapshot.size);
-          setIsLoadingRiderCompletedToday(false);
+          setRiderCompletedTodayCount(snapshot.size); setIsLoadingRiderCompletedToday(false);
         }, (error) => {
           console.error("Error fetching rider completed today:", error); setRiderCompletedTodayCount("Error"); setIsLoadingRiderCompletedToday(false);
         });
         unsubscribers.push(unsubRiderCompletedToday);
       } else {
-        setIsLoadingRiderActiveDeliveries(false);
-        setIsLoadingRiderCompletedToday(false);
+        setIsLoadingRiderActiveDeliveries(false); setIsLoadingRiderCompletedToday(false);
       }
 
       if (role === 'Supplier') {
-        setIsLoadingSupplierNewStockRequests(true);
-        setIsLoadingSupplierFulfilled(true);
-        setIsLoadingSupplierPendingInvoices(true);
-
-        const today = new Date();
-        const startOfDay = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0));
-        const endOfDay = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999));
-
+        setIsLoadingSupplierNewStockRequests(true); setIsLoadingSupplierFulfilled(true); setIsLoadingSupplierPendingInvoices(true);
+        const todayStart = Timestamp.fromDate(new Date(new Date().setHours(0,0,0,0)));
+        const todayEnd = Timestamp.fromDate(new Date(new Date().setHours(23,59,59,999)));
         const qNewStockRequests = query(stockRequestsCol,
-          where('status', '==', 'pending_supplier_fulfillment'), 
-          where('createdAt', '>=', startOfDay),
-          where('createdAt', '<=', endOfDay)
+          where('status', '==', 'pending_supplier_fulfillment'), where('createdAt', '>=', todayStart), where('createdAt', '<=', todayEnd)
         );
         const unsubNewStockRequests = onSnapshot(qNewStockRequests, (snapshot) => {
-          setSupplierNewStockRequestsToday(snapshot.size);
-          setIsLoadingSupplierNewStockRequests(false);
+          setSupplierNewStockRequestsToday(snapshot.size); setIsLoadingSupplierNewStockRequests(false);
         }, (error) => {
           console.error("Error fetching new stock requests for supplier:", error); setSupplierNewStockRequestsToday("Error"); setIsLoadingSupplierNewStockRequests(false);
         });
         unsubscribers.push(unsubNewStockRequests);
 
-        const qFulfilled = query(stockRequestsCol,
-          where('supplierId', '==', user.uid),
-          where('status', 'in', ['awaiting_receipt', 'received']) 
-        );
+        const qFulfilled = query(stockRequestsCol, where('supplierId', '==', user.uid), where('status', 'in', ['awaiting_receipt', 'received']));
         const unsubFulfilled = onSnapshot(qFulfilled, (snapshot) => {
-          setSupplierFulfilledRequests(snapshot.size);
-          setIsLoadingSupplierFulfilled(false);
+          setSupplierFulfilledRequests(snapshot.size); setIsLoadingSupplierFulfilled(false);
         }, (error) => {
           console.error("Error fetching fulfilled requests for supplier:", error); setSupplierFulfilledRequests("Error"); setIsLoadingSupplierFulfilled(false);
         });
         unsubscribers.push(unsubFulfilled);
 
-        const qPendingInvoices = query(invoicesCol,
-          where('supplierId', '==', user.uid),
-          where('status', 'in', ['pending_approval', 'approved_for_payment']) 
-        );
+        const qPendingInvoices = query(invoicesCol, where('supplierId', '==', user.uid), where('status', 'in', ['pending_approval', 'approved_for_payment']));
         const unsubPendingInvoices = onSnapshot(qPendingInvoices, (snapshot) => {
-          setSupplierPendingInvoices(snapshot.size);
-          setIsLoadingSupplierPendingInvoices(false);
+          setSupplierPendingInvoices(snapshot.size); setIsLoadingSupplierPendingInvoices(false);
         }, (error) => {
           console.error("Error fetching pending invoices for supplier:", error); setSupplierPendingInvoices("Error"); setIsLoadingSupplierPendingInvoices(false);
         });
         unsubscribers.push(unsubPendingInvoices);
       } else {
-        setIsLoadingSupplierNewStockRequests(false);
-        setIsLoadingSupplierFulfilled(false);
-        setIsLoadingSupplierPendingInvoices(false);
+        setIsLoadingSupplierNewStockRequests(false); setIsLoadingSupplierFulfilled(false); setIsLoadingSupplierPendingInvoices(false);
       }
 
+      if (role === 'Technician') {
+        setIsLoadingTechnicianActiveTasks(true); setIsLoadingTechnicianCompletedToday(true);
+        const qTechActive = query(tasksCol, where('assigneeId', '==', user.uid), where('status', 'in', ['pending', 'in-progress']));
+        const unsubTechActive = onSnapshot(qTechActive, (snapshot) => {
+          setTechnicianActiveTasks(snapshot.size); setIsLoadingTechnicianActiveTasks(false);
+        }, (error) => {
+          console.error("Error fetching technician active tasks:", error); setTechnicianActiveTasks("Error"); setIsLoadingTechnicianActiveTasks(false);
+        });
+        unsubscribers.push(unsubTechActive);
+
+        const todayStart = Timestamp.fromDate(new Date(new Date().setHours(0,0,0,0)));
+        // const todayEnd = Timestamp.fromDate(new Date(new Date().setHours(23,59,59,999))); No need for end with current logic
+        const qTechCompleted = query(tasksCol, 
+            where('assigneeId', '==', user.uid), 
+            where('status', '==', 'completed'),
+            where('updatedAt', '>=', todayStart) // Assuming updatedAt is set when task is completed
+        );
+        const unsubTechCompleted = onSnapshot(qTechCompleted, (snapshot) => {
+          setTechnicianCompletedToday(snapshot.size); setIsLoadingTechnicianCompletedToday(false);
+        }, (error) => {
+          console.error("Error fetching technician completed tasks:", error); setTechnicianCompletedToday("Error"); setIsLoadingTechnicianCompletedToday(false);
+        });
+        unsubscribers.push(unsubTechCompleted);
+      } else {
+        setIsLoadingTechnicianActiveTasks(false); setIsLoadingTechnicianCompletedToday(false);
+      }
+
+      if (role === 'ServiceManager' || role === 'Admin') { // Admin also gets these for completeness
+        setIsLoadingSmTotalActiveTasks(true); setIsLoadingSmTasksNeedingAction(true); setIsLoadingSmActiveTechnicians(true);
+        const qSmActiveTasks = query(tasksCol, where('status', 'in', ['pending', 'in-progress']));
+        const unsubSmActiveTasks = onSnapshot(qSmActiveTasks, (snapshot) => {
+          setSmTotalActiveTasks(snapshot.size); setIsLoadingSmTotalActiveTasks(false);
+        }, (error) => {
+          console.error("Error fetching SM total active tasks:", error); setSmTotalActiveTasks("Error"); setIsLoadingSmTotalActiveTasks(false);
+        });
+        unsubscribers.push(unsubSmActiveTasks);
+        
+        const qSmNeedingAction = query(tasksCol, where('status', 'in', ['pending', 'needs_approval']));
+        const unsubSmNeedingAction = onSnapshot(qSmNeedingAction, (snapshot) => {
+          setSmTasksNeedingAction(snapshot.size); setIsLoadingSmTasksNeedingAction(false);
+        }, (error) => {
+          console.error("Error fetching SM tasks needing action:", error); setSmTasksNeedingAction("Error"); setIsLoadingSmTasksNeedingAction(false);
+        });
+        unsubscribers.push(unsubSmNeedingAction);
+
+        const qSmTechnicians = query(usersCol, where('role', '==', 'Technician'), where('disabled', '!=', true));
+        const unsubSmTechnicians = onSnapshot(qSmTechnicians, (snapshot) => {
+          setSmActiveTechnicians(snapshot.size); setIsLoadingSmActiveTechnicians(false);
+        }, (error) => {
+          console.error("Error fetching SM active technicians:", error); setSmActiveTechnicians("Error"); setIsLoadingSmActiveTechnicians(false);
+        });
+        unsubscribers.push(unsubSmTechnicians);
+      } else {
+        setIsLoadingSmTotalActiveTasks(false); setIsLoadingSmTasksNeedingAction(false); setIsLoadingSmActiveTechnicians(false);
+      }
     }
     return () => unsubscribers.forEach(unsub => unsub());
   }, [authLoading, role, db, router, user]);
@@ -413,7 +437,7 @@ export default function DashboardPage() {
       case 'Rider': return "Rider Dashboard";
       case 'Supplier': return "Supplier Portal";
       case 'FinanceManager': return "Finance Overview";
-      case 'ServiceManager': return "Service Management";
+      case 'ServiceManager': return "Service Management Dashboard";
       case 'InventoryManager': return "Inventory Control";
       case 'DispatchManager': return "Dispatch Center Overview";
       default: return "Welcome to Zellow Enterprises";
@@ -427,7 +451,7 @@ export default function DashboardPage() {
           <>
             <DashboardItem title="Active Users" value={activeUserCount} icon={UserCog} link="/admin/users" description="Total active users." isLoadingValue={isLoadingUserCount} />
             <DashboardItem title="Total Products" value={totalProductCount} icon={Package} link="/admin/products" description="Products in catalog." isLoadingValue={isLoadingAllProductsForStats} />
-            <DashboardItem title="Low Stock Items" value={lowStockItemsCount} icon={AlertTriangle} link="/inventory?filter=lowstock" description="Items with &lt;10 stock." isLoadingValue={isLoadingAllProductsForStats} />
+            <DashboardItem title="Low Stock Items" value={lowStockItemsCount} icon={AlertTriangle} link="/inventory?filter=lowstock" description="Items with <10 stock." isLoadingValue={isLoadingAllProductsForStats} />
             <DashboardItem title="Out of Stock Items" value={outOfStockItemsCount} icon={PackageX} link="/inventory?filter=outofstock" description="Items with 0 stock." isLoadingValue={isLoadingAllProductsForStats} />
             <DashboardItem title="Inventory Value" value={totalInventoryValue} icon={DollarSign} link="/inventory" description="Total value of stock." isLoadingValue={isLoadingAllProductsForStats} isPrice />
             <DashboardItem title="Pending Stock Requests" value={pendingStockRequestsCount} icon={ListChecks} link="/finance/approvals" description="Stock requests needing action." isLoadingValue={isLoadingPendingStockRequests} />
@@ -488,9 +512,9 @@ export default function DashboardPage() {
       case 'Technician':
         return (
           <>
-            <DashboardItem title="Assigned Tasks" value={0} icon={Wrench} link="/tasks" isLoadingValue={false} description="Your current workload."/>
-            <DashboardItem title="Pending Approvals" value={0} icon={AlertTriangle} isLoadingValue={false} description="Items needing review."/>
-            <DashboardItem title="Completed Today" value={0} icon={Wrench} isLoadingValue={false} description="Tasks finished today."/>
+            <DashboardItem title="My Active Tasks" value={technicianActiveTasks} icon={Wrench} link="/tasks" isLoadingValue={isLoadingTechnicianActiveTasks} description="Tasks pending or in-progress."/>
+            <DashboardItem title="Tasks Completed Today" value={technicianCompletedToday} icon={CheckCircle2} isLoadingValue={isLoadingTechnicianCompletedToday} description="Tasks you finished today."/>
+            <DashboardItem title="Awaiting My Review" value={"0"} icon={AlertTriangle} isLoadingValue={false} description="Items needing your approval (Future)."/>
           </>
         );
        case 'Rider':
@@ -499,6 +523,14 @@ export default function DashboardPage() {
             <DashboardItem title="Active Deliveries" value={riderActiveDeliveriesCount} icon={Truck} link="/deliveries" isLoadingValue={isLoadingRiderActiveDeliveries} description="Your current deliveries."/>
             <DashboardItem title="Completed Today" value={riderCompletedTodayCount} icon={CheckCircle2} isLoadingValue={isLoadingRiderCompletedToday} description="Deliveries made today."/>
             <DashboardItem title="View Route Map" value={"Open"} icon={MapIcon} link="/rider/map" description="See your route."/>
+          </>
+        );
+      case 'ServiceManager':
+        return (
+          <>
+            <DashboardItem title="Total Active Prod. Tasks" value={smTotalActiveTasks} icon={ListChecks} link="/tasks" isLoadingValue={isLoadingSmTotalActiveTasks} description="All 'pending' or 'in-progress' tasks."/>
+            <DashboardItem title="Tasks Needing Action" value={smTasksNeedingAction} icon={AlertTriangle} link="/tasks?filter=action" isLoadingValue={isLoadingSmTasksNeedingAction} description="Tasks 'pending' or 'needs_approval'."/>
+            <DashboardItem title="Active Technicians" value={smActiveTechnicians} icon={UsersIcon} link="/admin/users?role=Technician" isLoadingValue={isLoadingSmActiveTechnicians} description="Count of enabled technicians."/>
           </>
         );
       default:
@@ -513,7 +545,7 @@ export default function DashboardPage() {
         Hello, {user.displayName || user.email}! Your role is: <span className="font-semibold text-primary">{role || 'Not Assigned'}</span>.
       </p>
       
-      {role !== 'Admin' && role !== 'DispatchManager' && role !== 'FinanceManager' && role !== 'InventoryManager' && role !== 'Supplier' && (
+      {role !== 'Admin' && role !== 'DispatchManager' && role !== 'FinanceManager' && role !== 'InventoryManager' && role !== 'Supplier' && role !== 'ServiceManager' && role !== 'Technician' && (
         <Alert>
           <BarChart2 className="h-4 w-4 mr-2" />
           <AlertTitle>Data Overview</AlertTitle>
@@ -576,6 +608,24 @@ export default function DashboardPage() {
           </AlertDescription>
         </Alert>
       )}
+      {role === 'ServiceManager' && (
+        <Alert variant="default" className="border-teal-500/50 bg-teal-500/5 text-teal-700 dark:text-teal-300">
+          <Wrench className="h-4 w-4 mr-2 text-teal-500" />
+          <AlertTitle className="text-teal-600 dark:text-teal-400">Service Manager Dashboard</AlertTitle>
+          <AlertDescription className="text-teal-600/90 dark:text-teal-400/90">
+            Oversee production tasks, manage technician workloads, and ensure quality. Metrics are updated in real-time.
+          </AlertDescription>
+        </Alert>
+      )}
+       {role === 'Technician' && (
+        <Alert variant="default" className="border-sky-500/50 bg-sky-500/5 text-sky-700 dark:text-sky-300">
+          <Wrench className="h-4 w-4 mr-2 text-sky-500" />
+          <AlertTitle className="text-sky-600 dark:text-sky-400">Technician Dashboard</AlertTitle>
+          <AlertDescription className="text-sky-600/90 dark:text-sky-400/90">
+            View your assigned tasks and manage your production workload. Key metrics are displayed below.
+          </AlertDescription>
+        </Alert>
+      )}
 
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -613,3 +663,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

@@ -1,6 +1,6 @@
 
 "use client";
-import { ReactNode, FC, useState, useEffect, useCallback, useRef } from 'react'; // Added useRef
+import { ReactNode, FC, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { Button } from '@/components/ui/button';
@@ -19,12 +19,12 @@ import {
 } from "@/components/ui/sidebar";
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'; // Added useRouter, useSearchParams
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   LayoutDashboard, Users, Package, ShoppingCart, Layers, DollarSign,
   Truck, Settings as SettingsIcon, UserCircle, LogOutIcon, Menu, Bell,
   FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIconLucide, ListChecks,
-  Aperture, Coins, Warehouse, PackageSearch, BarChart2, FileText
+  Aperture, Coins, Warehouse, PackageSearch, BarChart2, FileText, Wrench
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
@@ -50,7 +50,8 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/products', label: 'Products', icon: Package, roles: ['Admin'] },
     { href: '/inventory', label: 'Inventory Mgt', icon: Warehouse, roles: ['Admin', 'InventoryManager'] },
     { href: '/inventory/receivership', label: 'Receive Stock', icon: PackageSearch, roles: ['Admin', 'InventoryManager'] },
-    { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, roles: ['Admin', 'ServiceManager'] },
+    { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, roles: ['Admin'] }, // Removed ServiceManager
+    { href: '/tasks', label: 'Production Tasks', icon: Wrench, roles: ['Admin', 'ServiceManager'] },
     { href: '/admin/customizations', label: 'Customizations', icon: Layers, roles: ['Admin'] },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'] },
     { href: '/admin/shipping', label: 'Shipping', icon: Ship, roles: ['Admin'] },
@@ -366,8 +367,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
                           <nav className="py-4 px-2">
                               <Link href="/dashboard" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/dashboard" ? "bg-muted text-primary font-semibold" : ""}`}><Home className="mr-2 h-4 w-4" />Dashboard</Link>
                               {role === 'Technician' && <Link href="/tasks" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/tasks") ? "bg-muted text-primary font-semibold" : ""}`}><ListChecks className="mr-2 h-4 w-4" />Tasks</Link>}
-                              {role === 'ServiceManager' && <Link href="/admin/orders" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/admin/orders") ? "bg-muted text-primary font-semibold" : ""}`}><ShoppingCart className="mr-2 h-4 w-4" />Orders</Link>}
-                              {role === 'ServiceManager' && <Link href="/tasks" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/tasks") ? "bg-muted text-primary font-semibold" : ""}`}><ListChecks className="mr-2 h-4 w-4" />Team Tasks</Link>}
+                              {role === 'ServiceManager' && <Link href="/tasks" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/tasks") ? "bg-muted text-primary font-semibold" : ""}`}><Wrench className="mr-2 h-4 w-4" />Team Tasks</Link>}
                               {role === 'Rider' && <Link href="/deliveries" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/deliveries") ? "bg-muted text-primary font-semibold" : ""}`}><Truck className="mr-2 h-4 w-4" />Deliveries</Link>}
                               {role === 'Supplier' && <Link href="/supplier/stock-requests" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/supplier/stock-requests") ? "bg-muted text-primary font-semibold" : ""}`}><Warehouse className="mr-2 h-4 w-4" />Stock Requests</Link>}
                               {role === 'InventoryManager' && (<>

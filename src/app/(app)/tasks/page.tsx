@@ -3,16 +3,20 @@
 
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
-import type { Task } from "@/types";
-import { Filter, Loader2, Wrench, CheckCircle, AlertTriangle } from "lucide-react";
+import type { Task, Order, OrderItem as OrderItemType, Product, ProductCustomizationOption, CustomizationGroupDefinition } from "@/types";
+import { Filter, Loader2, Wrench, CheckCircle, AlertTriangle, Eye, Image as ImageIconPlaceholder, Palette } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, orderBy } from 'firebase/firestore'; // Added orderBy
+import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import Image from 'next/image';
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const getStatusBadgeVariant = (status: Task['status']): BadgeProps['variant'] => {
   switch (status) {
@@ -28,6 +32,13 @@ const getStatusBadgeVariant = (status: Task['status']): BadgeProps['variant'] =>
   }
 };
 
+interface ResolvedOptionDetails {
+  label: string;
+  value: string;
+  isColor?: boolean;
+  colorHex?: string;
+}
+
 export default function TasksPage() {
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -35,6 +46,14 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'active' | 'completed' | 'all'>('active');
+
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoadingModalDetails, setIsLoadingModalDetails] = useState(false);
+  const [modalOrder, setModalOrder] = useState<Order | null>(null);
+  const [modalOrderItem, setModalOrderItem] = useState<OrderItemType | null>(null);
+  const [modalCustomizationOptions, setModalCustomizationOptions] = useState<ProductCustomizationOption[]>([]);
+
 
   const fetchTasks = useCallback(() => {
     if (!user || !db || (role !== 'Technician' && role !== 'ServiceManager')) {
@@ -60,7 +79,7 @@ export default function TasksPage() {
         where('status', 'in', statusFilters),
         ...baseQueryConstraints
       );
-    } else { // ServiceManager sees all tasks, can filter client-side if needed or add DB filters
+    } else { 
         let statusFilters: Task['status'][] | undefined = undefined;
         if (filter === 'active') statusFilters = ['pending', 'in-progress', 'needs_approval', 'blocked'];
         else if (filter === 'completed') statusFilters = ['completed', 'rejected'];
@@ -101,10 +120,67 @@ export default function TasksPage() {
       const taskRef = doc(db, 'tasks', taskId);
       await updateDoc(taskRef, { status: newStatus, updatedAt: serverTimestamp() });
       toast({ title: "Task Updated", description: `Task status changed to ${newStatus.replace('_', ' ')}.` });
+      if (selectedTask && selectedTask.id === taskId) {
+        setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null);
+      }
     } catch (error) {
       console.error("Error updating task status: ", error);
       toast({ title: "Error", description: "Could not update task status.", variant: "destructive" });
     }
+  };
+
+  const fetchModalDetails = async (task: Task) => {
+    if (!task.orderId || !task.itemName || !db) {
+      setModalOrder(null);
+      setModalOrderItem(null);
+      setModalCustomizationOptions([]);
+      setIsLoadingModalDetails(false);
+      return;
+    }
+    setIsLoadingModalDetails(true);
+    try {
+      const orderDocRef = doc(db, 'orders', task.orderId);
+      const orderDoc = await getDoc(orderDocRef);
+      if (orderDoc.exists()) {
+        const orderData = { id: orderDoc.id, ...orderDoc.data() } as Order;
+        setModalOrder(orderData);
+        const item = orderData.items.find(i => i.name === task.itemName); // Assuming item name is unique enough for this task context
+        setModalOrderItem(item || null);
+
+        if (item && item.customizations && Object.keys(item.customizations).length > 0) {
+          const productDocRef = doc(db, 'products', item.productId);
+          const productDoc = await getDoc(productDocRef);
+          if (productDoc.exists()) {
+            const productData = productDoc.data() as Product;
+            let optionsToUse: ProductCustomizationOption[] = productData.customizationOptions || [];
+            if (productData.customizationGroupId) {
+              const groupDocRef = doc(db, 'customizationGroupDefinitions', productData.customizationGroupId);
+              const groupDoc = await getDoc(groupDocRef);
+              if (groupDoc.exists()) {
+                optionsToUse = (groupDoc.data() as CustomizationGroupDefinition).options || [];
+              }
+            }
+            setModalCustomizationOptions(optionsToUse);
+          }
+        } else {
+          setModalCustomizationOptions([]);
+        }
+      } else {
+        toast({ title: "Error", description: "Order details for this task not found.", variant: "destructive" });
+        setModalOrder(null); setModalOrderItem(null); setModalCustomizationOptions([]);
+      }
+    } catch (e) {
+      console.error("Error fetching modal details:", e);
+      toast({ title: "Error", description: "Could not load task details.", variant: "destructive" });
+    } finally {
+      setIsLoadingModalDetails(false);
+    }
+  };
+
+  const openTaskModal = (task: Task) => {
+    setSelectedTask(task);
+    setIsModalOpen(true);
+    fetchModalDetails(task);
   };
 
   const formatDate = (timestamp: any) => {
@@ -112,6 +188,41 @@ export default function TasksPage() {
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return format(date, 'PPp');
   };
+  
+  const getDisplayableCustomizationValue = (
+    optionId: string, 
+    selectedValue: any, 
+    optionsDefinitions?: ProductCustomizationOption[]
+  ): ResolvedOptionDetails => {
+    const optionDef = optionsDefinitions?.find(opt => opt.id === optionId);
+    if (!optionDef) return { label: optionId, value: String(selectedValue) };
+
+    let displayValue = String(selectedValue);
+    let isColor = false;
+    let colorHex: string | undefined = undefined;
+
+    switch (optionDef.type) {
+      case 'dropdown':
+        displayValue = optionDef.choices?.find(c => c.value === selectedValue)?.label || String(selectedValue);
+        break;
+      case 'color_picker':
+        const colorChoice = optionDef.choices?.find(c => c.value === selectedValue);
+        displayValue = colorChoice?.label || String(selectedValue);
+        isColor = true;
+        colorHex = colorChoice?.value;
+        break;
+      case 'image_upload':
+        displayValue = selectedValue ? "Uploaded Image" : "No image";
+        break;
+      case 'checkbox':
+        displayValue = selectedValue ? (optionDef.checkboxLabel || 'Selected') : 'Not selected';
+        break;
+      default: 
+        displayValue = String(selectedValue);
+    }
+    return { label: optionDef.label, value: displayValue, isColor, colorHex };
+  };
+
 
   if (authLoading || isLoading) {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -123,61 +234,130 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <h1 className="text-3xl font-headline font-semibold">
           {role === 'Technician' ? "My Tasks" : "Manage Production Tasks"}
         </h1>
-        {/* <div className="flex gap-2">
-          <Button variant="outline" size="sm"><Filter className="mr-2 h-4 w-4" /> Filter</Button>
-        </div> */}
+        {/* TODO: Add filter buttons if needed */}
       </div>
 
       {tasks.length === 0 ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No tasks found matching the current filter.
+            No tasks found.
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {tasks.map((task) => (
-            <Card key={task.id} className="flex flex-col">
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                  <CardTitle className="text-lg font-semibold font-headline capitalize">{task.taskType}</CardTitle>
-                  <Badge variant={getStatusBadgeVariant(task.status)} className="capitalize text-xs">{task.status.replace(/_/g, ' ')}</Badge>
+            <Card key={task.id} className="flex flex-col shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="pb-2 pt-4">
+                <div className="flex justify-between items-start gap-2">
+                  <CardTitle className="text-md sm:text-lg font-semibold font-headline capitalize line-clamp-2">{task.taskType}</CardTitle>
+                  <Badge variant={getStatusBadgeVariant(task.status)} className="capitalize text-xs whitespace-nowrap">{task.status.replace(/_/g, ' ')}</Badge>
                 </div>
-                 <CardDescription className="text-xs pt-1">
-                    For Item: {task.itemName || 'N/A'} (Order: {task.orderId ? task.orderId.substring(0,8)+'...' : 'N/A'})
+                 <CardDescription className="text-xs pt-0.5 line-clamp-1">
+                    For Item: {task.itemName || 'N/A'}
+                </CardDescription>
+                <CardDescription className="text-xs pt-0 line-clamp-1">
+                    Order: {task.orderId ? task.orderId.substring(0,8)+'...' : 'N/A'}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex-grow space-y-2 text-sm">
-                <p className="line-clamp-3">{task.description}</p>
-                {role === 'ServiceManager' && <p className="text-xs text-muted-foreground">Assigned to: {task.assigneeName || 'Unassigned'}</p>}
+              <CardContent className="flex-grow space-y-1.5 text-sm py-2">
+                <p className="line-clamp-3 text-xs text-muted-foreground">{task.description}</p>
+                {role === 'ServiceManager' && <p className="text-xs text-muted-foreground">Assigned: {task.assigneeName || 'Unassigned'}</p>}
                 <p className="text-xs text-muted-foreground">Created: {formatDate(task.createdAt)}</p>
               </CardContent>
-              <CardFooter className="pt-3 border-t flex justify-end items-center gap-2">
-                {role === 'Technician' && task.status === 'pending' && (
-                  <Button size="sm" onClick={() => handleStatusChange(task.id, 'in-progress')}>
-                    <Wrench className="mr-2 h-4 w-4" /> Start Task
-                  </Button>
-                )}
-                {role === 'Technician' && task.status === 'in-progress' && (
-                  <Button size="sm" onClick={() => handleStatusChange(task.id, 'completed')}>
-                    <CheckCircle className="mr-2 h-4 w-4" /> Mark Completed
-                  </Button>
-                )}
-                 {role === 'ServiceManager' && task.status === 'needs_approval' && (
-                  <Button size="sm" onClick={() => handleStatusChange(task.id, 'pending')}>
-                     Approve Task
-                  </Button>
-                )}
+              <CardFooter className="pt-2 pb-3 border-t flex justify-end items-center gap-2">
+                 <Button variant="outline" size="sm" onClick={() => openTaskModal(task)}>
+                    <Eye className="mr-1 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" /> Details
+                </Button>
               </CardFooter>
             </Card>
           ))}
         </div>
       )}
+
+      {/* Task Detail Modal */}
+      <Dialog open={isModalOpen} onOpenChange={(open) => { if(!open) setSelectedTask(null); setIsModalOpen(open); }}>
+        <DialogContent className="sm:max-w-lg md:max-w-xl lg:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-headline text-xl">{selectedTask?.taskType || "Task Details"}</DialogTitle>
+            <DialogDescription>
+              Item: {selectedTask?.itemName || "N/A"} | Order: {selectedTask?.orderId ? selectedTask.orderId.substring(0,10)+'...' : 'N/A'}
+            </DialogDescription>
+          </DialogHeader>
+          {isLoadingModalDetails ? (
+            <div className="flex justify-center items-center h-40"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>
+          ) : (
+          <ScrollArea className="max-h-[calc(100vh-20rem)] md:max-h-[60vh] pr-3">
+            <div className="space-y-4 py-2">
+              <div><p className="text-sm font-medium">Status:</p> <Badge variant={getStatusBadgeVariant(selectedTask?.status || 'pending')} className="capitalize">{selectedTask?.status.replace(/_/g, ' ')}</Badge></div>
+              <div><p className="text-sm font-medium">Description:</p><p className="text-sm text-muted-foreground whitespace-pre-line">{selectedTask?.description}</p></div>
+              <div><p className="text-sm font-medium">Created:</p><p className="text-sm text-muted-foreground">{formatDate(selectedTask?.createdAt)}</p></div>
+              {role === 'ServiceManager' && <div><p className="text-sm font-medium">Assigned To:</p><p className="text-sm text-muted-foreground">{selectedTask?.assigneeName || "Unassigned"}</p></div>}
+              
+              {modalOrderItem && modalOrderItem.customizations && Object.keys(modalOrderItem.customizations).length > 0 && (
+                <div className="pt-3">
+                  <h4 className="text-md font-semibold mb-2 border-t pt-3">Customization Details:</h4>
+                  <div className="space-y-1.5 text-sm">
+                    {Object.entries(modalOrderItem.customizations).map(([optionId, selectedValue]) => {
+                      const details = getDisplayableCustomizationValue(optionId, selectedValue, modalCustomizationOptions);
+                      return (
+                        <div key={optionId} className="flex flex-col sm:flex-row sm:items-center sm:gap-2 border-b pb-1.5 last:border-b-0">
+                          <span className="font-medium sm:w-1/3">{details.label}:</span>
+                          {details.isColor && details.colorHex && (
+                            <span style={{ backgroundColor: details.colorHex }} className="inline-block w-4 h-4 rounded-sm border border-muted-foreground mr-1.5 my-0.5 sm:my-0"></span>
+                          )}
+                          {optionId.toLowerCase().includes('image') || (typeof selectedValue === 'string' && selectedValue.includes('res.cloudinary.com')) ? (
+                             <div className="mt-1 sm:mt-0">
+                                {selectedValue && typeof selectedValue === 'string' ? (
+                                <a href={selectedValue} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-xs">
+                                    <Image src={selectedValue} alt="Customized image" width={100} height={100} className="rounded-md border max-w-full h-auto max-h-32 object-contain" data-ai-hint="customization image"/>
+                                </a>
+                                ) : <span className="text-muted-foreground italic text-xs">No image provided.</span> }
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">{details.value}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+               {modalOrder?.customerNotes && (
+                  <div className="pt-3">
+                      <h4 className="text-md font-semibold mb-1 border-t pt-3">General Order Notes from Customer:</h4>
+                      <p className="text-sm text-muted-foreground whitespace-pre-line">{modalOrder.customerNotes}</p>
+                  </div>
+              )}
+            </div>
+          </ScrollArea>
+          )}
+          <DialogFooter className="pt-4 border-t">
+            <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
+             {selectedTask && role === 'Technician' && selectedTask.status === 'pending' && (
+                <Button onClick={() => handleStatusChange(selectedTask.id, 'in-progress')}>
+                    <Wrench className="mr-2 h-4 w-4" /> Start Task
+                </Button>
+            )}
+            {selectedTask && role === 'Technician' && selectedTask.status === 'in-progress' && (
+                <Button onClick={() => handleStatusChange(selectedTask.id, 'completed')}>
+                    <CheckCircle className="mr-2 h-4 w-4" /> Mark Completed
+                </Button>
+            )}
+            {selectedTask && role === 'ServiceManager' && selectedTask.status === 'needs_approval' && (
+                 <Button onClick={() => handleStatusChange(selectedTask.id, 'pending')}> {/* Or 'completed' directly if SM approves */}
+                     Mark as Approved/Done
+                  </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
 
+    
