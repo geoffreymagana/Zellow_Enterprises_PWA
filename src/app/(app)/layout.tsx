@@ -1,6 +1,6 @@
 
 "use client";
-import { ReactNode, FC, useState, useEffect, useCallback } from 'react'; // Added useState, useEffect, useCallback
+import { ReactNode, FC, useState, useEffect, useCallback, useRef } from 'react'; // Added useRef
 import { useAuth } from '@/hooks/useAuth';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { Button } from '@/components/ui/button';
