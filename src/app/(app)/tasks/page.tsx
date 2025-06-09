@@ -9,7 +9,7 @@ import type { Task, Order, OrderItem as OrderItemType, Product, ProductCustomiza
 import { Filter, Loader2, Wrench, CheckCircle, AlertTriangle, Eye, Image as ImageIconPlaceholder, Palette, UserCog } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, getDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, getDoc, orderBy, getDocs } from 'firebase/firestore'; // Added getDocs
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
@@ -19,6 +19,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 const getStatusBadgeVariant = (status: Task['status']): BadgeProps['variant'] => {
   switch (status) {
@@ -245,7 +246,7 @@ export default function TasksPage() {
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
     return format(date, 'PPp');
   };
   
@@ -470,3 +471,4 @@ export default function TasksPage() {
     </div>
   );
 }
+
