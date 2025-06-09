@@ -5,8 +5,8 @@ import { Badge, BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
-import type { Task, Order, OrderItem as OrderItemType, Product, ProductCustomizationOption, CustomizationGroupDefinition } from "@/types";
-import { Filter, Loader2, Wrench, CheckCircle, AlertTriangle, Eye, Image as ImageIconPlaceholder, Palette } from "lucide-react";
+import type { Task, Order, OrderItem as OrderItemType, Product, ProductCustomizationOption, CustomizationGroupDefinition, User as AppUser } from "@/types";
+import { Filter, Loader2, Wrench, CheckCircle, AlertTriangle, Eye, Image as ImageIconPlaceholder, Palette, UserCog } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, getDoc, orderBy } from 'firebase/firestore';
@@ -17,6 +17,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import Image from 'next/image';
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 const getStatusBadgeVariant = (status: Task['status']): BadgeProps['variant'] => {
   switch (status) {
@@ -53,6 +55,38 @@ export default function TasksPage() {
   const [modalOrder, setModalOrder] = useState<Order | null>(null);
   const [modalOrderItem, setModalOrderItem] = useState<OrderItemType | null>(null);
   const [modalCustomizationOptions, setModalCustomizationOptions] = useState<ProductCustomizationOption[]>([]);
+  
+  const [technicians, setTechnicians] = useState<AppUser[]>([]);
+  const [isLoadingTechnicians, setIsLoadingTechnicians] = useState(false);
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | undefined>(undefined);
+  const [isUpdatingAssignee, setIsUpdatingAssignee] = useState(false);
+
+
+  const fetchTechnicians = useCallback(async () => {
+    if (!db || (role !== 'ServiceManager' && role !== 'Admin')) {
+      setIsLoadingTechnicians(false);
+      return;
+    }
+    setIsLoadingTechnicians(true);
+    try {
+      const techQuery = query(collection(db, 'users'), where("role", "==", "Technician"), where("disabled", "!=", true));
+      const techSnapshot = await getDocs(techQuery);
+      const fetchedTechs: AppUser[] = [];
+      techSnapshot.forEach(docUser => fetchedTechs.push({ uid: docUser.id, ...docUser.data() } as AppUser));
+      setTechnicians(fetchedTechs);
+    } catch (error) {
+      console.error("Error fetching technicians:", error);
+      toast({ title: "Error", description: "Could not load technicians.", variant: "destructive" });
+    } finally {
+      setIsLoadingTechnicians(false);
+    }
+  }, [db, role, toast]);
+
+  useEffect(() => {
+    if (role === 'ServiceManager' || role === 'Admin') {
+      fetchTechnicians();
+    }
+  }, [role, fetchTechnicians]);
 
 
   const fetchTasks = useCallback(() => {
@@ -67,26 +101,20 @@ export default function TasksPage() {
       orderBy("createdAt", "desc")
     ];
 
+    let statusFilters: Task['status'][];
+    if (filter === 'active') statusFilters = ['pending', 'in-progress', 'needs_approval', 'blocked'];
+    else if (filter === 'completed') statusFilters = ['completed', 'rejected'];
+    else statusFilters = ['pending', 'in-progress', 'completed', 'needs_approval', 'blocked', 'rejected']; // 'all'
+
     if (role === 'Technician') {
-      let statusFilters: Task['status'][];
-      if (filter === 'active') statusFilters = ['pending', 'in-progress', 'needs_approval', 'blocked'];
-      else if (filter === 'completed') statusFilters = ['completed', 'rejected'];
-      else statusFilters = ['pending', 'in-progress', 'completed', 'needs_approval', 'blocked', 'rejected'];
-      
       q = query(
         collection(db, 'tasks'), 
         where('assigneeId', '==', user.uid),
         where('status', 'in', statusFilters),
         ...baseQueryConstraints
       );
-    } else { // ServiceManager or Admin viewing all tasks
-        let statusFilters: Task['status'][] | undefined = undefined;
-        if (filter === 'active') statusFilters = ['pending', 'in-progress', 'needs_approval', 'blocked'];
-        else if (filter === 'completed') statusFilters = ['completed', 'rejected'];
-
-        q = statusFilters 
-            ? query(collection(db, 'tasks'), where('status', 'in', statusFilters), ...baseQueryConstraints)
-            : query(collection(db, 'tasks'), ...baseQueryConstraints);
+    } else { // ServiceManager or Admin viewing tasks
+        q = query(collection(db, 'tasks'), where('status', 'in', statusFilters), ...baseQueryConstraints);
     }
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -106,7 +134,7 @@ export default function TasksPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user || (role !== 'Technician' && role !== 'ServiceManager' && role !== 'Admin')) { // Admin can also view for oversight
+    if (!user || (role !== 'Technician' && role !== 'ServiceManager' && role !== 'Admin')) {
       router.replace('/dashboard');
       return;
     }
@@ -129,6 +157,37 @@ export default function TasksPage() {
     }
   };
 
+  const handleAssigneeChange = async () => {
+    if (!db || !selectedTask || !selectedAssigneeId) {
+        toast({ title: "Error", description: "No task or assignee selected.", variant: "destructive" });
+        return;
+    }
+    const technicianToAssign = technicians.find(t => t.uid === selectedAssigneeId);
+    if (!technicianToAssign) {
+        toast({ title: "Error", description: "Selected technician not found.", variant: "destructive" });
+        return;
+    }
+    setIsUpdatingAssignee(true);
+    try {
+        const taskRef = doc(db, 'tasks', selectedTask.id);
+        await updateDoc(taskRef, {
+            assigneeId: technicianToAssign.uid,
+            assigneeName: technicianToAssign.displayName || technicianToAssign.email,
+            updatedAt: serverTimestamp()
+        });
+        toast({ title: "Assignee Updated", description: `Task assigned to ${technicianToAssign.displayName || technicianToAssign.email}.` });
+        if (selectedTask) {
+            setSelectedTask(prev => prev ? { ...prev, assigneeId: technicianToAssign.uid, assigneeName: technicianToAssign.displayName || technicianToAssign.email } : null);
+        }
+    } catch (error) {
+        console.error("Error updating assignee:", error);
+        toast({ title: "Update Failed", description: "Could not update task assignee.", variant: "destructive" });
+    } finally {
+        setIsUpdatingAssignee(false);
+    }
+  };
+
+
   const fetchModalDetails = async (task: Task) => {
     if (!task.orderId || !task.itemName || !db) {
       setModalOrder(null);
@@ -144,7 +203,7 @@ export default function TasksPage() {
       if (orderDoc.exists()) {
         const orderData = { id: orderDoc.id, ...orderDoc.data() } as Order;
         setModalOrder(orderData);
-        const item = orderData.items.find(i => i.name === task.itemName); // Assuming item name is unique enough for this task context
+        const item = orderData.items.find(i => i.name === task.itemName); 
         setModalOrderItem(item || null);
 
         if (item && item.customizations && Object.keys(item.customizations).length > 0) {
@@ -179,6 +238,7 @@ export default function TasksPage() {
 
   const openTaskModal = (task: Task) => {
     setSelectedTask(task);
+    setSelectedAssigneeId(task.assigneeId || undefined); // Pre-fill current assignee
     setIsModalOpen(true);
     fetchModalDetails(task);
   };
@@ -238,13 +298,24 @@ export default function TasksPage() {
         <h1 className="text-3xl font-headline font-semibold">
           {role === 'Technician' ? "My Tasks" : (role === 'ServiceManager' ? "Manage Production Tasks" : "All Production Tasks (Admin)")}
         </h1>
-        {/* TODO: Add filter buttons if needed */}
+         <div className="flex gap-2">
+            <Select value={filter} onValueChange={(value) => setFilter(value as any)}>
+                <SelectTrigger className="w-[180px] h-9 text-xs sm:text-sm">
+                    <SelectValue placeholder="Filter status" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="active">Active Tasks</SelectItem>
+                    <SelectItem value="completed">Completed & Rejected</SelectItem>
+                    <SelectItem value="all">All Tasks</SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
       </div>
 
       {tasks.length === 0 ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No tasks found.
+            No tasks found for the current filter.
           </CardContent>
         </Card>
       ) : (
@@ -264,7 +335,7 @@ export default function TasksPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-1.5 text-sm py-2">
-                <p className="line-clamp-3 text-xs text-muted-foreground whitespace-pre-line">{task.description}</p>
+                <p className="line-clamp-3 text-xs text-muted-foreground whitespace-pre-line break-words">{task.description}</p>
                 {(role === 'ServiceManager' || role === 'Admin') && <p className="text-xs text-muted-foreground">Assigned: {task.assigneeName || 'Unassigned'}</p>}
                 <p className="text-xs text-muted-foreground">Created: {formatDate(task.createdAt)}</p>
               </CardContent>
@@ -290,12 +361,48 @@ export default function TasksPage() {
           {isLoadingModalDetails ? (
             <div className="flex justify-center items-center h-40"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>
           ) : (
-          <ScrollArea className="max-h-[calc(100vh-20rem)] md:max-h-[60vh] pr-3">
+          <ScrollArea className="max-h-[calc(100vh-22rem)] md:max-h-[calc(70vh-10rem)] pr-3">
             <div className="space-y-4 py-2">
               <div><p className="text-sm font-medium">Status:</p> <Badge variant={getStatusBadgeVariant(selectedTask?.status || 'pending')} className="capitalize">{selectedTask?.status.replace(/_/g, ' ')}</Badge></div>
               <div><p className="text-sm font-medium">Description:</p><p className="text-sm text-muted-foreground whitespace-pre-line break-words">{selectedTask?.description}</p></div>
               <div><p className="text-sm font-medium">Created:</p><p className="text-sm text-muted-foreground">{formatDate(selectedTask?.createdAt)}</p></div>
-              {(role === 'ServiceManager' || role === 'Admin') && <div><p className="text-sm font-medium">Assigned To:</p><p className="text-sm text-muted-foreground">{selectedTask?.assigneeName || "Unassigned"}</p></div>}
+              
+              {(role === 'ServiceManager' || role === 'Admin') && (
+                <div className="pt-2 space-y-2">
+                    <Label htmlFor="assigneeSelect">Assigned Technician:</Label>
+                    {selectedTask && (selectedTask.status === 'completed' || selectedTask.status === 'rejected') ? (
+                         <Input value={selectedTask.assigneeName || "N/A"} disabled className="h-9 text-sm" />
+                    ) : (
+                    <div className="flex gap-2 items-center">
+                        <Select 
+                            value={selectedAssigneeId || ""} 
+                            onValueChange={setSelectedAssigneeId}
+                            disabled={isLoadingTechnicians || isUpdatingAssignee}
+                        >
+                            <SelectTrigger id="assigneeSelect" className="flex-grow h-9 text-xs sm:text-sm">
+                                <SelectValue placeholder="Select Technician" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {isLoadingTechnicians && <SelectItem value="loading" disabled>Loading...</SelectItem>}
+                                {technicians.length === 0 && !isLoadingTechnicians && <SelectItem value="no-techs" disabled>No technicians available</SelectItem>}
+                                {technicians.map(tech => <SelectItem key={tech.uid} value={tech.uid}>{tech.displayName || tech.email}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <Button 
+                            size="sm" 
+                            onClick={handleAssigneeChange} 
+                            disabled={isLoadingTechnicians || isUpdatingAssignee || !selectedAssigneeId || selectedAssigneeId === selectedTask?.assigneeId}
+                            className="h-9"
+                        >
+                            {isUpdatingAssignee && <Loader2 className="mr-1 h-4 w-4 animate-spin"/>} Update
+                        </Button>
+                    </div>
+                    )}
+                </div>
+              )}
+              {role === 'Technician' && selectedTask?.assigneeName && (
+                <div><p className="text-sm font-medium">Assigned To:</p><p className="text-sm text-muted-foreground">{selectedTask.assigneeName}</p></div>
+              )}
               
               {modalOrderItem && modalOrderItem.customizations && Object.keys(modalOrderItem.customizations).length > 0 && (
                 <div className="pt-3">
@@ -363,6 +470,3 @@ export default function TasksPage() {
     </div>
   );
 }
-
-    
-    
