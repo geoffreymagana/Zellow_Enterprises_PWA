@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, PlusCircle, Edit, Trash2, GripVertical, MinusCircle, Palette } from 'lucide-react';
 import type { CustomizationGroupDefinition, CustomizationGroupOptionDefinition, CustomizationGroupChoiceDefinition } from '@/types';
-import { useForm, Controller, SubmitHandler, useFieldArray, useWatch } from "react-hook-form"; // Added useWatch
+import { useForm, Controller, SubmitHandler, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
@@ -34,8 +34,8 @@ const choiceDefinitionSchema = z.object({
 
 const colorChoiceDefinitionSchema = z.object({
   value: z.string().regex(hexColorRegex, "Must be a valid hex color (e.g., #RGB or #RRGGBB)"),
-  label: z.string().optional(), // Label for color can be optional
-  priceAdjustment: z.coerce.number().optional().default(0),
+  label: z.string().optional(),
+  priceAdjustment: z.coerce.number().optional().default(0), // Not currently used in UI for color choices, but good to have in schema
 });
 
 const optionDefinitionSchema = z.object({
@@ -46,11 +46,11 @@ const optionDefinitionSchema = z.object({
   showToCustomerByDefault: z.boolean().optional().default(true),
   choices: z.array(z.union([choiceDefinitionSchema, colorChoiceDefinitionSchema])).optional(),
   placeholder: z.string().optional(),
-  maxLength: z.coerce.number().positive("Max length must be positive").optional(),
+  maxLength: z.coerce.number().positive("Max length must be positive").optional().nullable(),
   checkboxLabel: z.string().optional(),
   priceAdjustmentIfChecked: z.coerce.number().optional().default(0),
   acceptedFileTypes: z.string().optional(),
-  maxFileSizeMB: z.coerce.number().positive("Max file size must be positive").optional(),
+  maxFileSizeMB: z.coerce.number().positive("Max file size must be positive").optional().nullable(),
 }).superRefine((data, ctx) => {
     if (data.type === 'dropdown') {
         if (!data.choices || data.choices.length === 0) {
@@ -88,6 +88,21 @@ const groupDefinitionFormSchema = z.object({
 });
 
 type GroupDefinitionFormValues = z.infer<typeof groupDefinitionFormSchema>;
+
+const defaultNewOptionValue: Omit<CustomizationGroupOptionDefinition, 'id'> = {
+  label: '',
+  type: 'text',
+  required: false,
+  showToCustomerByDefault: true,
+  choices: [],
+  placeholder: '',
+  maxLength: null, // Use null for optional numbers if input is type="number"
+  checkboxLabel: '',
+  priceAdjustmentIfChecked: 0,
+  acceptedFileTypes: '',
+  maxFileSizeMB: null, // Use null for optional numbers
+};
+
 
 export default function AdminCustomizationsPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -134,7 +149,18 @@ export default function AdminCustomizationsPage() {
 
   const handleOpenDialog = (group: CustomizationGroupDefinition | null = null) => {
     setEditingGroup(group);
-    form.reset(group ? group : { name: "", options: [] });
+    form.reset(group ? {
+      ...group,
+      options: group.options.map(opt => ({
+        ...opt,
+        maxLength: opt.maxLength ?? null, // Ensure undefined becomes null for form control
+        maxFileSizeMB: opt.maxFileSizeMB ?? null, // Ensure undefined becomes null
+        placeholder: opt.placeholder ?? '',
+        checkboxLabel: opt.checkboxLabel ?? '',
+        acceptedFileTypes: opt.acceptedFileTypes ?? '',
+        choices: opt.choices ?? [],
+      }))
+    } : { name: "", options: [] });
     setIsDialogOpen(true);
   };
 
@@ -143,6 +169,12 @@ export default function AdminCustomizationsPage() {
     setIsSubmitting(true);
     const dataToSave = {
       ...values,
+      options: values.options.map(opt => ({
+        ...opt,
+        // Convert empty strings from number inputs back to null if they were optional numbers
+        maxLength: opt.maxLength === null || (typeof opt.maxLength === 'string' && opt.maxLength.trim() === '') ? null : Number(opt.maxLength),
+        maxFileSizeMB: opt.maxFileSizeMB === null || (typeof opt.maxFileSizeMB === 'string' && opt.maxFileSizeMB.trim() === '') ? null : Number(opt.maxFileSizeMB),
+      })),
       updatedAt: serverTimestamp(),
       ...(editingGroup ? {} : { createdAt: serverTimestamp() }),
     };
@@ -235,7 +267,8 @@ export default function AdminCustomizationsPage() {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle className="text-lg">Customization Options in this Group</CardTitle>
-                      <Button type="button" variant="outline" size="sm" onClick={() => appendOption({ id: `opt_${Date.now()}`, label: '', type: 'text', required: false, showToCustomerByDefault: true, choices:[], placeholder: '', checkboxLabel: ''})}>
+                      <Button type="button" variant="outline" size="sm" 
+                        onClick={() => appendOption({ ...defaultNewOptionValue, id: `opt_${Date.now()}`})}>
                         <PlusCircle className="mr-2 h-4 w-4"/> Add Option
                       </Button>
                     </CardHeader>
@@ -278,7 +311,7 @@ function RenderOptionField({ control, index, removeOption }: { control: any, ind
       </div>
       <FormField control={control} name={`options.${index}.type`} render={({ field: typeField }) => (
         <FormItem className="mt-3"><FormLabel>Option Type</FormLabel>
-          <Select onValueChange={(value) => { typeField.onChange(value); control.setValue(`options.${index}.type`, value); }} value={typeField.value}>
+          <Select onValueChange={(value) => { typeField.onChange(value); }} value={typeField.value}>
             <FormControl><SelectTrigger><SelectValue placeholder="Select option type" /></SelectTrigger></FormControl>
             <SelectContent>
               <SelectItem value="dropdown">Dropdown</SelectItem>
@@ -301,8 +334,8 @@ function RenderOptionField({ control, index, removeOption }: { control: any, ind
         <FormField control={control} name={`options.${index}.required`} render={({ field }) => ( <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="font-normal">Required Option</FormLabel></FormItem> )} />
         <FormField control={control} name={`options.${index}.showToCustomerByDefault`} render={({ field }) => ( <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="font-normal">Show to Customer by Default</FormLabel></FormItem> )} />
       </div>
-       <FormMessage>{control.getFieldState(`options.${index}`).error?.message}</FormMessage>
-       <FormMessage>{control.getFieldState(`options.${index}.choices`)?.error?.message}</FormMessage>
+       <FormMessage>{(control.getFieldState(`options.${index}`)?.error as any)?.message}</FormMessage>
+       <FormMessage>{(control.getFieldState(`options.${index}.choices`)?.error as any)?.message}</FormMessage>
     </Card>
   );
 }
@@ -317,10 +350,11 @@ function RenderSelectChoicesConfig({ control, optionIndex }: { control: any, opt
         <div key={choiceField.id} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end p-2 border rounded bg-muted/20">
           <FormField control={control} name={`options.${optionIndex}.choices.${choiceIndex}.label`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Display Label</FormLabel><FormControl><Input {...field} placeholder="e.g., Red, Small"/></FormControl><FormMessage className="text-xs"/></FormItem>)} />
           <FormField control={control} name={`options.${optionIndex}.choices.${choiceIndex}.value`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Value (Unique)</FormLabel><FormControl><Input {...field} placeholder="e.g., red_option, size_sm"/></FormControl><FormMessage className="text-xs"/></FormItem>)} />
-          <FormField control={control} name={`options.${optionIndex}.choices.${choiceIndex}.priceAdjustment`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Price Adj. (KES)</FormLabel><FormControl><Input type="number" step="0.01" {...field} placeholder="0.00"/></FormControl><FormMessage className="text-xs"/></FormItem>)} />
+          <FormField control={control} name={`options.${optionIndex}.choices.${choiceIndex}.priceAdjustment`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Price Adj. (KES)</FormLabel><FormControl><Input type="number" step="0.01" {...field} placeholder="0.00" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl><FormMessage className="text-xs"/></FormItem>)} />
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => remove(choiceIndex)} aria-label="Remove choice"><MinusCircle className="h-4 w-4 text-destructive"/></Button>
         </div>
       ))}
+       <FormMessage>{(control.getFieldState(`options.${optionIndex}.choices`)?.error as any)?.message}</FormMessage>
     </div>
   );
 }
@@ -331,13 +365,13 @@ function RenderColorChoicesConfig({ control, optionIndex }: { control: any, opti
     <div className="mt-3 space-y-3 p-3 border rounded-md bg-background">
       <div className="flex justify-between items-center">
         <h5 className="text-sm font-medium">Color Choices</h5>
-        <Button type="button" size="sm" variant="outline" onClick={() => append({ value: '#FFFFFF', label: '' })}>
+        <Button type="button" size="sm" variant="outline" onClick={() => append({ value: '#FFFFFF', label: '', priceAdjustment: 0 })}>
           <Palette className="mr-1 h-3 w-3"/> Add Color
         </Button>
       </div>
       {fields.length === 0 && <p className="text-xs text-muted-foreground">No color choices added yet.</p>}
       {fields.map((choiceField, choiceIndex) => (
-        <div key={choiceField.id} className="grid grid-cols-1 sm:grid-cols-[auto_1fr_1fr_auto] gap-3 items-center p-2 border rounded bg-muted/20">
+        <div key={choiceField.id} className="grid grid-cols-1 sm:grid-cols-[auto_1fr_1fr_1fr_auto] gap-3 items-center p-2 border rounded bg-muted/20">
           <Controller
             control={control}
             name={`options.${optionIndex}.choices.${choiceIndex}.value`}
@@ -355,11 +389,13 @@ function RenderColorChoicesConfig({ control, optionIndex }: { control: any, opti
           <FormField control={control} name={`options.${optionIndex}.choices.${choiceIndex}.label`} render={({ field }) => (
             <FormItem><FormLabel className="text-xs">Color Name (Optional)</FormLabel><FormControl><Input {...field} placeholder="e.g., Ruby Red" className="h-9"/></FormControl><FormMessage className="text-xs"/></FormItem>
           )} />
+          <FormField control={control} name={`options.${optionIndex}.choices.${choiceIndex}.priceAdjustment`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Price Adj. (KES)</FormLabel><FormControl><Input type="number" step="0.01" {...field} placeholder="0.00" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl><FormMessage className="text-xs"/></FormItem>)} />
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => remove(choiceIndex)} aria-label="Remove color choice">
             <MinusCircle className="h-4 w-4 text-destructive"/>
           </Button>
         </div>
       ))}
+       <FormMessage>{(control.getFieldState(`options.${optionIndex}.choices`)?.error as any)?.message}</FormMessage>
     </div>
   );
 }
@@ -368,7 +404,7 @@ function RenderTextConfig({ control, optionIndex }: { control: any, optionIndex:
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
       <FormField control={control} name={`options.${optionIndex}.placeholder`} render={({ field }) => (<FormItem><FormLabel>Placeholder Text</FormLabel><FormControl><Input {...field} placeholder="e.g., Enter your text here"/></FormControl><FormMessage/></FormItem>)} />
-      <FormField control={control} name={`options.${optionIndex}.maxLength`} render={({ field }) => (<FormItem><FormLabel>Max Length (Optional)</FormLabel><FormControl><Input type="number" {...field} placeholder="e.g., 50"/></FormControl><FormMessage/></FormItem>)} />
+      <FormField control={control} name={`options.${optionIndex}.maxLength`} render={({ field }) => (<FormItem><FormLabel>Max Length (Optional)</FormLabel><FormControl><Input type="number" {...field} placeholder="e.g., 50" value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value, 10))} /></FormControl><FormMessage/></FormItem>)} />
     </div>
   );
 }
@@ -377,7 +413,7 @@ function RenderCheckboxConfig({ control, optionIndex }: { control: any, optionIn
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
       <FormField control={control} name={`options.${optionIndex}.checkboxLabel`} render={({ field }) => (<FormItem><FormLabel>Checkbox Label for Customer</FormLabel><FormControl><Input {...field} placeholder="e.g., Include gift wrapping?"/></FormControl><FormDescription className="text-xs">This text appears next to the checkbox.</FormDescription><FormMessage/></FormItem>)} />
-      <FormField control={control} name={`options.${optionIndex}.priceAdjustmentIfChecked`} render={({ field }) => (<FormItem><FormLabel>Price Adj. if Checked (KES)</FormLabel><FormControl><Input type="number" step="0.01" {...field} placeholder="0.00"/></FormControl><FormMessage/></FormItem>)} />
+      <FormField control={control} name={`options.${optionIndex}.priceAdjustmentIfChecked`} render={({ field }) => (<FormItem><FormLabel>Price Adj. if Checked (KES)</FormLabel><FormControl><Input type="number" step="0.01" {...field} placeholder="0.00" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl><FormMessage/></FormItem>)} />
     </div>
   );
 }
@@ -386,7 +422,9 @@ function RenderImageUploadConfig({ control, optionIndex }: { control: any, optio
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
       <FormField control={control} name={`options.${optionIndex}.acceptedFileTypes`} render={({ field }) => (<FormItem><FormLabel>Accepted File Types</FormLabel><FormControl><Input {...field} placeholder="e.g., .png, .jpg, .jpeg"/></FormControl><FormDescription className="text-xs">Comma-separated list of extensions.</FormDescription><FormMessage/></FormItem>)} />
-      <FormField control={control} name={`options.${optionIndex}.maxFileSizeMB`} render={({ field }) => (<FormItem><FormLabel>Max File Size (MB)</FormLabel><FormControl><Input type="number" {...field} placeholder="e.g., 5"/></FormControl><FormMessage/></FormItem>)} />
+      <FormField control={control} name={`options.${optionIndex}.maxFileSizeMB`} render={({ field }) => (<FormItem><FormLabel>Max File Size (MB)</FormLabel><FormControl><Input type="number" {...field} placeholder="e.g., 5" value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value, 10))} /></FormControl><FormMessage/></FormItem>)} />
     </div>
   );
 }
+
+    
