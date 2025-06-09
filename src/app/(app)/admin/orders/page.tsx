@@ -61,10 +61,8 @@ export default function AdminOrdersPage() {
     }
     setIsLoading(true);
     try {
-      // Base query orders by creation date descending
       let q = query(collection(db, 'orders'), orderBy("createdAt", "desc"));
       
-      // If a specific status filter is applied (and it's not the "all" sentinel)
       if (statusFilter && statusFilter !== ALL_STATUSES_SENTINEL) {
         q = query(collection(db, 'orders'), where("status", "==", statusFilter), orderBy("createdAt", "desc"));
       }
@@ -81,11 +79,11 @@ export default function AdminOrdersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, statusFilter]); // Add statusFilter to dependencies
+  }, [toast, statusFilter]); 
 
   useEffect(() => {
     if (!authLoading) {
-      if (!user || role !== 'Admin') { // Consider if ServiceManager should also access
+      if (!user || (role !== 'Admin' && role !== 'ServiceManager')) { 
         router.replace('/dashboard');
       } else {
         fetchOrders();
@@ -99,14 +97,12 @@ export default function AdminOrdersPage() {
       const idMatch = order.id.toLowerCase().includes(searchTermLower);
       const nameMatch = order.customerName?.toLowerCase().includes(searchTermLower);
       const emailMatch = order.customerEmail?.toLowerCase().includes(searchTermLower);
-      // Status filter is handled by the Firestore query if a specific status is selected
       return (idMatch || nameMatch || emailMatch);
     });
   }, [orders, searchTerm]);
   
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'N/A';
-    // Firebase Timestamps have toDate() method
     return timestamp.toDate ? format(timestamp.toDate(), 'PPp') : 'Invalid Date';
   };
 
@@ -114,7 +110,7 @@ export default function AdminOrdersPage() {
   if (authLoading || (!user && !authLoading)) {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
-  if (role !== 'Admin') {
+  if (role !== 'Admin' && role !== 'ServiceManager') {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">Access Denied.</div>;
   }
 
@@ -125,7 +121,6 @@ export default function AdminOrdersPage() {
           <h1 className="text-3xl font-headline font-semibold">Order Management</h1>
           <p className="text-muted-foreground">View, process, and track all customer orders.</p>
         </div>
-        {/* <Button onClick={() => {}}> Create Order (Manual)</Button> Potentially for phone orders */}
       </div>
 
       <Card>
@@ -144,7 +139,6 @@ export default function AdminOrdersPage() {
               value={statusFilter}
               onValueChange={(value) => {
                 setStatusFilter(value);
-                // fetchOrders will be called by useEffect due to statusFilter dependency change
               }}
             >
               <SelectTrigger className="w-full sm:w-[200px]">
@@ -221,3 +215,4 @@ export default function AdminOrdersPage() {
     </div>
   );
 }
+

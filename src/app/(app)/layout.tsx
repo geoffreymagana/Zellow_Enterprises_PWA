@@ -24,7 +24,7 @@ import {
   LayoutDashboard, Users, Package, ShoppingCart, Layers, DollarSign,
   Truck, Settings as SettingsIcon, UserCircle, LogOutIcon, Menu, Bell,
   FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIconLucide, ListChecks,
-  Aperture, Coins, Warehouse, PackageSearch, BarChart2, FileText // Added FileText
+  Aperture, Coins, Warehouse, PackageSearch, BarChart2, FileText
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
@@ -366,6 +366,8 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
                           <nav className="py-4 px-2">
                               <Link href="/dashboard" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/dashboard" ? "bg-muted text-primary font-semibold" : ""}`}><Home className="mr-2 h-4 w-4" />Dashboard</Link>
                               {role === 'Technician' && <Link href="/tasks" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/tasks") ? "bg-muted text-primary font-semibold" : ""}`}><ListChecks className="mr-2 h-4 w-4" />Tasks</Link>}
+                              {role === 'ServiceManager' && <Link href="/admin/orders" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/admin/orders") ? "bg-muted text-primary font-semibold" : ""}`}><ShoppingCart className="mr-2 h-4 w-4" />Orders</Link>}
+                              {role === 'ServiceManager' && <Link href="/tasks" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/tasks") ? "bg-muted text-primary font-semibold" : ""}`}><ListChecks className="mr-2 h-4 w-4" />Team Tasks</Link>}
                               {role === 'Rider' && <Link href="/deliveries" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/deliveries") ? "bg-muted text-primary font-semibold" : ""}`}><Truck className="mr-2 h-4 w-4" />Deliveries</Link>}
                               {role === 'Supplier' && <Link href="/supplier/stock-requests" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/supplier/stock-requests") ? "bg-muted text-primary font-semibold" : ""}`}><Warehouse className="mr-2 h-4 w-4" />Stock Requests</Link>}
                               {role === 'InventoryManager' && (<>
@@ -399,15 +401,13 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
 export default function AppGroupLayout({ children }: LayoutProps) {
   const { user, role, loading } = useAuth();
   const pathname = usePathname();
-  const router = useRouter(); // Added for initial redirect from '/'
+  const router = useRouter(); 
 
   useEffect(() => {
     if (!loading) {
       if (!user && !['/login', '/signup'].includes(pathname)) {
         router.replace('/login');
       }
-      // If user is logged in and on '/', redirect to dashboard.
-      // This replaces the functionality of the specific HomePage component.
       if (user && pathname === '/') {
           router.replace('/dashboard');
       }
@@ -419,12 +419,10 @@ export default function AppGroupLayout({ children }: LayoutProps) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
   
-  // If on login/signup page and not authenticated, show the page.
   if (!user && (pathname === '/login' || pathname === '/signup')) {
     return <>{children}</>;
   }
   
-  // If user is somehow null at this point but not on login/signup (should be caught by above)
   if (!user) { 
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /> Awaiting authentication...</div>;
   }
@@ -439,3 +437,5 @@ export default function AppGroupLayout({ children }: LayoutProps) {
 
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
+
+    

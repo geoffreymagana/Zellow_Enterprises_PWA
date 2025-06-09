@@ -1,115 +1,177 @@
 
 "use client";
 
-import { Badge } from "@/components/ui/badge";
+import { Badge, BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
 import type { Task } from "@/types";
-import { Filter, PlusCircle, Edit2, AlertTriangle } from "lucide-react";
+import { Filter, Loader2, Wrench, CheckCircle, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useToast } from "@/hooks/use-toast";
+import { format } from 'date-fns';
 
-const sampleTasks: Task[] = [
-  { id: 'TSK001', assigneeId: 'tech123', type: 'engraving', description: 'Engrave "Happy Birthday" on Mug #MUG789.', orderId: 'ORD001', status: 'pending', createdAt: new Date('2023-11-01'), updatedAt: new Date('2023-11-01') },
-  { id: 'TSK002', assigneeId: 'tech123', type: 'printing', description: 'Print design on T-Shirt #TS002, 5 units.', orderId: 'ORD002', status: 'in-progress', createdAt: new Date('2023-11-02'), updatedAt: new Date('2023-11-02') },
-  { id: 'TSK003', assigneeId: 'tech456', type: 'engraving', description: 'Engrave logo on 10 Pen #PEN011.', orderId: 'ORD003', status: 'completed', createdAt: new Date('2023-10-30'), updatedAt: new Date('2023-10-31') },
-  { id: 'TSK004', assigneeId: 'tech123', type: 'printing', description: 'Urgent: Reprint banner for Event #EVT001', status: 'needs_approval', createdAt: new Date('2023-11-03'), updatedAt: new Date('2023-11-03') },
-];
+const getStatusBadgeVariant = (status: Task['status']): BadgeProps['variant'] => {
+  switch (status) {
+    case 'pending': return 'statusYellow';
+    case 'in-progress': return 'statusBlue';
+    case 'completed': return 'statusGreen';
+    case 'needs_approval':
+    case 'blocked':
+      return 'statusAmber';
+    case 'rejected':
+      return 'statusRed';
+    default: return 'outline';
+  }
+};
 
 export default function TasksPage() {
-  const { user, role } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState<'active' | 'completed' | 'all'>('active');
+
+  const fetchTasks = useCallback(() => {
+    if (!user || !db || (role !== 'Technician' && role !== 'ServiceManager')) {
+      setIsLoading(false);
+      return () => {}; 
+    }
+    setIsLoading(true);
+    
+    let q;
+    const baseQueryConstraints = [
+      orderBy("createdAt", "desc")
+    ];
+
+    if (role === 'Technician') {
+      let statusFilters: Task['status'][];
+      if (filter === 'active') statusFilters = ['pending', 'in-progress', 'needs_approval', 'blocked'];
+      else if (filter === 'completed') statusFilters = ['completed', 'rejected'];
+      else statusFilters = ['pending', 'in-progress', 'completed', 'needs_approval', 'blocked', 'rejected'];
+      
+      q = query(
+        collection(db, 'tasks'), 
+        where('assigneeId', '==', user.uid),
+        where('status', 'in', statusFilters),
+        ...baseQueryConstraints
+      );
+    } else { // ServiceManager sees all tasks, can filter client-side if needed or add DB filters
+        let statusFilters: Task['status'][] | undefined = undefined;
+        if (filter === 'active') statusFilters = ['pending', 'in-progress', 'needs_approval', 'blocked'];
+        else if (filter === 'completed') statusFilters = ['completed', 'rejected'];
+
+        q = statusFilters 
+            ? query(collection(db, 'tasks'), where('status', 'in', statusFilters), ...baseQueryConstraints)
+            : query(collection(db, 'tasks'), ...baseQueryConstraints);
+    }
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const fetchedTasks: Task[] = [];
+      querySnapshot.forEach((doc) => {
+        fetchedTasks.push({ id: doc.id, ...doc.data() } as Task);
+      });
+      setTasks(fetchedTasks);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error fetching tasks: ", error);
+      toast({ title: "Error", description: "Could not fetch tasks.", variant: "destructive" });
+      setIsLoading(false);
+    });
+    return unsubscribe;
+  }, [user, db, role, toast, filter]);
 
   useEffect(() => {
-    if (role && !['Technician', 'ServiceManager'].includes(role)) {
-      router.replace('/dashboard'); // Redirect if not authorized
-    } else if (user) {
-      // Fetch tasks based on user role
-      // Technicians see their assigned tasks, Service Managers see all/team tasks
-      const userTasks = (role === 'Technician') 
-        ? sampleTasks.filter(t => t.assigneeId === user.uid && t.status !== 'completed') 
-        : sampleTasks; // ServiceManager sees all for now
-      setTasks(userTasks);
+    if (authLoading) return;
+    if (!user || (role !== 'Technician' && role !== 'ServiceManager')) {
+      router.replace('/dashboard');
+      return;
     }
-  }, [user, role, router]);
+    const unsubscribe = fetchTasks();
+    return () => unsubscribe();
+  }, [authLoading, user, role, router, fetchTasks]);
+  
+  const handleStatusChange = async (taskId: string, newStatus: Task['status']) => {
+    if (!db) return;
+    try {
+      const taskRef = doc(db, 'tasks', taskId);
+      await updateDoc(taskRef, { status: newStatus, updatedAt: serverTimestamp() });
+      toast({ title: "Task Updated", description: `Task status changed to ${newStatus.replace('_', ' ')}.` });
+    } catch (error) {
+      console.error("Error updating task status: ", error);
+      toast({ title: "Error", description: "Could not update task status.", variant: "destructive" });
+    }
+  };
 
-  if (role && !['Technician', 'ServiceManager'].includes(role)) {
-     return <div className="text-center py-10">Access denied. This page is for Technicians and Service Managers only.</div>;
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return 'N/A';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return format(date, 'PPp');
+  };
+
+  if (authLoading || isLoading) {
+    return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   
-  const handleStatusChange = (taskId: string, newStatus: Task['status']) => {
-    // In a real app, update task status in Firestore
-    setTasks(prevTasks => prevTasks.map(task => task.id === taskId ? {...task, status: newStatus, updatedAt: new Date()} : task));
-    console.log(`Task ${taskId} status updated to ${newStatus}`);
-  };
-
-  const getStatusBadgeVariant = (status: Task['status']) => {
-    switch (status) {
-      case 'pending': return 'default';
-      case 'in-progress': return 'secondary';
-      case 'completed': return 'default'; // Consider green
-      case 'needs_approval': return 'destructive'; // Consider yellow/orange
-      default: return 'default';
-    }
-  };
+  if (role !== 'Technician' && role !== 'ServiceManager') {
+     return <div className="text-center py-10">Access denied.</div>;
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-headline font-semibold">
-          {role === 'Technician' ? "My Tasks" : "Manage Tasks"}
+          {role === 'Technician' ? "My Tasks" : "Manage Production Tasks"}
         </h1>
-        <div className="flex gap-2">
+        {/* <div className="flex gap-2">
           <Button variant="outline" size="sm"><Filter className="mr-2 h-4 w-4" /> Filter</Button>
-          {role === 'ServiceManager' && <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" /> New Task</Button>}
-        </div>
+        </div> */}
       </div>
 
       {tasks.length === 0 ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No tasks assigned or matching filters.
+            No tasks found matching the current filter.
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {tasks.map((task) => (
-            <Card key={task.id} className="overflow-hidden">
-              <CardHeader className="flex flex-row items-start justify-between bg-muted/30 p-4">
-                <div>
-                  <CardTitle className="text-lg font-semibold font-headline">{task.description}</CardTitle>
-                  <CardDescription className="text-xs">
-                    Task ID: {task.id} {task.orderId && `| Order: ${task.orderId}`} | Updated: {task.updatedAt.toLocaleDateString()}
-                  </CardDescription>
+            <Card key={task.id} className="flex flex-col">
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start">
+                  <CardTitle className="text-lg font-semibold font-headline capitalize">{task.taskType}</CardTitle>
+                  <Badge variant={getStatusBadgeVariant(task.status)} className="capitalize text-xs">{task.status.replace(/_/g, ' ')}</Badge>
                 </div>
-                <Badge variant={getStatusBadgeVariant(task.status)} className="capitalize">{task.status.replace('_', ' ')}</Badge>
+                 <CardDescription className="text-xs pt-1">
+                    For Item: {task.itemName || 'N/A'} (Order: {task.orderId ? task.orderId.substring(0,8)+'...' : 'N/A'})
+                </CardDescription>
               </CardHeader>
-              <CardContent className="p-4 space-y-3">
-                <p className="text-sm"><strong>Type:</strong> <span className="capitalize">{task.type}</span></p>
-                {task.status === 'needs_approval' && (
-                     <div className="flex items-center p-2 border border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30 rounded-md text-yellow-700 dark:text-yellow-300">
-                        <AlertTriangle className="h-5 w-5 mr-2 text-yellow-500 dark:text-yellow-400" />
-                        This task requires approval.
-                     </div>
-                )}
+              <CardContent className="flex-grow space-y-2 text-sm">
+                <p className="line-clamp-3">{task.description}</p>
+                {role === 'ServiceManager' && <p className="text-xs text-muted-foreground">Assigned to: {task.assigneeName || 'Unassigned'}</p>}
+                <p className="text-xs text-muted-foreground">Created: {formatDate(task.createdAt)}</p>
               </CardContent>
-              <CardFooter className="bg-muted/30 p-4 flex justify-end items-center gap-2">
+              <CardFooter className="pt-3 border-t flex justify-end items-center gap-2">
                 {role === 'Technician' && task.status === 'pending' && (
-                  <Button size="sm" onClick={() => handleStatusChange(task.id, 'in-progress')}>Start Task</Button>
+                  <Button size="sm" onClick={() => handleStatusChange(task.id, 'in-progress')}>
+                    <Wrench className="mr-2 h-4 w-4" /> Start Task
+                  </Button>
                 )}
                 {role === 'Technician' && task.status === 'in-progress' && (
-                  <Button size="sm" onClick={() => handleStatusChange(task.id, 'completed')}>Mark as Completed</Button>
+                  <Button size="sm" onClick={() => handleStatusChange(task.id, 'completed')}>
+                    <CheckCircle className="mr-2 h-4 w-4" /> Mark Completed
+                  </Button>
                 )}
-                 {role === 'ServiceManager' && (
-                  <Button variant="outline" size="sm"><Edit2 className="mr-2 h-3 w-3" /> Edit</Button>
+                 {role === 'ServiceManager' && task.status === 'needs_approval' && (
+                  <Button size="sm" onClick={() => handleStatusChange(task.id, 'pending')}>
+                     Approve Task
+                  </Button>
                 )}
-                {role === 'ServiceManager' && task.status === 'needs_approval' && (
-                  <Button size="sm" onClick={() => handleStatusChange(task.id, 'pending')}>Approve Task</Button>
-                )}
-                {/* Add photo upload for proof if needed */}
               </CardFooter>
             </Card>
           ))}
