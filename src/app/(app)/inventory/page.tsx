@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import type { Product, StockRequest, StockRequestStatus } from "@/types";
 import { PlusCircle, Search, Edit, AlertTriangle, PackageCheck, PackageX, RefreshCw, Boxes, ShoppingBasket, ClipboardList, ImageOff } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react"; // Added useMemo
 import Link from "next/link";
 import { collection, getDocs, query, orderBy, where, doc, addDoc, serverTimestamp, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -32,9 +32,11 @@ const requestStockFormSchema = z.object({
 });
 type RequestStockFormValues = z.infer<typeof requestStockFormSchema>;
 
+const LOW_STOCK_THRESHOLD = 10; // Define low stock threshold
+
 const getStockLevelColor = (stock: number): string => {
   if (stock === 0) return 'bg-destructive'; // Red
-  if (stock < 10) return 'bg-orange-500'; // Orange
+  if (stock < LOW_STOCK_THRESHOLD) return 'bg-orange-500'; // Orange
   return 'bg-green-500'; // Green
 };
 
@@ -43,6 +45,8 @@ const getStockRequestStatusVariant = (status: StockRequestStatus): BadgeProps['v
   switch (status) {
     case 'pending_finance_approval': return 'statusYellow';
     case 'pending_supplier_fulfillment': return 'statusAmber';
+    case 'awaiting_receipt': return 'statusBlue';
+    case 'received': return 'statusGreen';
     case 'fulfilled': return 'statusGreen';
     case 'rejected_finance':
     case 'rejected_supplier':
@@ -77,6 +81,7 @@ export default function InventoryPage() {
     if (!db) return;
     setIsLoadingProducts(true);
     try {
+      // Default sort by name for initial fetch, will be re-sorted in useMemo
       const q = query(collection(db, 'products'), orderBy("name", "asc"));
       const snapshot = await getDocs(q);
       setProducts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
@@ -123,11 +128,38 @@ export default function InventoryPage() {
     }
   }, [authLoading, user, role, router, fetchProducts, fetchStockRequests]);
 
-  const filteredProducts = products.filter(item =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.categories?.some(cat => cat.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredAndSortedProducts = useMemo(() => {
+    let searchFiltered = products.filter(item =>
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.categories?.some(cat => cat.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+
+    if (role === 'InventoryManager' || role === 'Admin') {
+      searchFiltered.sort((a, b) => {
+        // Prioritize out of stock
+        if (a.stock === 0 && b.stock !== 0) return -1;
+        if (a.stock !== 0 && b.stock === 0) return 1;
+
+        // Then prioritize low stock
+        const aIsLowStock = a.stock > 0 && a.stock < LOW_STOCK_THRESHOLD;
+        const bIsLowStock = b.stock > 0 && b.stock < LOW_STOCK_THRESHOLD;
+        if (aIsLowStock && !bIsLowStock) return -1;
+        if (!aIsLowStock && bIsLowStock) return 1;
+        
+        // If both are low stock, sort by stock level then name
+        if (aIsLowStock && bIsLowStock) {
+          if (a.stock !== b.stock) {
+            return a.stock - b.stock;
+          }
+        }
+        
+        // Finally, sort by name alphabetically for items in the same stock category
+        return a.name.localeCompare(b.name);
+      });
+    }
+    return searchFiltered;
+  }, [products, searchTerm, role]);
 
   const handleOpenRequestDialog = (product: Product) => {
     setProductToRequest(product);
@@ -210,11 +242,11 @@ export default function InventoryPage() {
 
       {isLoadingProducts && products.length === 0 ? (
         <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
-      ) : filteredProducts.length === 0 ? (
+      ) : filteredAndSortedProducts.length === 0 ? (
         <Card><CardContent className="pt-6 text-center text-muted-foreground">{products.length === 0 ? "No products found." : "No products match search."}</CardContent></Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filteredProducts.map((item) => (
+          {filteredAndSortedProducts.map((item) => (
             <Card key={item.id} className="flex overflow-hidden shadow-sm hover:shadow-md transition-shadow">
               <div className={cn("w-2 flex-shrink-0", getStockLevelColor(item.stock))}></div>
               <div className="flex-grow p-3 flex flex-col">
@@ -261,7 +293,7 @@ export default function InventoryPage() {
           ))}
         </div>
       )}
-      {filteredProducts.length > 0 && !isLoadingProducts && <p className="text-xs text-muted-foreground mt-4">Showing {filteredProducts.length} of {products.length} products.</p>}
+      {filteredAndSortedProducts.length > 0 && !isLoadingProducts && <p className="text-xs text-muted-foreground mt-4">Showing {filteredAndSortedProducts.length} of {products.length} products.</p>}
       
       {role === 'InventoryManager' && (
         <Card className="mt-8">
@@ -332,3 +364,4 @@ export default function InventoryPage() {
   );
 }
 
+    
