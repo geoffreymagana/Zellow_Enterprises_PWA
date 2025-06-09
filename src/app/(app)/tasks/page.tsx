@@ -9,7 +9,7 @@ import type { Task, Order, OrderItem as OrderItemType, Product, ProductCustomiza
 import { Filter, Loader2, Wrench, CheckCircle, AlertTriangle, Eye, Image as ImageIconPlaceholder, Palette } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, getDoc, orderBy } from 'firebase/firestore'; // Added orderBy
+import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, getDoc, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
@@ -56,7 +56,7 @@ export default function TasksPage() {
 
 
   const fetchTasks = useCallback(() => {
-    if (!user || !db || (role !== 'Technician' && role !== 'ServiceManager')) {
+    if (!user || !db || (role !== 'Technician' && role !== 'ServiceManager' && role !== 'Admin')) {
       setIsLoading(false);
       return () => {}; 
     }
@@ -264,7 +264,7 @@ export default function TasksPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-1.5 text-sm py-2">
-                <p className="line-clamp-3 text-xs text-muted-foreground">{task.description}</p>
+                <p className="line-clamp-3 text-xs text-muted-foreground whitespace-pre-line">{task.description}</p>
                 {(role === 'ServiceManager' || role === 'Admin') && <p className="text-xs text-muted-foreground">Assigned: {task.assigneeName || 'Unassigned'}</p>}
                 <p className="text-xs text-muted-foreground">Created: {formatDate(task.createdAt)}</p>
               </CardContent>
@@ -293,7 +293,7 @@ export default function TasksPage() {
           <ScrollArea className="max-h-[calc(100vh-20rem)] md:max-h-[60vh] pr-3">
             <div className="space-y-4 py-2">
               <div><p className="text-sm font-medium">Status:</p> <Badge variant={getStatusBadgeVariant(selectedTask?.status || 'pending')} className="capitalize">{selectedTask?.status.replace(/_/g, ' ')}</Badge></div>
-              <div><p className="text-sm font-medium">Description:</p><p className="text-sm text-muted-foreground whitespace-pre-line">{selectedTask?.description}</p></div>
+              <div><p className="text-sm font-medium">Description:</p><p className="text-sm text-muted-foreground whitespace-pre-line break-words">{selectedTask?.description}</p></div>
               <div><p className="text-sm font-medium">Created:</p><p className="text-sm text-muted-foreground">{formatDate(selectedTask?.createdAt)}</p></div>
               {(role === 'ServiceManager' || role === 'Admin') && <div><p className="text-sm font-medium">Assigned To:</p><p className="text-sm text-muted-foreground">{selectedTask?.assigneeName || "Unassigned"}</p></div>}
               
@@ -304,22 +304,24 @@ export default function TasksPage() {
                     {Object.entries(modalOrderItem.customizations).map(([optionId, selectedValue]) => {
                       const details = getDisplayableCustomizationValue(optionId, selectedValue, modalCustomizationOptions);
                       return (
-                        <div key={optionId} className="flex flex-col sm:flex-row sm:items-center sm:gap-2 border-b pb-1.5 last:border-b-0">
-                          <span className="font-medium sm:w-1/3">{details.label}:</span>
-                          {details.isColor && details.colorHex && (
-                            <span style={{ backgroundColor: details.colorHex }} className="inline-block w-4 h-4 rounded-sm border border-muted-foreground mr-1.5 my-0.5 sm:my-0"></span>
-                          )}
-                          {optionId.toLowerCase().includes('image') || (typeof selectedValue === 'string' && selectedValue.includes('res.cloudinary.com')) ? (
-                             <div className="mt-1 sm:mt-0">
-                                {selectedValue && typeof selectedValue === 'string' ? (
-                                <a href={selectedValue} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-xs">
-                                    <Image src={selectedValue} alt="Customized image" width={100} height={100} className="rounded-md border max-w-full h-auto max-h-32 object-contain" data-ai-hint="customization image"/>
-                                </a>
-                                ) : <span className="text-muted-foreground italic text-xs">No image provided.</span> }
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">{details.value}</span>
-                          )}
+                        <div key={optionId} className="flex flex-col sm:flex-row sm:items-start sm:gap-2 border-b pb-1.5 last:border-b-0">
+                          <span className="font-medium sm:w-1/3 shrink-0">{details.label}:</span>
+                          <div className="flex items-center gap-1.5 mt-0.5 sm:mt-0 flex-wrap break-words min-w-0">
+                            {details.isColor && details.colorHex && (
+                              <span style={{ backgroundColor: details.colorHex }} className="inline-block w-4 h-4 rounded-sm border border-muted-foreground mr-1.5 shrink-0"></span>
+                            )}
+                            {optionId.toLowerCase().includes('image') || (typeof selectedValue === 'string' && selectedValue.includes('res.cloudinary.com')) ? (
+                               <div className="mt-1 sm:mt-0">
+                                  {selectedValue && typeof selectedValue === 'string' ? (
+                                  <a href={selectedValue} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-xs">
+                                      <Image src={selectedValue} alt="Customized image" width={150} height={150} className="rounded-md border max-w-full h-auto max-h-40 object-contain bg-muted" data-ai-hint="customization image"/>
+                                  </a>
+                                  ) : <span className="text-muted-foreground italic text-xs">No image provided.</span> }
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">{details.value}</span>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -329,29 +331,31 @@ export default function TasksPage() {
                {modalOrder?.customerNotes && (
                   <div className="pt-3">
                       <h4 className="text-md font-semibold mb-1 border-t pt-3">General Order Notes from Customer:</h4>
-                      <p className="text-sm text-muted-foreground whitespace-pre-line">{modalOrder.customerNotes}</p>
+                      <p className="text-sm text-muted-foreground whitespace-pre-line break-words">{modalOrder.customerNotes}</p>
                   </div>
               )}
             </div>
           </ScrollArea>
           )}
-          <DialogFooter className="pt-4 border-t">
-            <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
-             {selectedTask && role === 'Technician' && selectedTask.status === 'pending' && (
-                <Button onClick={() => handleStatusChange(selectedTask.id, 'in-progress')}>
-                    <Wrench className="mr-2 h-4 w-4" /> Start Task
-                </Button>
-            )}
-            {selectedTask && role === 'Technician' && selectedTask.status === 'in-progress' && (
-                <Button onClick={() => handleStatusChange(selectedTask.id, 'completed')}>
-                    <CheckCircle className="mr-2 h-4 w-4" /> Mark Completed
-                </Button>
-            )}
-            {selectedTask && role === 'ServiceManager' && selectedTask.status === 'needs_approval' && ( // Example SM action
-                 <Button onClick={() => handleStatusChange(selectedTask.id, 'completed')}> 
-                     Approve & Mark Completed
-                  </Button>
-            )}
+          <DialogFooter className="pt-4 border-t flex-col sm:flex-row sm:justify-between gap-2">
+            <DialogClose asChild><Button type="button" variant="outline" size="sm">Close</Button></DialogClose>
+             <div className="flex gap-2 justify-end">
+                {selectedTask && role === 'Technician' && selectedTask.status === 'pending' && (
+                    <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'in-progress')}>
+                        <Wrench className="mr-2 h-4 w-4" /> Start Task
+                    </Button>
+                )}
+                {selectedTask && role === 'Technician' && selectedTask.status === 'in-progress' && (
+                    <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'completed')}>
+                        <CheckCircle className="mr-2 h-4 w-4" /> Mark Completed
+                    </Button>
+                )}
+                {selectedTask && role === 'ServiceManager' && selectedTask.status === 'needs_approval' && ( 
+                     <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'completed')}> 
+                         Approve & Mark Completed
+                      </Button>
+                )}
+             </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
