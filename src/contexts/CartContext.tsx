@@ -252,8 +252,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     setNotifyRecipientState(false);
     setShowPricesToRecipientState(false);
     setGiftRecipientCanViewAndTrackState(true); // Reset to default
-    toast({ title: "Cart Cleared", description: "Your shopping cart and checkout details are now empty." });
-  }, [toast]);
+    // Toast is removed from here, success page will handle it.
+    // toast({ title: "Cart Cleared", description: "Your shopping cart and checkout details are now empty." });
+  }, []);
 
   const cartSubtotal = cartItems.reduce((total, item) => total + (item.currentPrice * item.quantity), 0);
   const cartTotalItems = cartItems.reduce((total, item) => total + item.quantity, 0);

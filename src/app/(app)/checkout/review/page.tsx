@@ -232,9 +232,6 @@ export default function ReviewOrderPage() {
         await batch.commit();
       }
 
-      // Toast is now handled by the success page
-      // toast({ title: "Order Placed!", description: `Your order #${newOrderRef.id.substring(0, 8)}... has been successfully placed.` });
-
        if (isGiftOrder && notifyRecipient && giftDetailsToSave && giftDetailsToSave.recipientContactMethod && giftDetailsToSave.recipientContactValue) {
         try {
           const notificationInput: GiftNotificationInput = {
@@ -248,20 +245,16 @@ export default function ReviewOrderPage() {
             showPricesToRecipient: giftDetailsToSave.showPricesToRecipient,
           };
           const notificationResult = await sendGiftNotification(notificationInput);
-          if (notificationResult.success) {
-            // Optional: toast on review page or let success page handle broader success message
-            // toast({ title: "Gift Notification Update", description: notificationResult.message, variant: "default" });
-          } else {
-            toast({ title: "Gift Notification Issue", description: notificationResult.message, variant: "destructive" });
-          }
+          // Toast for notification result can be handled on success page or contextually if needed
         } catch (notificationError: any) {
           console.error("Error sending gift notification:", notificationError);
-          toast({ title: "Gift Notification Error", description: "Could not send gift notification: " + notificationError.message, variant: "destructive" });
+          // It's important not to stop the whole order process for this, but log/toast separately
+          toast({ title: "Gift Notification Issue", description: "Order placed, but could not send gift notification: " + notificationError.message, variant: "destructive", duration: 7000 });
         }
       }
 
-      clearCart();
-      router.push(`/checkout/success/${newOrderRef.id}`); // Redirect to new success page
+      clearCart(); // This will no longer show a "Cart Cleared" toast
+      router.push(`/checkout/success/${newOrderRef.id}`); 
     } catch (error: any) {
       console.error("Error placing order:", error);
       toast({ title: "Order Placement Failed", description: error.message || "Could not place your order. Please try again.", variant: "destructive" });
@@ -414,4 +407,3 @@ export default function ReviewOrderPage() {
     </div>
   );
 }
-    

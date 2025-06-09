@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
-import { UserCircle2, Edit3, ShieldCheck, LogOut, Loader2, HelpCircle, ShieldQuestion, Info } from "lucide-react";
+import { UserCircle2, Edit3, ShieldCheck, LogOut, Loader2, HelpCircle, ShieldQuestion, Info, ShoppingCart } from "lucide-react";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -114,9 +114,16 @@ export default function ProfilePage() {
 
       <Card className="shadow-lg w-full">
         <CardHeader>
-          <CardTitle className="font-headline">Account Settings</CardTitle>
+          <CardTitle className="font-headline">Account & Support</CardTitle>
         </CardHeader>
         <CardContent className="p-6 md:p-8 space-y-3">
+          {role === 'Customer' && (
+             <Link href="/orders" passHref legacyBehavior>
+                <Button asChild variant="outline" className="w-full justify-start">
+                  <a><ShoppingCart className="mr-2 h-4 w-4" /> My Orders</a>
+                </Button>
+              </Link>
+          )}
           <Button variant="outline" className="w-full justify-start">
             <ShieldCheck className="mr-2 h-4 w-4" /> Change Password
           </Button>
@@ -124,19 +131,7 @@ export default function ProfilePage() {
             <p className="text-sm font-medium">Dark Mode</p>
             <ThemeToggle />
           </div>
-          <Button variant="destructive" className="w-full justify-start" onClick={logout} disabled={authLoading}>
-            {authLoading && logout === undefined ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
-            Logout
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-lg w-full">
-        <CardHeader>
-          <CardTitle className="font-headline">Resources</CardTitle>
-        </CardHeader>
-        <CardContent className="p-6 md:p-8 space-y-3">
-          <Link href="/help" passHref legacyBehavior>
+           <Link href="/help" passHref legacyBehavior>
             <Button asChild variant="outline" className="w-full justify-start">
               <a><HelpCircle className="mr-2 h-4 w-4" /> Help Center</a>
             </Button>
@@ -151,6 +146,10 @@ export default function ProfilePage() {
               <a><Info className="mr-2 h-4 w-4" /> About Zellow</a>
             </Button>
           </Link>
+          <Button variant="destructive" className="w-full justify-start" onClick={logout} disabled={authLoading}>
+            {authLoading && logout === undefined ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
+            Logout
+          </Button>
         </CardContent>
       </Card>
     </div>
@@ -177,5 +176,3 @@ function RoleBadge({ role }: { role: string | null }) {
     </span>
   );
 }
-
-    

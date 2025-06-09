@@ -32,18 +32,28 @@ export default function OrderSuccessPage() {
           if (orderDoc.exists()) {
             const orderData = { id: orderDoc.id, ...orderDoc.data() } as Order;
             setOrder(orderData);
-            // Display a success toast once order is confirmed
             toast({
               title: "Order Placed Successfully!",
               description: `Your order #${orderData.id.substring(0, 8)}... is confirmed.`,
               variant: "default", 
+              duration: 7000, // Increased duration for better visibility
             });
           } else {
             setError("Order not found. It might still be processing or the ID is incorrect.");
+             toast({
+              title: "Order Not Found",
+              description: "Could not retrieve order details. Please check 'My Orders' or contact support.",
+              variant: "destructive",
+            });
           }
         } catch (err: any) {
           console.error("Error fetching order:", err);
           setError("Failed to load your order confirmation.");
+          toast({
+            title: "Error Loading Confirmation",
+            description: "There was an issue loading your order confirmation.",
+            variant: "destructive",
+          });
         } finally {
           setLoading(false);
         }
@@ -52,6 +62,11 @@ export default function OrderSuccessPage() {
     } else if (!orderId) {
         setError("No order ID provided. Cannot display confirmation.");
         setLoading(false);
+        toast({
+            title: "Missing Order ID",
+            description: "Cannot display confirmation without an order ID.",
+            variant: "destructive",
+        });
     }
   }, [orderId, toast]);
 
@@ -85,13 +100,6 @@ export default function OrderSuccessPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 p-4">
       <Card className="w-full max-w-md shadow-xl text-center rounded-lg overflow-hidden">
-        {/* Optional: If you want a close button like the image, but typically success pages don't need it.
-        <div className="absolute top-2 right-2">
-            <Button variant="ghost" size="icon" onClick={() => router.push('/products')}>
-                <X className="h-5 w-5 text-muted-foreground"/>
-            </Button>
-        </div> 
-        */}
         <CardContent className="p-6 sm:p-8 pt-8 sm:pt-10">
           <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 dark:bg-green-900 mb-5">
             <CheckCircle className="h-10 w-10 text-green-600 dark:text-green-400" />
@@ -106,7 +114,7 @@ export default function OrderSuccessPage() {
             Order ID: <strong className="text-foreground/80">{order.id.substring(0,12)}...</strong>
           </p>
           <p className="text-sm text-muted-foreground leading-relaxed mb-8">
-            Pull up a chair, sit back and relax as your order is on its way to you! An email confirmation has been sent to {order.customerEmail}.
+            Pull up a chair, sit back and relax as your order is on its way to you! An email confirmation {order.customerEmail ? `has been sent to ${order.customerEmail}` : 'will be sent shortly'}.
           </p>
           
           <div className="border-t border-border pt-6 space-y-3">
