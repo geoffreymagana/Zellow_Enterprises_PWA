@@ -336,7 +336,6 @@ export default function TasksPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-1.5 text-sm py-2">
-                {/* Description removed from card view */}
                 {(role === 'ServiceManager' || role === 'Admin') && <p className="text-xs text-muted-foreground">Assigned: {task.assigneeName || 'Unassigned'}</p>}
                 <p className="text-xs text-muted-foreground">Created: {formatDate(task.createdAt)}</p>
               </CardContent>
@@ -365,7 +364,7 @@ export default function TasksPage() {
           <ScrollArea className="max-h-[calc(100vh-22rem)] md:max-h-[calc(70vh-10rem)] pr-3">
             <div className="space-y-4 py-2">
               <div><p className="text-sm font-medium">Status:</p> <Badge variant={getStatusBadgeVariant(selectedTask?.status || 'pending')} className="capitalize">{selectedTask?.status.replace(/_/g, ' ')}</Badge></div>
-              <div><p className="text-sm font-medium">Description:</p><p className="text-sm text-muted-foreground whitespace-pre-line break-words">{selectedTask?.description}</p></div>
+              
               <div><p className="text-sm font-medium">Created:</p><p className="text-sm text-muted-foreground">{formatDate(selectedTask?.createdAt)}</p></div>
               
               {(role === 'ServiceManager' || role === 'Admin') && (
@@ -471,3 +470,4 @@ export default function TasksPage() {
     </div>
   );
 }
+
