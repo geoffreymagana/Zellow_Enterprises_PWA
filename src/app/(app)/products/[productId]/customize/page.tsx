@@ -76,7 +76,7 @@ export default function CustomizeProductPage() {
       } else if (opt.type === 'color_picker' && opt.choices) {
         const choice = opt.choices.find(c => c.value === selectedValue);
         if (choice && choice.priceAdjustment) {
-          calculatedPrice += choice.priceAdjustment; // Add this if color choices can have price adjustments
+          calculatedPrice += choice.priceAdjustment; 
         }
       }
     });
@@ -449,7 +449,7 @@ export default function CustomizeProductPage() {
                                   {uploadStates[option.id]?.error && <p className="text-xs text-destructive">{uploadStates[option.id]?.error}</p>}
                                   {field.value && uploadStates[option.id]?.url && !uploadStates[option.id]?.uploading && (
                                     <div className="mt-2 p-2 border rounded-md bg-muted/50 relative w-32 h-32 group">
-                                      <Image src={field.value} alt="Upload preview" layout="fill" objectFit="cover" className="rounded-md" data-ai-hint="customized image" />
+                                      <Image src={field.value} alt="Upload preview" layout="fill" objectFit="cover" className="rounded-md" data-ai-hint="customized image"/>
                                       <Button 
                                         type="button" 
                                         variant="destructive" 
@@ -470,10 +470,11 @@ export default function CustomizeProductPage() {
                                 </div>
                               )}
                               {option.type === 'color_picker' && (
-                                  <div className="flex flex-wrap gap-2 items-center pt-1">
-                                    {option.choices && option.choices.length > 0 ? (
-                                      option.choices.map(choice => (
-                                        <TooltipTrigger key={choice.value} asChild>
+                                <div className="flex flex-wrap gap-2 items-center pt-1">
+                                  {option.choices && option.choices.length > 0 ? (
+                                    option.choices.map(choice => (
+                                      <Tooltip key={choice.value}>
+                                        <TooltipTrigger asChild>
                                           <button
                                             type="button"
                                             className={cn(
@@ -491,20 +492,19 @@ export default function CustomizeProductPage() {
                                             <span className="sr-only">{choice.label || choice.value}</span>
                                           </button>
                                         </TooltipTrigger>
-                                      ))
-                                    ) : (
-                                      <p className="text-xs text-muted-foreground">No color options defined.</p>
-                                    )}
-                                  </div>
-                                )}
-                                {option.type === 'color_picker' && option.choices && option.choices.map(choice => (
-                                  choice.label ? 
-                                  <TooltipContent key={`${choice.value}-tooltip`} side="bottom">
-                                      <p>{choice.label} ({choice.value})</p>
-                                      {choice.priceAdjustment && choice.priceAdjustment !== 0 ? <p>({choice.priceAdjustment > 0 ? '+' : ''}{formatPrice(choice.priceAdjustment)})</p> : null}
-                                  </TooltipContent> 
-                                  : null
-                                ))}
+                                        {choice.label && (
+                                          <TooltipContent side="bottom">
+                                              <p>{choice.label} ({choice.value})</p>
+                                              {choice.priceAdjustment && choice.priceAdjustment !== 0 ? <p>({choice.priceAdjustment > 0 ? '+' : ''}{formatPrice(choice.priceAdjustment)})</p> : null}
+                                          </TooltipContent>
+                                        )}
+                                      </Tooltip>
+                                    ))
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground">No color options defined.</p>
+                                  )}
+                                </div>
+                              )}
                               <FormMessage />
                             </FormItem>
                           )}
@@ -539,3 +539,5 @@ export default function CustomizeProductPage() {
     </div>
   );
 }
+
+    
