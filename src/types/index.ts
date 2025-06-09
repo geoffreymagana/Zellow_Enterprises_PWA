@@ -36,12 +36,17 @@ export interface CustomizationChoiceOption {
 export interface ProductCustomizationOption {
   id: string; // e.g., "engraving_text", "color_option"
   label: string; // e.g., "Engraving Text", "Select Color"
-  type: 'select' | 'text' | 'checkbox';
+  type: 'dropdown' | 'text' | 'checkbox' | 'image_upload' | 'color_picker'; // Added 'color_picker', renamed 'select' to 'dropdown'
   required?: boolean;
-  choices?: CustomizationChoiceOption[]; // For 'select' or 'radio' types
+  showToCustomerByDefault?: boolean; // Added to control visibility on customer side
+  choices?: CustomizationChoiceOption[]; // For 'dropdown' type
   maxLength?: number; // For 'text' type
-  placeholder?: string; // For 'text' or 'checkbox' (as label text)
+  placeholder?: string; // For 'text' type
   defaultValue?: string | boolean; // Default value for the option
+  checkboxLabel?: string; // For 'checkbox' type, label next to checkbox
+  priceAdjustmentIfChecked?: number; // For 'checkbox' type
+  acceptedFileTypes?: string; // For 'image_upload', e.g., ".png,.jpg"
+  maxFileSizeMB?: number; // For 'image_upload'
 }
 
 export interface Product {
@@ -222,7 +227,7 @@ export interface CustomizationGroupChoiceDefinition {
 export interface CustomizationGroupOptionDefinition {
   id: string; 
   label: string; 
-  type: 'select' | 'text' | 'checkbox' | 'image_upload';
+  type: 'dropdown' | 'text' | 'checkbox' | 'image_upload' | 'color_picker'; // Changed 'select' to 'dropdown', added 'color_picker'
   required?: boolean;
   showToCustomerByDefault?: boolean;
   choices?: CustomizationGroupChoiceDefinition[];
@@ -326,3 +331,4 @@ export interface Invoice {
   financeManagerName?: string; 
 }
 
+    

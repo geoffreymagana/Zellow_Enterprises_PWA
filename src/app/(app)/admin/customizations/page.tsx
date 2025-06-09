@@ -34,7 +34,7 @@ const choiceDefinitionSchema = z.object({
 const optionDefinitionSchema = z.object({
   id: z.string().min(1, "Option ID is required (e.g., color_option)").regex(/^[a-zA-Z0-9_]+$/, "ID can only contain letters, numbers, and underscores"),
   label: z.string().min(1, "Option label is required"),
-  type: z.enum(['select', 'text', 'checkbox', 'image_upload']),
+  type: z.enum(['dropdown', 'text', 'checkbox', 'image_upload', 'color_picker']),
   required: z.boolean().optional().default(false),
   showToCustomerByDefault: z.boolean().optional().default(true),
   choices: z.array(choiceDefinitionSchema).optional(),
@@ -45,9 +45,9 @@ const optionDefinitionSchema = z.object({
   acceptedFileTypes: z.string().optional(), // e.g. ".png,.jpg,.jpeg"
   maxFileSizeMB: z.coerce.number().positive("Max file size must be positive").optional(),
 }).refine(data => { // Conditional validation based on type
-    if (data.type === 'select' && (!data.choices || data.choices.length === 0)) return false;
+    if (data.type === 'dropdown' && (!data.choices || data.choices.length === 0)) return false;
     return true;
-}, { message: "Choices are required for 'select' type.", path: ["choices"] })
+}, { message: "Choices are required for 'dropdown' type.", path: ["choices"] })
 .refine(data => {
     if (data.type === 'checkbox' && !data.checkboxLabel) return false;
     return true;
@@ -71,7 +71,6 @@ export default function AdminCustomizationsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<CustomizationGroupDefinition | null>(null);
-  // const [groupToDelete, setGroupToDelete] = useState<CustomizationGroupDefinition | null>(null); // For future delete
 
   const form = useForm<GroupDefinitionFormValues>({
     resolver: zodResolver(groupDefinitionFormSchema),
@@ -137,10 +136,8 @@ export default function AdminCustomizationsPage() {
     }
   };
   
-  // Placeholder for delete - implement with AlertDialog
   const handleDeleteGroup = async (groupId: string) => {
     if (!db) return;
-    // Add confirmation dialog here before deleting
     try {
       await deleteDoc(doc(db, 'customizationGroupDefinitions', groupId));
       toast({title: "Group Deleted", description: "Customization group has been deleted."});
@@ -179,11 +176,10 @@ export default function AdminCustomizationsPage() {
               </CardHeader>
               <CardContent className="text-sm">
                 <p className="font-medium mb-1">Options Summary:</p>
-                {group.options.slice(0,3).map(opt => <Badge key={opt.id} variant="outline" className="mr-1 mb-1 capitalize">{opt.type}</Badge>)}
+                {group.options.slice(0,3).map(opt => <Badge key={opt.id} variant="outline" className="mr-1 mb-1 capitalize">{opt.type.replace(/_/g, " ")}</Badge>)}
                 {group.options.length > 3 && <Badge variant="outline">+{group.options.length - 3} more</Badge>}
               </CardContent>
               <CardFooter className="flex justify-end gap-2">
-                 {/* <Button variant="ghost" size="icon" onClick={() => {}} title="View Options (Not implemented)"><Eye className="h-4 w-4"/></Button> */}
                 <Button variant="outline" size="sm" onClick={() => handleOpenDialog(group)}><Edit className="mr-1 h-3 w-3"/>Edit</Button>
                 <Button variant="destructive" size="sm" onClick={() => handleDeleteGroup(group.id)}><Trash2 className="mr-1 h-3 w-3"/>Delete</Button>
               </CardFooter>
@@ -259,19 +255,21 @@ function RenderOptionField({ control, index, removeOption }: { control: any, ind
           <Select onValueChange={typeField.onChange} value={typeField.value}>
             <FormControl><SelectTrigger><SelectValue placeholder="Select option type" /></SelectTrigger></FormControl>
             <SelectContent>
-              <SelectItem value="select">Select List (Dropdown)</SelectItem>
+              <SelectItem value="dropdown">Dropdown (Select List)</SelectItem>
               <SelectItem value="text">Text Input</SelectItem>
               <SelectItem value="checkbox">Checkbox (Yes/No)</SelectItem>
               <SelectItem value="image_upload">Image Upload</SelectItem>
+              <SelectItem value="color_picker">Color Picker</SelectItem>
             </SelectContent>
           </Select><FormMessage/>
         </FormItem>
       )} />
 
-      {optionType === 'select' && <RenderSelectChoicesConfig control={control} optionIndex={index} />}
+      {optionType === 'dropdown' && <RenderSelectChoicesConfig control={control} optionIndex={index} />}
       {optionType === 'text' && <RenderTextConfig control={control} optionIndex={index} />}
       {optionType === 'checkbox' && <RenderCheckboxConfig control={control} optionIndex={index} />}
       {optionType === 'image_upload' && <RenderImageUploadConfig control={control} optionIndex={index} />}
+      {/* No specific config needed for 'color_picker' on admin side yet */}
       
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
         <FormField control={control} name={`options.${index}.required`} render={({ field }) => ( <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="font-normal">Required Option</FormLabel></FormItem> )} />
@@ -285,7 +283,7 @@ function RenderSelectChoicesConfig({ control, optionIndex }: { control: any, opt
   const { fields, append, remove } = useFieldArray({ control, name: `options.${optionIndex}.choices` });
   return (
     <div className="mt-3 space-y-3 p-3 border rounded-md bg-background">
-      <div className="flex justify-between items-center"><h5 className="text-sm font-medium">Choices for Select List</h5><Button type="button" size="sm" variant="outline" onClick={() => append({ value: '', label: '', priceAdjustment: 0 })}><PlusCircle className="mr-1 h-3 w-3"/> Add Choice</Button></div>
+      <div className="flex justify-between items-center"><h5 className="text-sm font-medium">Choices for Dropdown</h5><Button type="button" size="sm" variant="outline" onClick={() => append({ value: '', label: '', priceAdjustment: 0 })}><PlusCircle className="mr-1 h-3 w-3"/> Add Choice</Button></div>
       {fields.length === 0 && <p className="text-xs text-muted-foreground">No choices added yet.</p>}
       {fields.map((choiceField, choiceIndex) => (
         <div key={choiceField.id} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end p-2 border rounded bg-muted/20">
@@ -326,3 +324,4 @@ function RenderImageUploadConfig({ control, optionIndex }: { control: any, optio
   );
 }
 
+    

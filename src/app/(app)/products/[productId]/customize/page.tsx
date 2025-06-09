@@ -64,17 +64,15 @@ export default function CustomizeProductPage() {
 
     resolvedOptions.forEach(opt => {
       const selectedValue = formValues[opt.id];
-      if (opt.type === 'select' && opt.choices && selectedValue) {
+      if (opt.type === 'dropdown' && opt.choices && selectedValue) {
         const choice = opt.choices.find(c => c.value === selectedValue);
         if (choice && choice.priceAdjustment) {
           calculatedPrice += choice.priceAdjustment;
         }
       }
-      if (opt.type === 'checkbox' && selectedValue === true && (opt as any).priceAdjustmentIfChecked) {
-        calculatedPrice += (opt as any).priceAdjustmentIfChecked;
+      if (opt.type === 'checkbox' && selectedValue === true && opt.priceAdjustmentIfChecked) {
+        calculatedPrice += opt.priceAdjustmentIfChecked;
       }
-      // Note: Image uploads typically don't have direct price adjustments in this model,
-      // but if they did, logic would go here.
     });
     setCurrentPrice(calculatedPrice);
   }, [product, resolvedOptions, form]);
@@ -130,7 +128,7 @@ export default function CustomizeProductPage() {
           finalOptions.forEach(opt => {
             let fieldSchema: z.ZodTypeAny;
             switch (opt.type) {
-              case 'select':
+              case 'dropdown':
                 fieldSchema = z.string();
                 if (opt.required) fieldSchema = fieldSchema.min(1, `${opt.label} is required.`);
                 else fieldSchema = fieldSchema.optional().nullable();
@@ -149,8 +147,15 @@ export default function CustomizeProductPage() {
                 break;
               case 'image_upload':
                 fieldSchema = z.string().url({ message: "A valid image URL is required after upload." }).optional().or(z.literal(''));
+                if (opt.required) fieldSchema = z.string().url({message: "Image upload is required."}).min(1, `${opt.label} is required.`);
                 newDefaultValues[opt.id] = opt.defaultValue ?? ""; // This will store the URL
                 initialUploadStates[opt.id] = { progress: 0, error: undefined, uploading: false, url: newDefaultValues[opt.id] || undefined };
+                break;
+              case 'color_picker':
+                fieldSchema = z.string().regex(/^#[0-9A-Fa-f]{6}$/, `${opt.label} must be a valid hex color.`);
+                if (opt.required) fieldSchema = fieldSchema.min(1, `${opt.label} is required.`);
+                else fieldSchema = fieldSchema.optional().nullable();
+                newDefaultValues[opt.id] = opt.defaultValue ?? "#000000";
                 break;
               default:
                 fieldSchema = z.any().optional();
@@ -197,16 +202,20 @@ export default function CustomizeProductPage() {
   useEffect(() => {
     if (customizationSchema) {
       form.reset(defaultFormValues);
+       // Initial price calculation after form and options are set
+      if(product && resolvedOptions.length > 0) {
+          calculatePrice();
+      }
     }
-  }, [customizationSchema, defaultFormValues, form]);
+  }, [customizationSchema, defaultFormValues, form, product, resolvedOptions, calculatePrice]);
 
 
   useEffect(() => {
-    if (product && form.formState.isDirty) {
+    if (product && form.formState.isDirty && resolvedOptions.length > 0) { // Check if resolvedOptions is not empty
         const subscription = form.watch(() => calculatePrice());
         return () => subscription.unsubscribe();
     }
-  }, [form, product, calculatePrice]);
+  }, [form, product, calculatePrice, resolvedOptions]);
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>, option: ProductCustomizationOption) => {
     if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
@@ -217,7 +226,6 @@ export default function CustomizeProductPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Client-side validation
     if (option.acceptedFileTypes) {
       const allowedTypes = option.acceptedFileTypes.split(',').map(t => t.trim().toLowerCase());
       const fileExtension = `.${file.name.split('.').pop()?.toLowerCase()}`;
@@ -238,13 +246,11 @@ export default function CustomizeProductPage() {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-    // You can add formData.append('folder', 'your_folder_name'); here if you want to override upload preset folder
 
     try {
       const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
         method: 'POST',
         body: formData,
-        // TODO: Implement XHR for progress tracking if needed, fetch doesn't support it out of box
       });
       
       if (!response.ok) {
@@ -255,11 +261,12 @@ export default function CustomizeProductPage() {
       const data = await response.json();
       form.setValue(option.id, data.secure_url);
       setUploadStates(prev => ({ ...prev, [option.id]: { progress: 100, error: undefined, uploading: false, url: data.secure_url }}));
-      calculatePrice(); // Recalculate price if image upload has associated cost (not implemented yet but good practice)
+      calculatePrice(); 
       toast({ title: "Image Uploaded", description: `${option.label} updated successfully.`, variant: "default" });
     } catch (err: any) {
       console.error("Cloudinary upload error:", err);
-      setUploadStates(prev => ({ ...prev, [option.id]: { ...prev[option.id], error: err.message || "Upload failed", uploading: false }}));
+      form.setValue(option.id, ""); // Clear value on error
+      setUploadStates(prev => ({ ...prev, [option.id]: { ...prev[option.id], error: err.message || "Upload failed", uploading: false, url: undefined }}));
       toast({ title: "Upload Failed", description: err.message || "Could not upload image.", variant: "destructive" });
     }
   };
@@ -270,10 +277,11 @@ export default function CustomizeProductPage() {
     
     const customizationsToSave: Record<string, any> = {};
     resolvedOptions.forEach(opt => {
-      if (data[opt.id] !== undefined && data[opt.id] !== '' && data[opt.id] !== false) {
+      if (data[opt.id] !== undefined && data[opt.id] !== '' && data[opt.id] !== false && data[opt.id] !== null) {
         customizationsToSave[opt.id] = data[opt.id];
-      } else if (opt.required && (data[opt.id] === undefined || data[opt.id] === '' || data[opt.id] === false)) {
-        console.warn(`Required field ${opt.id} missing value during submission.`);
+      } else if (opt.required && (data[opt.id] === undefined || data[opt.id] === '' || data[opt.id] === false || data[opt.id] === null)) {
+        // This case should ideally be caught by Zod, but good to be aware
+        console.warn(`Required field ${opt.id} missing value during submission attempt.`);
       }
     });
 
@@ -382,7 +390,7 @@ export default function CustomizeProductPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-base font-medium">{option.label} {option.required && <span className="text-destructive">*</span>}</FormLabel>
-                            {option.type === 'select' && option.choices && (
+                            {option.type === 'dropdown' && option.choices && (
                               <Select 
                                 onValueChange={(value) => { field.onChange(value); calculatePrice(); }} 
                                 value={String(field.value ?? "")} 
@@ -418,7 +426,7 @@ export default function CustomizeProductPage() {
                                  />
                                  <label htmlFor={option.id} className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-grow cursor-pointer">
                                    {option.checkboxLabel || option.label}
-                                   {(option as any).priceAdjustmentIfChecked ? ` (+${formatPrice((option as any).priceAdjustmentIfChecked)})` : ''}
+                                   {option.priceAdjustmentIfChecked ? ` (+${formatPrice(option.priceAdjustmentIfChecked)})` : ''}
                                  </label>
                               </div>
                             )}
@@ -435,13 +443,12 @@ export default function CustomizeProductPage() {
                                 {uploadStates[option.id]?.uploading && (
                                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                     <Loader2 className="h-4 w-4 animate-spin"/> Uploading...
-                                    {/* <Progress value={uploadStates[option.id]?.progress || 0} className="w-full h-2" /> */}
                                   </div>
                                 )}
                                 {uploadStates[option.id]?.error && <p className="text-xs text-destructive">{uploadStates[option.id]?.error}</p>}
                                 {field.value && !uploadStates[option.id]?.uploading && (
                                   <div className="mt-2 p-2 border rounded-md bg-muted/50 relative w-32 h-32 group">
-                                    <Image src={field.value} alt="Upload preview" layout="fill" objectFit="cover" className="rounded-md" />
+                                    <Image src={field.value} alt="Upload preview" layout="fill" objectFit="cover" className="rounded-md" data-ai-hint="customized image" />
                                     <Button 
                                       type="button" 
                                       variant="destructive" 
@@ -460,6 +467,21 @@ export default function CustomizeProductPage() {
                                   </div>
                                 )}
                               </div>
+                             )}
+                             {option.type === 'color_picker' && (
+                                <div className="flex items-center gap-2">
+                                  <Input 
+                                    type="color" 
+                                    id={option.id}
+                                    value={field.value ?? "#000000"} // Default to black if no value
+                                    onInput={(e) => { // Use onInput for immediate feedback
+                                      field.onChange(e.currentTarget.value);
+                                      calculatePrice(); // Recalculate price (if color has price impact)
+                                    }}
+                                    className="h-10 w-16 p-1 border-none cursor-pointer"
+                                  />
+                                  <span className="text-sm uppercase">{field.value ?? "#000000"}</span>
+                                </div>
                              )}
                             <FormMessage />
                           </FormItem>
@@ -495,3 +517,4 @@ export default function CustomizeProductPage() {
   );
 }
 
+    
