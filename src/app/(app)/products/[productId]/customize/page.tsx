@@ -138,10 +138,15 @@ export default function CustomizeProductPage() {
                 defaultValue = defaultValue ?? (opt.choices?.[0]?.value || null);
                 break;
               case 'text':
-                fieldSchema = z.string();
-                if (opt.required) fieldSchema = fieldSchema.min(1, `${opt.label} is required.`);
-                else fieldSchema = fieldSchema.optional().nullable();
-                if (opt.maxLength) fieldSchema = fieldSchema.max(opt.maxLength, `${opt.label} cannot exceed ${opt.maxLength} characters.`);
+                let textSchemaBase = z.string();
+                if (opt.maxLength) {
+                  textSchemaBase = textSchemaBase.max(opt.maxLength, `${opt.label} cannot exceed ${opt.maxLength} characters.`);
+                }
+                if (opt.required) {
+                  fieldSchema = textSchemaBase.min(1, `${opt.label} is required.`);
+                } else {
+                  fieldSchema = textSchemaBase.optional().nullable();
+                }
                 defaultValue = defaultValue ?? "";
                 break;
               case 'checkbox':
@@ -539,5 +544,3 @@ export default function CustomizeProductPage() {
     </div>
   );
 }
-
-    
