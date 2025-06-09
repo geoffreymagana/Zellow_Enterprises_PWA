@@ -2,6 +2,7 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getAuth, Auth } from "firebase/auth";
 import { getFirestore, Firestore } from "firebase/firestore";
+import { getAnalytics, Analytics } from "firebase/analytics"; // Added
 // import { getFunctions, Functions } from "firebase/functions"; // Uncomment if needed
 // import { getStorage, FirebaseStorage } from "firebase/storage"; // Uncomment if needed
 
@@ -12,11 +13,13 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID, // Added
 };
 
 let app: FirebaseApp | undefined;
 let auth: Auth | undefined;
 let db: Firestore | undefined;
+let analytics: Analytics | undefined; // Added
 // let functions: Functions; // Uncomment if needed
 // let storage: FirebaseStorage; // Uncomment if needed
 
@@ -31,6 +34,9 @@ if (typeof window !== "undefined") {
     }
     auth = getAuth(app);
     db = getFirestore(app);
+    if (firebaseConfig.measurementId) { // Conditionally initialize analytics
+        analytics = getAnalytics(app);
+    }
     // functions = getFunctions(app); // Uncomment if needed
     // storage = getStorage(app); // Uncomment if needed
   } else {
@@ -40,6 +46,5 @@ if (typeof window !== "undefined") {
 }
 // On the server side (when typeof window === "undefined"), app, auth, db will also be undefined.
 
-export { app, auth, db };
+export { app, auth, db, analytics }; // Added analytics
 // export { app, auth, db, functions, storage }; // Uncomment if needed
-

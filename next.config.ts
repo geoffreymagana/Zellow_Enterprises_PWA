@@ -56,6 +56,12 @@ const nextConfig: NextConfig = {
         hostname: 'res.cloudinary.com', // Added for Cloudinary
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com', // Added for Firebase Storage
+        port: '',
+        pathname: '/**',
       }
     ],
   },
