@@ -14,7 +14,7 @@ import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth'; // For checking logged-in user
-import { Badge, BadgeProps } from '@/components/ui/badge';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -198,8 +198,8 @@ export default function TrackOrderPage() {
             <div>
                 <h4 className="font-semibold mb-2">Order Summary:</h4>
                 <ul className="space-y-1 text-sm">
-                {order.items.map(item => (
-                    <li key={item.productId} className="flex justify-between">
+                {order.items.map((item, index) => (
+                    <li key={`order-item-${item.productId}-${index}`} className="flex justify-between">
                     <span>{item.name} (x{item.quantity})</span>
                     {!order.isGift || order.giftDetails?.showPricesToRecipient ? <span>{formatPrice(item.price * item.quantity)}</span> : null}
                     </li>
