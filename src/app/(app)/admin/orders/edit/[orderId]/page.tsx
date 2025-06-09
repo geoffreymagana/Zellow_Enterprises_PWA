@@ -470,7 +470,7 @@ export default function AdminOrderDetailPage() {
                   <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value || undefined}>
                     <SelectTrigger id="assigneeId"><SelectValue placeholder="Select technician" /></SelectTrigger>
                     <SelectContent>
-                      {technicians.length === 0 && <SelectItem value="" disabled>No technicians found</SelectItem>}
+                      {technicians.length === 0 && <SelectItem value="NO_TECHNICIANS_AVAILABLE_SENTINEL" disabled>No technicians found</SelectItem>}
                       {technicians.map(tech => <SelectItem key={tech.uid} value={tech.uid}>{tech.displayName || tech.email}</SelectItem>)}
                     </SelectContent>
                   </Select>
