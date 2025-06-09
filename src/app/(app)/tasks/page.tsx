@@ -9,7 +9,7 @@ import type { Task, Order, OrderItem as OrderItemType, Product, ProductCustomiza
 import { Filter, Loader2, Wrench, CheckCircle, AlertTriangle, Eye, Image as ImageIconPlaceholder, Palette } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, getDoc, orderBy } from 'firebase/firestore'; // Added orderBy
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
@@ -79,7 +79,7 @@ export default function TasksPage() {
         where('status', 'in', statusFilters),
         ...baseQueryConstraints
       );
-    } else { 
+    } else { // ServiceManager or Admin viewing all tasks
         let statusFilters: Task['status'][] | undefined = undefined;
         if (filter === 'active') statusFilters = ['pending', 'in-progress', 'needs_approval', 'blocked'];
         else if (filter === 'completed') statusFilters = ['completed', 'rejected'];
@@ -106,7 +106,7 @@ export default function TasksPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user || (role !== 'Technician' && role !== 'ServiceManager')) {
+    if (!user || (role !== 'Technician' && role !== 'ServiceManager' && role !== 'Admin')) { // Admin can also view for oversight
       router.replace('/dashboard');
       return;
     }
@@ -228,7 +228,7 @@ export default function TasksPage() {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   
-  if (role !== 'Technician' && role !== 'ServiceManager') {
+  if (role !== 'Technician' && role !== 'ServiceManager' && role !== 'Admin') {
      return <div className="text-center py-10">Access denied.</div>;
   }
 
@@ -236,7 +236,7 @@ export default function TasksPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <h1 className="text-3xl font-headline font-semibold">
-          {role === 'Technician' ? "My Tasks" : "Manage Production Tasks"}
+          {role === 'Technician' ? "My Tasks" : (role === 'ServiceManager' ? "Manage Production Tasks" : "All Production Tasks (Admin)")}
         </h1>
         {/* TODO: Add filter buttons if needed */}
       </div>
@@ -265,7 +265,7 @@ export default function TasksPage() {
               </CardHeader>
               <CardContent className="flex-grow space-y-1.5 text-sm py-2">
                 <p className="line-clamp-3 text-xs text-muted-foreground">{task.description}</p>
-                {role === 'ServiceManager' && <p className="text-xs text-muted-foreground">Assigned: {task.assigneeName || 'Unassigned'}</p>}
+                {(role === 'ServiceManager' || role === 'Admin') && <p className="text-xs text-muted-foreground">Assigned: {task.assigneeName || 'Unassigned'}</p>}
                 <p className="text-xs text-muted-foreground">Created: {formatDate(task.createdAt)}</p>
               </CardContent>
               <CardFooter className="pt-2 pb-3 border-t flex justify-end items-center gap-2">
@@ -295,7 +295,7 @@ export default function TasksPage() {
               <div><p className="text-sm font-medium">Status:</p> <Badge variant={getStatusBadgeVariant(selectedTask?.status || 'pending')} className="capitalize">{selectedTask?.status.replace(/_/g, ' ')}</Badge></div>
               <div><p className="text-sm font-medium">Description:</p><p className="text-sm text-muted-foreground whitespace-pre-line">{selectedTask?.description}</p></div>
               <div><p className="text-sm font-medium">Created:</p><p className="text-sm text-muted-foreground">{formatDate(selectedTask?.createdAt)}</p></div>
-              {role === 'ServiceManager' && <div><p className="text-sm font-medium">Assigned To:</p><p className="text-sm text-muted-foreground">{selectedTask?.assigneeName || "Unassigned"}</p></div>}
+              {(role === 'ServiceManager' || role === 'Admin') && <div><p className="text-sm font-medium">Assigned To:</p><p className="text-sm text-muted-foreground">{selectedTask?.assigneeName || "Unassigned"}</p></div>}
               
               {modalOrderItem && modalOrderItem.customizations && Object.keys(modalOrderItem.customizations).length > 0 && (
                 <div className="pt-3">
@@ -347,9 +347,9 @@ export default function TasksPage() {
                     <CheckCircle className="mr-2 h-4 w-4" /> Mark Completed
                 </Button>
             )}
-            {selectedTask && role === 'ServiceManager' && selectedTask.status === 'needs_approval' && (
-                 <Button onClick={() => handleStatusChange(selectedTask.id, 'pending')}> {/* Or 'completed' directly if SM approves */}
-                     Mark as Approved/Done
+            {selectedTask && role === 'ServiceManager' && selectedTask.status === 'needs_approval' && ( // Example SM action
+                 <Button onClick={() => handleStatusChange(selectedTask.id, 'completed')}> 
+                     Approve & Mark Completed
                   </Button>
             )}
           </DialogFooter>
@@ -360,4 +360,5 @@ export default function TasksPage() {
   );
 }
 
+    
     
