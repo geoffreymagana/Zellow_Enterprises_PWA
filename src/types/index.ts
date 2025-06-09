@@ -27,82 +27,82 @@ export interface User {
   assignedOrdersCount?: number;
 }
 
-export interface CustomizationChoiceOption {
-  value: string;
-  label: string;
+export interface CustomizationChoiceOption { // Re-using this structure for color_picker choices as well
+  value: string; // For dropdown: choice value. For color_picker: hex code.
+  label?: string; // For dropdown: display label. For color_picker: optional color name (e.g., "Ruby Red").
   priceAdjustment?: number;
 }
 
 export interface ProductCustomizationOption {
-  id: string; // e.g., "engraving_text", "color_option"
-  label: string; // e.g., "Engraving Text", "Select Color"
-  type: 'dropdown' | 'text' | 'checkbox' | 'image_upload' | 'color_picker'; // Added 'color_picker', renamed 'select' to 'dropdown'
+  id: string; 
+  label: string; 
+  type: 'dropdown' | 'text' | 'checkbox' | 'image_upload' | 'color_picker';
   required?: boolean;
-  showToCustomerByDefault?: boolean; // Added to control visibility on customer side
-  choices?: CustomizationChoiceOption[]; // For 'dropdown' type
-  maxLength?: number; // For 'text' type
-  placeholder?: string; // For 'text' type
-  defaultValue?: string | boolean; // Default value for the option
-  checkboxLabel?: string; // For 'checkbox' type, label next to checkbox
-  priceAdjustmentIfChecked?: number; // For 'checkbox' type
-  acceptedFileTypes?: string; // For 'image_upload', e.g., ".png,.jpg"
-  maxFileSizeMB?: number; // For 'image_upload'
+  showToCustomerByDefault?: boolean; 
+  choices?: CustomizationChoiceOption[]; // For 'dropdown' and 'color_picker'
+  maxLength?: number; 
+  placeholder?: string; 
+  defaultValue?: string | boolean; 
+  checkboxLabel?: string; 
+  priceAdjustmentIfChecked?: number; 
+  acceptedFileTypes?: string; 
+  maxFileSizeMB?: number; 
 }
 
 export interface Product {
   id: string;
   name: string;
   description: string;
-  price: number; // This is the BASE unit price of the product
+  price: number; 
   imageUrl?: string;
   stock: number;
   categories?: string[];
-  supplier?: string; // Optional: default supplier ID
-  createdAt?: any; // Firestore Timestamp or Date
-  updatedAt?: any; // Firestore Timestamp or Date
-  customizationOptions?: ProductCustomizationOption[]; // Kept for products that might have inline customizations
-  customizationGroupId?: string | null; // ID of the assigned CustomizationGroupDefinition
+  supplier?: string; 
+  createdAt?: any; 
+  updatedAt?: any; 
+  customizationOptions?: ProductCustomizationOption[]; 
+  customizationGroupId?: string | null; 
   dataAiHint?: string;
 }
 
 export type OrderStatus =
-  | 'pending' // Customer placed order, awaiting payment/processing
-  | 'processing' // Payment confirmed, order being prepared
-  | 'awaiting_assignment' // Ready for dispatch, needs rider
-  | 'assigned' // Rider assigned to order
-  | 'out_for_delivery' // Rider has picked up and is en route
-  | 'delivered' // Customer received order
-  | 'delivery_attempted' // Rider attempted delivery but failed
-  | 'cancelled' // Order cancelled by customer or admin
-  | 'shipped'; // Alternative to out_for_delivery for non-local courier
+  | 'pending' 
+  | 'processing' 
+  | 'awaiting_assignment' 
+  | 'assigned' 
+  | 'out_for_delivery' 
+  | 'delivered' 
+  | 'delivery_attempted' 
+  | 'cancelled' 
+  | 'shipped'; 
 
 export interface DeliveryHistoryEntry {
-  status: OrderStatus | string; // Could be custom status string
-  timestamp: any; // Firestore Timestamp or Date
+  status: OrderStatus | string; 
+  timestamp: any; 
   notes?: string;
-  actorId?: string; // UID of user who made the change (admin, rider, system)
-  location?: { lat: number; lng: number }; // Optional location for status update
+  actorId?: string; 
+  location?: { lat: number; lng: number }; 
 }
 
 export interface ShippingAddress {
   fullName: string;
   addressLine1: string;
   addressLine2?: string;
-  city: string; // This will be the selected Town
-  county: string; // Derived from selected Town/Region
+  city: string; 
+  county: string; 
   postalCode?: string;
   phone: string;
   email?: string;
-  selectedShippingRegionId?: string; // Store the ID of the selected region
+  selectedShippingRegionId?: string; 
 }
 
 export interface OrderItem {
   productId: string;
   name: string;
-  price: number; // Price per item AT TIME OF PURCHASE (this unit price INCLUDES customization adjustments if any were applied during cart addition)
+  price: number; 
   quantity: number;
   imageUrl?: string | null;
-  customizations?: Record<string, any> | null; // { optionId: selectedValue, ... }
+  customizations?: Record<string, any> | null; 
 }
 
 export interface GiftDetails {
@@ -118,25 +118,25 @@ export interface GiftDetails {
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 
 export interface OrderRating {
-  value: number; // e.g., 1-5
+  value: number; 
   comment?: string;
-  ratedAt: any; // Firestore Timestamp
+  ratedAt: any; 
   userId: string;
 }
 
 export interface Order {
-  id: string; // Firestore document ID
-  customerId: string | null; // Null if guest checkout
+  id: string; 
+  customerId: string | null; 
   customerName: string;
   customerEmail: string;
   customerPhone: string;
   items: OrderItem[];
-  totalAmount: number; // Overall total including shipping
-  subTotal: number; // Total of items (items prices * quantity)
+  totalAmount: number; 
+  subTotal: number; 
   shippingCost: number;
   status: OrderStatus;
-  createdAt: any; // Firestore Timestamp
-  updatedAt?: any; // Firestore Timestamp
+  createdAt: any; 
+  updatedAt?: any; 
   shippingAddress: ShippingAddress;
   shippingMethodId?: string | null;
   shippingMethodName?: string | null;
@@ -160,8 +160,8 @@ export interface Order {
 export interface CartItem {
   productId: string; 
   name: string;
-  unitPrice: number; // Base unit price of the product (from Product.price)
-  currentPrice: number; // Price for one unit INCLUDING customizations (calculated at time of adding to cart or customization)
+  unitPrice: number; 
+  currentPrice: number; 
   imageUrl?: string;
   quantity: number;
   stock: number;
@@ -219,18 +219,18 @@ export interface ShippingRate {
 }
 
 export interface CustomizationGroupChoiceDefinition {
-  value: string;
-  label: string;
-  priceAdjustment?: number;
+  value: string; // For dropdown: choice value. For color_picker: hex code.
+  label?: string; // For dropdown: display label. For color_picker: optional color name.
+  priceAdjustment?: number; // Primarily for dropdown, can be extended for colors if needed.
 }
 
 export interface CustomizationGroupOptionDefinition {
   id: string; 
   label: string; 
-  type: 'dropdown' | 'text' | 'checkbox' | 'image_upload' | 'color_picker'; // Changed 'select' to 'dropdown', added 'color_picker'
+  type: 'dropdown' | 'text' | 'checkbox' | 'image_upload' | 'color_picker';
   required?: boolean;
   showToCustomerByDefault?: boolean;
-  choices?: CustomizationGroupChoiceDefinition[];
+  choices?: CustomizationGroupChoiceDefinition[]; // Used for 'dropdown' and 'color_picker'
   placeholder?: string;
   maxLength?: number;
   checkboxLabel?: string; 

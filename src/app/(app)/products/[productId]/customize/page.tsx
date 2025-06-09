@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Product, ProductCustomizationOption, CustomizationGroupDefinition } from '@/types';
+import type { Product, ProductCustomizationOption, CustomizationGroupDefinition, CustomizationGroupChoiceDefinition } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
@@ -19,9 +19,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from "zod";
-import { Loader2, AlertTriangle, ArrowLeft, ShoppingCart, UploadCloud, ImagePlus, CheckCircleIcon } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, ShoppingCart, UploadCloud, ImagePlus, CheckCircleIcon, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -73,6 +74,8 @@ export default function CustomizeProductPage() {
       if (opt.type === 'checkbox' && selectedValue === true && opt.priceAdjustmentIfChecked) {
         calculatedPrice += opt.priceAdjustmentIfChecked;
       }
+      // Note: Price adjustments for 'color_picker' choices are not implemented yet.
+      // If they were, logic would go here to check opt.type === 'color_picker', find the selected choice, and add its priceAdjustment.
     });
     setCurrentPrice(calculatedPrice);
   }, [product, resolvedOptions, form]);
@@ -148,14 +151,14 @@ export default function CustomizeProductPage() {
               case 'image_upload':
                 fieldSchema = z.string().url({ message: "A valid image URL is required after upload." }).optional().or(z.literal(''));
                 if (opt.required) fieldSchema = z.string().url({message: "Image upload is required."}).min(1, `${opt.label} is required.`);
-                newDefaultValues[opt.id] = opt.defaultValue ?? ""; // This will store the URL
+                newDefaultValues[opt.id] = opt.defaultValue ?? ""; 
                 initialUploadStates[opt.id] = { progress: 0, error: undefined, uploading: false, url: newDefaultValues[opt.id] || undefined };
                 break;
               case 'color_picker':
-                fieldSchema = z.string().regex(/^#[0-9A-Fa-f]{6}$/, `${opt.label} must be a valid hex color.`);
+                fieldSchema = z.string().regex(/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/i, `${opt.label} must be a valid hex color.`);
                 if (opt.required) fieldSchema = fieldSchema.min(1, `${opt.label} is required.`);
                 else fieldSchema = fieldSchema.optional().nullable();
-                newDefaultValues[opt.id] = opt.defaultValue ?? "#000000";
+                newDefaultValues[opt.id] = opt.defaultValue ?? (opt.choices?.[0]?.value || null); // Default to first admin-defined color if any
                 break;
               default:
                 fieldSchema = z.any().optional();
@@ -202,7 +205,6 @@ export default function CustomizeProductPage() {
   useEffect(() => {
     if (customizationSchema) {
       form.reset(defaultFormValues);
-       // Initial price calculation after form and options are set
       if(product && resolvedOptions.length > 0) {
           calculatePrice();
       }
@@ -211,7 +213,7 @@ export default function CustomizeProductPage() {
 
 
   useEffect(() => {
-    if (product && form.formState.isDirty && resolvedOptions.length > 0) { // Check if resolvedOptions is not empty
+    if (product && form.formState.isDirty && resolvedOptions.length > 0) { 
         const subscription = form.watch(() => calculatePrice());
         return () => subscription.unsubscribe();
     }
@@ -265,7 +267,7 @@ export default function CustomizeProductPage() {
       toast({ title: "Image Uploaded", description: `${option.label} updated successfully.`, variant: "default" });
     } catch (err: any) {
       console.error("Cloudinary upload error:", err);
-      form.setValue(option.id, ""); // Clear value on error
+      form.setValue(option.id, ""); 
       setUploadStates(prev => ({ ...prev, [option.id]: { ...prev[option.id], error: err.message || "Upload failed", uploading: false, url: undefined }}));
       toast({ title: "Upload Failed", description: err.message || "Could not upload image.", variant: "destructive" });
     }
@@ -280,7 +282,6 @@ export default function CustomizeProductPage() {
       if (data[opt.id] !== undefined && data[opt.id] !== '' && data[opt.id] !== false && data[opt.id] !== null) {
         customizationsToSave[opt.id] = data[opt.id];
       } else if (opt.required && (data[opt.id] === undefined || data[opt.id] === '' || data[opt.id] === false || data[opt.id] === null)) {
-        // This case should ideally be caught by Zod, but good to be aware
         console.warn(`Required field ${opt.id} missing value during submission attempt.`);
       }
     });
@@ -469,18 +470,30 @@ export default function CustomizeProductPage() {
                               </div>
                              )}
                              {option.type === 'color_picker' && (
-                                <div className="flex items-center gap-2">
-                                  <Input 
-                                    type="color" 
-                                    id={option.id}
-                                    value={field.value ?? "#000000"} // Default to black if no value
-                                    onInput={(e) => { // Use onInput for immediate feedback
-                                      field.onChange(e.currentTarget.value);
-                                      calculatePrice(); // Recalculate price (if color has price impact)
-                                    }}
-                                    className="h-10 w-16 p-1 border-none cursor-pointer"
-                                  />
-                                  <span className="text-sm uppercase">{field.value ?? "#000000"}</span>
+                                <div className="flex flex-wrap gap-2 items-center">
+                                  {option.choices && option.choices.length > 0 ? (
+                                    option.choices.map(choice => (
+                                      <button
+                                        type="button"
+                                        key={choice.value}
+                                        className={cn(
+                                          "h-8 w-8 rounded-full border-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 flex items-center justify-center transition-all",
+                                          field.value === choice.value ? 'ring-2 ring-offset-2 ring-primary border-primary scale-110' : 'border-transparent hover:border-muted-foreground'
+                                        )}
+                                        style={{ backgroundColor: choice.value }}
+                                        onClick={() => {
+                                          field.onChange(choice.value);
+                                          calculatePrice(); 
+                                        }}
+                                        title={choice.label || choice.value}
+                                      >
+                                        {field.value === choice.value && <Check className="h-4 w-4 text-white mix-blend-difference" />}
+                                        <span className="sr-only">{choice.label || choice.value}</span>
+                                      </button>
+                                    ))
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground">No color options defined by admin.</p>
+                                  )}
                                 </div>
                              )}
                             <FormMessage />

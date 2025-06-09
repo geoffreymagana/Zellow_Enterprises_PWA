@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PlusCircle, Edit, Trash2, Settings2, GripVertical, MinusCircle, Eye } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Settings2, GripVertical, MinusCircle, Eye, Palette } from 'lucide-react';
 import type { CustomizationGroupDefinition, CustomizationGroupOptionDefinition, CustomizationGroupChoiceDefinition } from '@/types';
 import { useForm, Controller, SubmitHandler, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,11 +25,21 @@ import { Badge } from '@/components/ui/badge';
 import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
+const hexColorRegex = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
+
 const choiceDefinitionSchema = z.object({
   value: z.string().min(1, "Value is required"),
-  label: z.string().min(1, "Label is required"),
+  label: z.string().optional(), // Label is optional for colors, hex is primary
   priceAdjustment: z.coerce.number().optional(),
 });
+
+// Specific schema for color choices
+const colorChoiceDefinitionSchema = z.object({
+  value: z.string().regex(hexColorRegex, "Must be a valid hex color (e.g., #RGB or #RRGGBB)"),
+  label: z.string().optional(), // Optional name for the color
+  priceAdjustment: z.coerce.number().optional().default(0), // Defaulting to 0, not really used for colors yet
+});
+
 
 const optionDefinitionSchema = z.object({
   id: z.string().min(1, "Option ID is required (e.g., color_option)").regex(/^[a-zA-Z0-9_]+$/, "ID can only contain letters, numbers, and underscores"),
@@ -37,21 +47,36 @@ const optionDefinitionSchema = z.object({
   type: z.enum(['dropdown', 'text', 'checkbox', 'image_upload', 'color_picker']),
   required: z.boolean().optional().default(false),
   showToCustomerByDefault: z.boolean().optional().default(true),
-  choices: z.array(choiceDefinitionSchema).optional(),
+  choices: z.array(z.union([choiceDefinitionSchema, colorChoiceDefinitionSchema])).optional(),
   placeholder: z.string().optional(),
   maxLength: z.coerce.number().positive("Max length must be positive").optional(),
   checkboxLabel: z.string().optional(),
   priceAdjustmentIfChecked: z.coerce.number().optional(),
-  acceptedFileTypes: z.string().optional(), // e.g. ".png,.jpg,.jpeg"
+  acceptedFileTypes: z.string().optional(), 
   maxFileSizeMB: z.coerce.number().positive("Max file size must be positive").optional(),
-}).refine(data => { // Conditional validation based on type
-    if (data.type === 'dropdown' && (!data.choices || data.choices.length === 0)) return false;
-    return true;
-}, { message: "Choices are required for 'dropdown' type.", path: ["choices"] })
-.refine(data => {
-    if (data.type === 'checkbox' && !data.checkboxLabel) return false;
-    return true;
-}, { message: "Checkbox label is required for 'checkbox' type.", path: ["checkboxLabel"] });
+}).superRefine((data, ctx) => { 
+    if (data.type === 'dropdown') {
+        if (!data.choices || data.choices.length === 0) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Choices are required for 'dropdown' type.", path: ["choices"] });
+        } else if (data.choices.some(choice => !choice.label || choice.label.trim() === '')) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Display Label is required for all dropdown choices.", path: ["choices"] });
+        }
+    }
+    if (data.type === 'checkbox' && (!data.checkboxLabel || data.checkboxLabel.trim() === '')) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Checkbox label is required for 'checkbox' type.", path: ["checkboxLabel"] });
+    }
+    if (data.type === 'color_picker') {
+      if (!data.choices || data.choices.length === 0) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "At least one color choice is required for 'Color Picker' type.", path: ["choices"] });
+      } else {
+        data.choices.forEach((choice, index) => {
+          if (!hexColorRegex.test(choice.value)) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Invalid hex color format for choice ${index + 1}. Use #RGB or #RRGGBB.`, path: [`choices.${index}.value`] });
+          }
+        });
+      }
+    }
+});
 
 
 const groupDefinitionFormSchema = z.object({
@@ -255,11 +280,11 @@ function RenderOptionField({ control, index, removeOption }: { control: any, ind
           <Select onValueChange={typeField.onChange} value={typeField.value}>
             <FormControl><SelectTrigger><SelectValue placeholder="Select option type" /></SelectTrigger></FormControl>
             <SelectContent>
-              <SelectItem value="dropdown">Dropdown (Select List)</SelectItem>
+              <SelectItem value="dropdown">Dropdown</SelectItem>
               <SelectItem value="text">Text Input</SelectItem>
               <SelectItem value="checkbox">Checkbox (Yes/No)</SelectItem>
               <SelectItem value="image_upload">Image Upload</SelectItem>
-              <SelectItem value="color_picker">Color Picker</SelectItem>
+              <SelectItem value="color_picker">Color Picker (Predefined)</SelectItem>
             </SelectContent>
           </Select><FormMessage/>
         </FormItem>
@@ -269,7 +294,7 @@ function RenderOptionField({ control, index, removeOption }: { control: any, ind
       {optionType === 'text' && <RenderTextConfig control={control} optionIndex={index} />}
       {optionType === 'checkbox' && <RenderCheckboxConfig control={control} optionIndex={index} />}
       {optionType === 'image_upload' && <RenderImageUploadConfig control={control} optionIndex={index} />}
-      {/* No specific config needed for 'color_picker' on admin side yet */}
+      {optionType === 'color_picker' && <RenderColorChoicesConfig control={control} optionIndex={index} />}
       
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
         <FormField control={control} name={`options.${index}.required`} render={({ field }) => ( <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="font-normal">Required Option</FormLabel></FormItem> )} />
@@ -291,6 +316,44 @@ function RenderSelectChoicesConfig({ control, optionIndex }: { control: any, opt
           <FormField control={control} name={`options.${optionIndex}.choices.${choiceIndex}.value`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Value (Unique)</FormLabel><FormControl><Input {...field} placeholder="e.g., red_option, size_sm"/></FormControl><FormMessage className="text-xs"/></FormItem>)} />
           <FormField control={control} name={`options.${optionIndex}.choices.${choiceIndex}.priceAdjustment`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Price Adj. (KES)</FormLabel><FormControl><Input type="number" step="0.01" {...field} placeholder="0.00"/></FormControl><FormMessage className="text-xs"/></FormItem>)} />
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => remove(choiceIndex)} aria-label="Remove choice"><MinusCircle className="h-4 w-4 text-destructive"/></Button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RenderColorChoicesConfig({ control, optionIndex }: { control: any, optionIndex: number }) {
+  const { fields, append, remove } = useFieldArray({ control, name: `options.${optionIndex}.choices` });
+  return (
+    <div className="mt-3 space-y-3 p-3 border rounded-md bg-background">
+      <div className="flex justify-between items-center">
+        <h5 className="text-sm font-medium">Predefined Colors for Picker</h5>
+        <Button type="button" size="sm" variant="outline" onClick={() => append({ value: '#FFFFFF', label: '' })}>
+          <PlusCircle className="mr-1 h-3 w-3"/> Add Color
+        </Button>
+      </div>
+      {fields.length === 0 && <p className="text-xs text-muted-foreground">No colors added yet.</p>}
+      {fields.map((choiceField, choiceIndex) => (
+        <div key={choiceField.id} className="grid grid-cols-1 sm:grid-cols-[auto_1fr_1fr_auto] gap-3 items-center p-2 border rounded bg-muted/20">
+          <Controller
+            control={control}
+            name={`options.${optionIndex}.choices.${choiceIndex}.value`}
+            render={({ field }) => (
+              <div 
+                className="w-8 h-8 rounded-md border" 
+                style={{ backgroundColor: field.value && hexColorRegex.test(field.value) ? field.value : 'transparent' }}
+              />
+            )}
+          />
+          <FormField control={control} name={`options.${optionIndex}.choices.${choiceIndex}.value`} render={({ field }) => (
+            <FormItem><FormLabel className="text-xs">Hex Color Value</FormLabel><FormControl><Input {...field} placeholder="#RRGGBB" className="h-9"/></FormControl><FormMessage className="text-xs"/></FormItem>
+          )} />
+          <FormField control={control} name={`options.${optionIndex}.choices.${choiceIndex}.label`} render={({ field }) => (
+            <FormItem><FormLabel className="text-xs">Color Name (Optional)</FormLabel><FormControl><Input {...field} placeholder="e.g., Ruby Red" className="h-9"/></FormControl><FormMessage className="text-xs"/></FormItem>
+          )} />
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => remove(choiceIndex)} aria-label="Remove color choice">
+            <MinusCircle className="h-4 w-4 text-destructive"/>
+          </Button>
         </div>
       ))}
     </div>
@@ -323,5 +386,4 @@ function RenderImageUploadConfig({ control, optionIndex }: { control: any, optio
     </div>
   );
 }
-
     
