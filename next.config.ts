@@ -9,6 +9,14 @@ const withPWA = withPWAInit({
   skipWaiting: true, // Skip waiting for service worker to activate
   // cacheOnFrontEndNav: true, // Optional: Aggressively cache assets on frontend navigation
   // reloadOnOnline: true, // Optional: Auto-reload PWA when online again
+  fallbacks: { // Add fallbacks configuration
+    document: '/offline', // Custom offline page for document requests (page navigations)
+    // image: '/static/images/fallback.png', // Optional: A fallback image
+    // font: '/static/fonts/fallback.woff2', // Optional: A fallback font
+    // data: '/static/data/fallback.json', // Optional: Fallback for data/API requests
+    // audio: ...,
+    // video: ...,
+  },
 });
 
 const nextConfig: NextConfig = {
