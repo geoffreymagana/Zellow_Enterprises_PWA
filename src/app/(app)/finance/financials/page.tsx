@@ -63,7 +63,6 @@ export default function FinancialsPage() {
         invoicesBaseQuery = query(invoicesBaseQuery, where("invoiceDate", ">=", Timestamp.fromDate(filterRange.start)));
       }
       if (filterRange?.end) {
-        // For end date, we want to include the whole day, so add 1 day and use '<'
         const exclusiveEndDate = addDays(filterRange.end, 1);
         ordersBaseQuery = query(ordersBaseQuery, where("createdAt", "<", Timestamp.fromDate(exclusiveEndDate)));
         invoicesBaseQuery = query(invoicesBaseQuery, where("invoiceDate", "<", Timestamp.fromDate(exclusiveEndDate)));
@@ -90,8 +89,11 @@ export default function FinancialsPage() {
 
       ordersSnapshot.forEach((doc) => {
         const order = doc.data() as Order;
-        const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date();
-        if (!isValid(orderDate)) return; 
+        if (!order.createdAt?.toDate || !isValid(order.createdAt.toDate())) {
+            console.warn(`Skipping order ${order.id} due to invalid createdAt date.`);
+            return; // Skip this order if createdAt is invalid
+        }
+        const orderDate = order.createdAt.toDate();
         const monthKey = format(orderDate, 'yyyy-MM');
 
         monthlyRevenue[monthKey] = (monthlyRevenue[monthKey] || 0) + order.totalAmount;
@@ -111,8 +113,11 @@ export default function FinancialsPage() {
 
       invoicesSnapshot.forEach((doc) => {
         const invoice = doc.data() as Invoice;
-        const invoiceDate = invoice.invoiceDate?.toDate ? invoice.invoiceDate.toDate() : new Date();
-        if (!isValid(invoiceDate)) return;
+        if (!invoice.invoiceDate?.toDate || !isValid(invoice.invoiceDate.toDate())) {
+            console.warn(`Skipping invoice ${invoice.id} due to invalid invoiceDate.`);
+            return; // Skip this invoice if invoiceDate is invalid
+        }
+        const invoiceDate = invoice.invoiceDate.toDate();
         const monthKey = format(invoiceDate, 'yyyy-MM');
         monthlyExpenses[monthKey] = (monthlyExpenses[monthKey] || 0) + invoice.totalAmount;
 
@@ -122,10 +127,12 @@ export default function FinancialsPage() {
 
       const currentRangeRevenue = Object.values(monthlyRevenue).reduce((sum, val) => sum + val, 0);
       const currentRangeExpenses = Object.values(monthlyExpenses).reduce((sum, val) => sum + val, 0);
+      const currentNetProfit = currentRangeRevenue - currentRangeExpenses;
+
       setTotalRevenue(currentRangeRevenue);
       setTotalSales(ordersSnapshot.size);
       setTotalExpenses(currentRangeExpenses);
-      setNetProfit(currentRangeRevenue - currentRangeExpenses);
+      setNetProfit(currentNetProfit); // This updates the summary card Net Profit
       
       setRevenueBreakdownData([
         { name: "Product Sales", value: revenueFromProductSales, color: "hsl(var(--chart-1))" },
@@ -151,8 +158,8 @@ export default function FinancialsPage() {
 
       ordersSnapshot.forEach((doc) => {
         const order = doc.data() as Order;
-        const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date();
-        if (!isValid(orderDate)) return;
+         if (!order.createdAt?.toDate || !isValid(order.createdAt.toDate())) return;
+        const orderDate = order.createdAt.toDate();
         if (isSameMonth(orderDate, targetMonthForDailyChart)) {
           const dayKey = format(orderDate, 'MMM dd');
           const dayEntry = dailyDataForMonthChart.find(d => d.day === dayKey);
@@ -162,8 +169,8 @@ export default function FinancialsPage() {
 
       invoicesSnapshot.forEach((doc) => {
         const invoice = doc.data() as Invoice;
-        const invoiceDate = invoice.invoiceDate?.toDate ? invoice.invoiceDate.toDate() : new Date();
-        if (!isValid(invoiceDate)) return;
+        if (!invoice.invoiceDate?.toDate || !isValid(invoice.invoiceDate.toDate())) return;
+        const invoiceDate = invoice.invoiceDate.toDate();
          if (isSameMonth(invoiceDate, targetMonthForDailyChart)) {
           const dayKey = format(invoiceDate, 'MMM dd');
           const dayEntry = dailyDataForMonthChart.find(d => d.day === dayKey);
@@ -173,7 +180,8 @@ export default function FinancialsPage() {
       
       setDailyChartData(dailyDataForMonthChart);
       setLatestMonthNetChange(currentMonthRevenue - currentMonthExpenses);
-      setOverallCumulativeNetProfit(netProfit); // For filtered range, this is just the range's net profit.
+      // This is the value passed to the chart for "Total Balance"
+      setOverallCumulativeNetProfit(currentNetProfit); 
 
       const productSalesAgg: Record<string, { name: string; totalRevenue: number; totalQuantity: number }> = {};
       ordersSnapshot.forEach((doc) => {
@@ -182,7 +190,7 @@ export default function FinancialsPage() {
           if (!productSalesAgg[item.productId]) {
             productSalesAgg[item.productId] = { name: item.name, totalRevenue: 0, totalQuantity: 0 };
           }
-          productSalesAgg[item.productId].totalRevenue += item.price * item.quantity; // Use item price * quantity
+          productSalesAgg[item.productId].totalRevenue += item.price * item.quantity;
           productSalesAgg[item.productId].totalQuantity += item.quantity;
         });
       });
@@ -196,7 +204,7 @@ export default function FinancialsPage() {
     } finally {
       setIsLoadingStats(false);
     }
-  }, []); // startDate, endDate are not dependencies here as fetch is called explicitly with them
+  }, []);
 
   useEffect(() => {
     if (!authLoading) {
@@ -215,7 +223,6 @@ export default function FinancialsPage() {
   const handleClearFilter = () => {
     setStartDate(undefined);
     setEndDate(undefined);
-    // fetchFinancialData(); // fetchFinancialData is already called by useEffect on startDate/endDate change
   };
 
 
@@ -350,7 +357,7 @@ export default function FinancialsPage() {
            {dailyChartData.length > 0 ? (
               <MonthlyRevenueExpensesChart 
                 dailyData={dailyChartData} 
-                overallCumulativeNetProfit={overallCumulativeNetProfit} // This is net profit for the range or all time
+                overallCumulativeNetProfit={overallCumulativeNetProfit}
                 latestMonthNetChange={latestMonthNetChange}
                 latestMonthLabel={latestMonthLabel}
                 targetMonthDate={targetMonthDateForChart}
