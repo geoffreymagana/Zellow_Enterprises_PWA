@@ -47,40 +47,43 @@ These instructions will get you a copy of the project up and running on your loc
     *   Obtain your Firebase project configuration (API key, authDomain, etc.).
     *   Create a `.env.local` file in the root of your project and add your Firebase configuration keys. Example:
         ```env
+        # Firebase Client-Side Configuration
         NEXT_PUBLIC_FIREBASE_API_KEY=YOUR_API_KEY
         NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=YOUR_AUTH_DOMAIN
         NEXT_PUBLIC_FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
         NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=YOUR_STORAGE_BUCKET
         NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=YOUR_MESSAGING_SENDER_ID
         NEXT_PUBLIC_FIREBASE_APP_ID=YOUR_APP_ID
-        NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=YOUR_MEASUREMENT_ID
+        NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=YOUR_MEASUREMENT_ID # Optional, for Analytics
 
-        # For Genkit (AI Features) - if using Gemini
+        # Genkit (AI Features) - Server-Side
         GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 
-        # For Email Notifications (using Gmail as an example)
+        # Email Notifications (SMTP) - Server-Side
         SMTP_HOST=smtp.gmail.com
         SMTP_PORT=587
-        SMTP_SECURE=false
+        SMTP_SECURE=false # For STARTTLS on port 587
         SMTP_USER=your-gmail-username@gmail.com
-        SMTP_PASS=your-gmail-app-password
-        SMTP_FROM_EMAIL=noreply@yourdomain.com
+        SMTP_PASS=your-gmail-app-password # Use an App Password for Gmail
+        SMTP_FROM_EMAIL=noreply@yourdomain.com # Gmail might override this
         SMTP_FROM_NAME="Zellow Notifications"
 
-        # Site URL for links in emails/notifications
+        # Mapbox Token (Client-Side)
+        NEXT_PUBLIC_MAPBOX_TOKEN=YOUR_MAPBOX_ACCESS_TOKEN
+        
+        # Cloudinary (if used for image uploads during customization)
+        NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=YOUR_CLOUDINARY_CLOUD_NAME
+        NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=YOUR_CLOUDINARY_UPLOAD_PRESET
+
+        # Site URL - Crucial for links in emails/notifications
+        # For local development:
         NEXT_PUBLIC_SITE_URL=http://localhost:9002
+        # For Vercel/Production deployment, update this to your actual deployed URL on Vercel, e.g.:
+        # NEXT_PUBLIC_SITE_URL=https://your-zellowlive-project.vercel.app 
         ```
     *   **Note:** For `SMTP_PASS` with Gmail, you'll need to generate an "App Password" if you have 2-Step Verification enabled on your Google account.
 
-4.  **Set up Mapbox Token (for Dispatch Center Map):**
-    *   Create an account at [mapbox.com](https://www.mapbox.com/).
-    *   Get your public access token.
-    *   Add it to your `.env.local` file:
-        ```env
-        NEXT_PUBLIC_MAPBOX_TOKEN=YOUR_MAPBOX_ACCESS_TOKEN
-        ```
-
-5.  **Run the development server:**
+4.  **Run the development server:**
     ```bash
     npm run dev
     # or
@@ -88,11 +91,23 @@ These instructions will get you a copy of the project up and running on your loc
     ```
     The application should now be running on `http://localhost:9002` (or your configured port).
 
-6.  **Run the Genkit development server (for AI flows):**
+5.  **Run the Genkit development server (for AI flows):**
     In a separate terminal:
     ```bash
     npm run genkit:dev
     ```
+
+## Deployment to Vercel
+
+This Next.js application is optimized for deployment on Vercel.
+
+1.  **Create a Vercel Account:** Sign up at [vercel.com](https://vercel.com/).
+2.  **Connect Git Repository:** Link your GitHub, GitLab, or Bitbucket repository to Vercel.
+3.  **Configure Environment Variables:**
+    *   In your Vercel project settings (Project > Settings > Environment Variables), add all the variables listed in the `.env.local` example above.
+    *   **Crucially for `NEXT_PUBLIC_SITE_URL`**: Change its value to your Vercel production URL (e.g., `https://your-project-name.vercel.app`).
+4.  **Deploy:** Vercel will automatically detect Next.js settings and deploy your application. Subsequent pushes to your main branch will trigger redeployments.
+5.  The `apphosting.yaml` file is for Firebase App Hosting and is not used by Vercel.
 
 ## Key Functionalities
 
@@ -128,14 +143,15 @@ These instructions will get you a copy of the project up and running on your loc
 *   **`src/hooks/`**: Custom React hooks.
 *   **`src/lib/`**: Utility functions and Firebase initialization.
 *   **`src/ai/`**: Genkit flows and configuration.
-*   **`public/`**: Static assets like icons.
+*   **`public/`**: Static assets like icons and manifest.json.
 
 ## Future Considerations (Potential Enhancements)
 
 *   More sophisticated email templates.
 *   Advanced reporting and analytics.
-*   Direct image uploads instead of URL pasting for product images.
-*   Integration with actual payment gateways.
+*   Direct image uploads to Firebase Storage instead of URL pasting for product images (or better Cloudinary integration for product image management by admin).
+*   Integration with actual payment gateways (e.g., Stripe, PayPal, or local Kenyan gateways).
 *   Push notifications for real-time updates.
+*   Enhanced PWA features (offline caching strategies, background sync).
 
     
