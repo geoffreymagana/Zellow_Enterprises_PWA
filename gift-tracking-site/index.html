@@ -1,0 +1,53 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Your Gift - Zellow Enterprises</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Add your Firebase SDK version 8.x.x scripts here -->
+    <!-- It's recommended to use the latest compatible v9+ modular SDKs if possible,
+         but for simplicity with plain JS, v8 is sometimes easier for beginners.
+         For v9+, you'd use import maps or a build step.
+         This example will assume v9+ modular SDK loaded globally for simplicity of demonstration,
+         though that's not best practice for production without a bundler.
+    -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="https://placehold.co/150x50.png?text=ZellowLogo" alt="Zellow Enterprises Logo" id="logo" data-ai-hint="logo company">
+            <h1>Your Gift Status</h1>
+        </header>
+        <main id="tracking-info">
+            <div id="loader" class="loader">Loading gift details...</div>
+            <div id="error-message" class="error-message" style="display: none;"></div>
+            <div id="order-details" style="display: none;">
+                <p>Hello <strong id="recipient-name"></strong>,</p>
+                
+                <div class="status-card">
+                    <h2>Current Status:</h2>
+                    <p id="order-status" class="status-text"></p>
+                </div>
+
+                <div class="detail-card">
+                    <h3>Expected Delivery:</h3>
+                    <p id="expected-delivery-date"></p>
+                </div>
+
+                <div class="detail-card" id="message-card" style="display: none;">
+                    <h3>Message from Sender:</h3>
+                    <p id="message-from-sender" class="gift-message"></p>
+                </div>
+            </div>
+        </main>
+        <footer>
+            <p>&copy; <span id="current-year"></span> Zellow Enterprises. All rights reserved.</p>
+        </footer>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

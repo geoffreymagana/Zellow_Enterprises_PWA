@@ -21,6 +21,7 @@ const GiftNotificationInputSchema = z.object({
   senderName: z.string().describe("The sender's name."),
   canViewAndTrack: z.boolean().describe('Whether the recipient can view order details and track the gift.'),
   showPricesToRecipient: z.boolean().describe('Whether to show prices to the recipient in the notification.'),
+  giftTrackingToken: z.string().optional().describe('The unique token for public gift tracking if recipientCanViewAndTrack is true.'),
 });
 export type GiftNotificationInput = z.infer<typeof GiftNotificationInputSchema>;
 
@@ -53,8 +54,20 @@ const sendGiftNotificationFlow = ai.defineFlow(
     }
 
     const siteBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://zellow-enterprises.vercel.app';
-    // Add ctx=gift_recipient to the tracking link
-    const trackingLink = `${siteBaseUrl}/track/order/${input.orderId}?ctx=gift_recipient`;
+    let trackingLink = "";
+
+    if (input.canViewAndTrack) {
+      if (input.giftTrackingToken) {
+        // This link should point to your new gift-tracking mini-site
+        trackingLink = `${siteBaseUrl}/gift-tracking?token=${input.giftTrackingToken}`;
+      } else {
+        // Fallback or internal tracking if token is not available, but ideally it should be
+        // This link points to the main app's authenticated tracking.
+        trackingLink = `${siteBaseUrl}/track/order/${input.orderId}?ctx=gift_recipient`;
+        console.warn(`[GiftNotificationFlow] giftTrackingToken not provided for order ${input.orderId}, but recipient can view/track. Falling back to authenticated link.`);
+      }
+    }
+
 
     if (input.recipientContactMethod === 'email') {
       const transporter = nodemailer.createTransport({
@@ -78,7 +91,7 @@ const sendGiftNotificationFlow = ai.defineFlow(
         emailHtmlBody += `<p style="margin-top: 15px;"><strong>Their message:</strong></p><p style="border-left: 3px solid #eee; padding-left: 10px; margin-left: 5px; font-style: italic;">${input.giftMessage}</p>`;
       }
 
-      if (input.canViewAndTrack) {
+      if (input.canViewAndTrack && trackingLink) {
         emailHtmlBody += `
           <p style="margin-top: 20px; text-align: center;">
             <a href="${trackingLink}" style="display: inline-block; background-color: #34A7C1; color: white; padding: 12px 25px; text-align: center; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold;">
@@ -86,11 +99,13 @@ const sendGiftNotificationFlow = ai.defineFlow(
             </a>
           </p>
         `;
-        if (input.showPricesToRecipient) {
-          emailHtmlBody += `<p style="font-size: 0.9em; color: #555; text-align: center; margin-top: 5px;"><small>Price information will be visible when you view the order.</small></p>`;
-        } else {
-          emailHtmlBody += `<p style="font-size: 0.9em; color: #555; text-align: center; margin-top: 5px;"><small>Price information for this gift has been hidden by the sender.</small></p>`;
-        }
+        // Price visibility note is only relevant if they can track and the system would show prices.
+        // The new mini-site probably won't show prices by default.
+        // if (input.showPricesToRecipient) {
+        //   emailHtmlBody += `<p style="font-size: 0.9em; color: #555; text-align: center; margin-top: 5px;"><small>Price information may be visible when you view the order.</small></p>`;
+        // } else {
+        //   emailHtmlBody += `<p style="font-size: 0.9em; color: #555; text-align: center; margin-top: 5px;"><small>Price information for this gift has been hidden by the sender.</small></p>`;
+        // }
       } else {
         emailHtmlBody += `<p style="margin-top: 20px;">Your gift is being processed by Zellow Enterprises and will be on its way soon.</p>`;
       }
@@ -118,28 +133,28 @@ const sendGiftNotificationFlow = ai.defineFlow(
         console.log('[GiftNotificationFlow] Email sent successfully to:', input.recipientContactValue);
         return {
           success: true,
-          message: `Email notification sent to ${input.recipientContactValue}. Tracking link: ${input.canViewAndTrack ? trackingLink : 'N/A'}`,
-          trackingLink: input.canViewAndTrack ? trackingLink : undefined,
+          message: `Email notification sent to ${input.recipientContactValue}. Tracking link: ${trackingLink || 'N/A'}`,
+          trackingLink: trackingLink || undefined,
         };
       } catch (error: any) {
         console.error('[GiftNotificationFlow] Error sending email:', error);
         return {
           success: false,
           message: `Failed to send email notification: ${error.message}. Order was still placed.`,
-          trackingLink: input.canViewAndTrack ? trackingLink : undefined, 
+          trackingLink: trackingLink || undefined, 
         };
       }
 
     } else if (input.recipientContactMethod === 'phone') {
       let smsBody = `Hello ${input.recipientName}, ${input.senderName} sent you a gift from Zellow!`;
       if (input.giftMessage) smsBody += ` Message: "${input.giftMessage.substring(0, 50)}..."`;
-      if (input.canViewAndTrack) smsBody += ` Track: ${trackingLink}`; // Link includes ctx param
+      if (input.canViewAndTrack && trackingLink) smsBody += ` Track: ${trackingLink}`;
       
       console.log(`[GiftNotificationFlow] SIMULATING SMS to ${input.recipientContactValue}: ${smsBody}`);
       return {
         success: true,
-        message: `Simulated SMS notification sent to ${input.recipientContactValue}. Tracking link: ${input.canViewAndTrack ? trackingLink : 'N/A'}`,
-        trackingLink: input.canViewAndTrack ? trackingLink : undefined,
+        message: `Simulated SMS notification sent to ${input.recipientContactValue}. Tracking link: ${trackingLink || 'N/A'}`,
+        trackingLink: trackingLink || undefined,
       };
     }
 
@@ -149,6 +164,3 @@ const sendGiftNotificationFlow = ai.defineFlow(
     };
   }
 );
-    
-
-    
