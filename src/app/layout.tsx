@@ -5,6 +5,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { CartProvider } from '@/contexts/CartContext'; // Import CartProvider
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 // const manifestBase64 = "eyJuYW1lIjoiWmVsbG93TGl2ZSIsInNob3J0X25hbWUiOiJaZWxsb3dMaXZlIiwiZGVzY3JpcHRpb24iOiJQV0EgZm9yIFplbGxvdyBFbnRlcnByaXNlczogQ3VzdG9tZXIgYW5kIFN0YWZmIFBvcnRhbHMuIiwiaWNvbnMiOlt7InNyYyI6Ii9pY29ucy9pY29uLTE5MngxOTIucG5nIiwic2l6ZXMiOiIxOTJ4MTkyIiwidHlwZSI6ImltYWdlL3BuZyIsInB1cnBvc2UiOiJhbnkgbWFza2FibGUifSx7InNyYyI6Ii9pY29ucy9pY29uLTUxMng1MTIucG5nIiwic2l6ZXMiOiI1MTJ4NTEyIiwidHlwZSI6ImltYWdlL3BuZyJ9XSwic3RhcnRfdXJsIjoiLyIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwic2NvcGUiOiIvIiwidGhlbWVfY29sb3IiOiIjMzRBN0MxIiwiYmFja2dyb3VuZF9jb2xvciI6IiNGMEY4RkEifQ==";
 
