@@ -6,12 +6,12 @@
 
 // ** IMPORTANT: Replace with your actual Firebase project configuration **
 const firebaseConfig = {
-  apiKey: "YOUR_NEXT_PUBLIC_FIREBASE_API_KEY",
-  authDomain: "YOUR_NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
-  projectId: "YOUR_NEXT_PUBLIC_FIREBASE_PROJECT_ID",
-  storageBucket: "YOUR_NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
-  appId: "YOUR_NEXT_PUBLIC_FIREBASE_APP_ID",
+  apiKey: "AIzaSyDzUlYdqqdkTxcHJHChsX6zM-U_7N92xec",
+  authDomain: "zellowlive.firebaseapp.com",
+  projectId: "zellowlive",
+  storageBucket: "zellowlive.firebasestorage.app",
+  messagingSenderId: "943761891650",
+  appId: "1:943761891650:web:e8c12f77ea9d5edf0b68dbYOUR_NEXT_PUBLIC_FIREBASE_APP_ID",
 };
 
 // Initialize Firebase (Compat version for global SDKs)
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_NEXT_PUBLIC_FIREBASE_API_KEY") {
+    if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "AIzaSyDzUlYdqqdkTxcHJHChsX6zM-U_7N92xec") {
         showError("Firebase is not configured in script.js. Please add your project credentials.");
         return;
     }
