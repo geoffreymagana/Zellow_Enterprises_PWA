@@ -2,19 +2,20 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { doc, getDoc, onSnapshot, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { useParams, useRouter, useSearchParams } from 'next/navigation'; // Added useSearchParams
+import { doc, onSnapshot, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, DeliveryHistoryEntry, OrderStatus } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertTriangle, Package, ShoppingBag, Truck, CheckCircle, MapPin, Clock, Star, MessageSquare } from 'lucide-react';
+import { Loader2, AlertTriangle, Package, ShoppingBag, Truck, CheckCircle, MapPin, Clock, Star, MessageSquare, Home } from 'lucide-react'; // Added Home
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth'; // For checking logged-in user
+import { useAuth } from '@/hooks/useAuth'; 
 import { Badge, type BadgeProps } from '@/components/ui/badge';
+import { Logo } from '@/components/common/Logo'; // For minimal header
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -28,7 +29,6 @@ const formatDate = (timestamp: any, includeTime: boolean = true) => {
 };
 
 const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] => {
-  // This function should ideally be centralized if used in multiple places
   switch (status) {
     case 'pending': return 'statusYellow';
     case 'processing': return 'statusAmber';
@@ -43,11 +43,27 @@ const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] 
   }
 };
 
+const MinimalHeader = () => (
+  <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-[var(--header-height)]">
+    <div className="container mx-auto h-full flex items-center justify-between px-4">
+      <Logo iconSize={24} textSize="text-xl" />
+      <span className="text-sm text-muted-foreground">Gift Tracking</span>
+    </div>
+  </header>
+);
+
+const MinimalFooter = () => (
+  <footer className="py-4 text-center text-xs text-muted-foreground border-t bg-background mt-8">
+    © {new Date().getFullYear()} Zellow Enterprises. All rights reserved.
+  </footer>
+);
+
 
 export default function TrackOrderPage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth(); // Get current user for feedback submission
+  const searchParams = useSearchParams(); // For reading query parameters
+  const { user } = useAuth(); 
   const { toast } = useToast();
   const orderId = typeof params.orderId === 'string' ? params.orderId : null;
 
@@ -58,6 +74,8 @@ export default function TrackOrderPage() {
   const [selectedRating, setSelectedRating] = useState(0);
   const [comment, setComment] = useState("");
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+
+  const isGiftRecipientView = searchParams.get('ctx') === 'gift_recipient';
 
   useEffect(() => {
     if (!orderId || !db) {
@@ -73,7 +91,8 @@ export default function TrackOrderPage() {
       if (docSnapshot.exists()) {
         const orderData = { id: docSnapshot.id, ...docSnapshot.data() } as Order;
         
-        if (orderData.isGift && orderData.giftDetails && !orderData.giftDetails.recipientCanViewAndTrack) {
+        // If it's a gift recipient view AND they are not allowed to track, show error.
+        if (isGiftRecipientView && orderData.isGift && orderData.giftDetails && !orderData.giftDetails.recipientCanViewAndTrack) {
           setOrder(null); 
           setError("Access to detailed tracking for this gift is restricted by the sender.");
         } else {
@@ -97,11 +116,12 @@ export default function TrackOrderPage() {
     });
 
     return () => unsubscribe();
-  }, [orderId]);
+  }, [orderId, isGiftRecipientView]);
 
   const handleFeedbackSubmit = async () => {
-    if (!orderId || !db || !user || selectedRating === 0) {
-      toast({ title: "Feedback Error", description: "Please select a rating.", variant: "destructive"});
+    // Feedback can only be submitted by the logged-in customer who placed the order.
+    if (!orderId || !db || !user || (order && order.customerId !== user.uid) || selectedRating === 0) {
+      toast({ title: "Feedback Error", description: "Please select a rating. Only the order placer can leave feedback.", variant: "destructive"});
       return;
     }
     setIsSubmittingFeedback(true);
@@ -112,12 +132,11 @@ export default function TrackOrderPage() {
           value: selectedRating,
           comment: comment,
           ratedAt: serverTimestamp(),
-          userId: user.uid, // Store who rated
+          userId: user.uid, 
         },
         updatedAt: serverTimestamp(),
       });
       toast({ title: "Feedback Submitted", description: "Thank you for your feedback!"});
-      // Order state will update via onSnapshot
     } catch (e: any) {
       console.error("Error submitting feedback:", e);
       toast({ title: "Error", description: "Could not submit feedback.", variant: "destructive"});
@@ -125,7 +144,6 @@ export default function TrackOrderPage() {
       setIsSubmittingFeedback(false);
     }
   };
-
 
   if (loading) {
     return (
@@ -137,36 +155,96 @@ export default function TrackOrderPage() {
   }
 
   if (error && !order) { 
-    return (
+    const mainContent = (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
         <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
         <h1 className="text-xl font-semibold mb-2">Tracking Unavailable</h1>
         <p className="text-muted-foreground mb-6">{error}</p>
-        <Button onClick={() => router.push('/')} variant="outline">
-          Go to Homepage
-        </Button>
+        {isGiftRecipientView ? (
+          <p className="text-sm text-muted-foreground">If you believe this is an error, please contact the sender.</p>
+        ) : (
+          <Button onClick={() => router.push('/')} variant="outline">
+            Go to Homepage
+          </Button>
+        )}
       </div>
     );
+    if (isGiftRecipientView) {
+      return (
+        <div className="flex flex-col min-h-screen bg-muted/40">
+          <MinimalHeader />
+          <main className="flex-grow">{mainContent}</main>
+          <MinimalFooter />
+        </div>
+      );
+    }
+    return mainContent; // For non-gift recipient view, let the main layout handle header/footer
   }
   
   if (!order) { 
-     return (
+     const mainContent = (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
         <Package className="h-12 w-12 text-muted-foreground mb-4" />
         <p className="text-muted-foreground mb-6">Order details could not be loaded.</p>
-        <Button onClick={() => router.push('/')} variant="outline">Go to Homepage</Button>
+        {isGiftRecipientView ? (
+          <p className="text-sm text-muted-foreground">Please check the link or contact the sender.</p>
+        ) : (
+          <Button onClick={() => router.push('/')} variant="outline">Go to Homepage</Button>
+        )}
       </div>
     );
+    if (isGiftRecipientView) {
+      return (
+        <div className="flex flex-col min-h-screen bg-muted/40">
+          <MinimalHeader />
+          <main className="flex-grow">{mainContent}</main>
+          <MinimalFooter />
+        </div>
+      );
+    }
+    return mainContent;
   }
 
   const currentStatusEntry = order.deliveryHistory && order.deliveryHistory.length > 0 
     ? order.deliveryHistory[order.deliveryHistory.length - 1] 
     : { status: order.status, timestamp: order.updatedAt || order.createdAt, notes: 'Order status updated.' };
 
-  const canRateOrder = order.status === 'delivered' && !order.rating;
-  const hasBeenRated = !!order.rating;
+  const canRateOrder = !isGiftRecipientView && user && order.customerId === user.uid && order.status === 'delivered' && !order.rating;
+  const hasBeenRated = !isGiftRecipientView && user && order.customerId === user.uid && !!order.rating;
 
-  return (
+
+  // Content for Gift Recipient when order is delivered
+  if (isGiftRecipientView && order.status === 'delivered') {
+    return (
+      <div className="flex flex-col min-h-screen bg-muted/40">
+        <MinimalHeader />
+        <main className="flex-grow flex items-center justify-center p-4">
+            <Card className="shadow-lg max-w-md w-full text-center">
+            <CardHeader>
+                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-3" />
+                <CardTitle className="text-2xl font-headline">Your Gift Has Been Delivered!</CardTitle>
+                <CardDescription>Order ID: {order.id.substring(0,12)}...</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <p className="text-muted-foreground">We hope you enjoy your special gift from {order.senderName || "your sender"}!</p>
+                {order.actualDeliveryTime && (
+                    <p className="text-xs text-muted-foreground mt-2">Delivered on: {formatDate(order.actualDeliveryTime)}</p>
+                )}
+            </CardContent>
+            <CardFooter className="justify-center">
+                 <Link href="/products" passHref>
+                    <Button variant="outline"><ShoppingBag className="mr-2 h-4 w-4"/> Explore More Gifts</Button>
+                 </Link>
+            </CardFooter>
+            </Card>
+        </main>
+        <MinimalFooter />
+      </div>
+    );
+  }
+  
+  // Main tracking content for logged-in user or non-delivered gift
+  const trackingContent = (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <Card className="shadow-lg">
         <CardHeader className="text-center">
@@ -192,30 +270,27 @@ export default function TrackOrderPage() {
             {currentStatusEntry.notes && <p className="text-xs text-muted-foreground mt-1">Note: {currentStatusEntry.notes}</p>}
           </div>
 
-          {order.isGift && order.giftDetails && !order.giftDetails.showPricesToRecipient ? (
-             <p className="text-sm text-center text-muted-foreground italic">This is a gift order. Price details are hidden.</p>
-          ) : (
+          {(!isGiftRecipientView || (order.isGift && order.giftDetails?.showPricesToRecipient)) && (
             <div>
                 <h4 className="font-semibold mb-2">Order Summary:</h4>
                 <ul className="space-y-1 text-sm">
                 {order.items.map((item, index) => (
                     <li key={`order-item-${item.productId}-${index}`} className="flex justify-between">
                     <span>{item.name} (x{item.quantity})</span>
-                    {!order.isGift || order.giftDetails?.showPricesToRecipient ? <span>{formatPrice(item.price * item.quantity)}</span> : null}
+                    <span>{formatPrice(item.price * item.quantity)}</span>
                     </li>
                 ))}
                 <li className="flex justify-between border-t pt-1 mt-1">
                     <span>Shipping</span>
-                    {!order.isGift || order.giftDetails?.showPricesToRecipient ? <span>{formatPrice(order.shippingCost)}</span> : null}
+                    <span>{formatPrice(order.shippingCost)}</span>
                 </li>
                 <li className="flex justify-between font-bold text-md border-t pt-1 mt-1">
                     <span>Total</span>
-                    {!order.isGift || order.giftDetails?.showPricesToRecipient ? <span>{formatPrice(order.totalAmount)}</span> : null}
+                    <span>{formatPrice(order.totalAmount)}</span>
                 </li>
                 </ul>
             </div>
           )}
-
 
           {order.shippingAddress && (
             <div>
@@ -246,7 +321,6 @@ export default function TrackOrderPage() {
             </div>
           )}
 
-          {/* Feedback Section */}
           {(canRateOrder || hasBeenRated) && (
             <Card className="mt-6 bg-muted/50">
               <CardHeader>
@@ -297,13 +371,28 @@ export default function TrackOrderPage() {
           )}
 
           <div className="mt-6 text-center">
-            <Link href="/products" passHref>
-              <Button variant="outline"><ShoppingBag className="mr-2 h-4 w-4"/> Continue Shopping</Button>
+            <Link href={isGiftRecipientView ? "/" : "/products"} passHref>
+              <Button variant="outline">
+                  {isGiftRecipientView ? <Home className="mr-2 h-4 w-4"/> : <ShoppingBag className="mr-2 h-4 w-4"/> }
+                  {isGiftRecipientView ? "Zellow Home" : "Continue Shopping"}
+              </Button>
             </Link>
           </div>
         </CardContent>
       </Card>
     </div>
   );
-}
 
+  if (isGiftRecipientView) {
+    return (
+      <div className="flex flex-col min-h-screen bg-muted/40">
+        <MinimalHeader />
+        <main className="flex-grow">{trackingContent}</main>
+        <MinimalFooter />
+      </div>
+    );
+  }
+
+  return trackingContent; // Regular view uses main app layout
+}
+    
