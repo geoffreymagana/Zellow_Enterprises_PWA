@@ -31,10 +31,10 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
         
         {/* PWA Meta Tags */}
-        <meta name="application-name" content="ZellowLive" />
+        <meta name="application-name" content="Zellow" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="ZellowLive" />
+        <meta name="apple-mobile-web-app-title" content="Zellow" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="msapplication-config" content="/icons/browserconfig.xml" />
@@ -45,7 +45,7 @@ export default function RootLayout({
         <link rel="manifest" href={`data:application/manifest+json;base64,${manifestBase64}`} />
         
         {/* More specific apple touch icons (optional, but good practice) */}
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <link rel="apple-touch-icon" href="/icons/Zellow-icon-192.png" />
         {/* <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" /> */}
         {/* <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png" /> */}
         {/* <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167x167.png" /> */}

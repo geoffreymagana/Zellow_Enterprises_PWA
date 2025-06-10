@@ -65,7 +65,7 @@ export default function ReviewOrderPage() {
         recipientName: giftRecipientName,
         recipientContactMethod: giftRecipientContactMethod,
         recipientContactValue: giftRecipientContactValue,
-        giftMessage: giftMessage || undefined,
+        giftMessage: giftMessage || "", // Changed from undefined to empty string
         notifyRecipient: notifyRecipient,
         showPricesToRecipient: notifyRecipient ? showPricesToRecipient : false,
         recipientCanViewAndTrack: notifyRecipient ? giftRecipientCanViewAndTrack : true, 
