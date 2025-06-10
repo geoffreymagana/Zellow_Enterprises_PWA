@@ -34,7 +34,7 @@ export default function CartPage() {
       <div className="flex flex-col lg:flex-row gap-8">
         <div className="lg:w-2/3 space-y-6">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl sm:text-3xl font-headline font-semibold">Your Shopping Cart</h1>
+            <h1 className="text-2xl sm:text-3xl font-headline font-semibold">Your Cart</h1>
             <Button variant="outline" onClick={() => router.push('/products')}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Continue Shopping
             </Button>
@@ -139,4 +139,3 @@ export default function CartPage() {
     </div>
   );
 }
-

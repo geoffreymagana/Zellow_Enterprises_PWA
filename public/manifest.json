@@ -1,17 +1,17 @@
 
 {
-  "name": "ZellowLive",
-  "short_name": "ZellowLive",
-  "description": "PWA for Zellow Enterprises: Customer and Staff Portals.",
+  "name": "Zellow Enterprises",
+  "short_name": "Zellow",
+  "description": "Zellow Enterprises: Customer and Staff Portals.",
   "icons": [
     {
-      "src": "/icons/icon-192x192.png",
+      "src": "/icons/Zellow-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512x512.png",
+      "src": "/icons/Zellow-icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }

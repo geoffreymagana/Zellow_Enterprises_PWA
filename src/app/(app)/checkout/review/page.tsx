@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, PackageCheck, Gift, Image as ImageIconPlaceholder, Palette } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { sendGiftNotification, GiftNotificationInput } from '@/ai/flows/send-gift-notification-flow'; 
+import { OrderSuccessModal } from '@/components/checkout/OrderSuccessModal'; // Import the new modal
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -49,6 +50,8 @@ export default function ReviewOrderPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false); // State for modal
+  const [confirmedOrderId, setConfirmedOrderId] = useState<string | null>(null); // State for order ID
 
   const [resolvedProductOptionsMap, setResolvedProductOptionsMap] = useState<Map<string, ProductCustomizationOption[]>>(new Map());
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
@@ -73,7 +76,7 @@ export default function ReviewOrderPage() {
 
   const fetchAndResolveProductOptions = useCallback(async () => {
     if (!db || cartItems.length === 0) {
-      setResolvedProductOptionsMap(new Map()); // Clear if no items
+      setResolvedProductOptionsMap(new Map()); 
       return;
     }
     setIsLoadingOptions(true);
@@ -112,18 +115,18 @@ export default function ReviewOrderPage() {
 
   useEffect(() => {
     if (!shippingAddress || !paymentMethod || !selectedShippingMethodInfo || cartItems.length === 0) {
-      if (cartItems.length === 0) {
+      if (cartItems.length === 0 && !isSuccessModalOpen) { // Don't redirect if success modal is about to show
         router.replace('/orders/cart');
       } else if (!shippingAddress) {
         router.replace('/checkout/shipping');
       } else if (!selectedShippingMethodInfo || !paymentMethod) {
         router.replace('/checkout/payment');
       }
-      if (!isPlacingOrder && (cartItems.length > 0 || !!shippingAddress)) { // Only toast if not already in order placement and there's something to go back for
+      if (!isPlacingOrder && !isSuccessModalOpen && (cartItems.length > 0 || !!shippingAddress)) { 
         toast({ title: "Missing Information", description: "Please complete all previous steps.", variant: "destructive" });
       }
     }
-  }, [shippingAddress, paymentMethod, selectedShippingMethodInfo, cartItems, router, toast, isPlacingOrder]);
+  }, [shippingAddress, paymentMethod, selectedShippingMethodInfo, cartItems, router, toast, isPlacingOrder, isSuccessModalOpen]);
 
   const getDisplayableCustomizationValue = (
     optionId: string, 
@@ -244,20 +247,23 @@ export default function ReviewOrderPage() {
             canViewAndTrack: giftDetailsToSave.recipientCanViewAndTrack,
             showPricesToRecipient: giftDetailsToSave.showPricesToRecipient,
           };
-          const notificationResult = await sendGiftNotification(notificationInput);
-          // Toast for notification result can be handled on success page or contextually if needed
+          await sendGiftNotification(notificationInput);
         } catch (notificationError: any) {
           console.error("Error sending gift notification:", notificationError);
-          // It's important not to stop the whole order process for this, but log/toast separately
           toast({ title: "Gift Notification Issue", description: "Order placed, but could not send gift notification: " + notificationError.message, variant: "destructive", duration: 7000 });
         }
       }
 
-      clearCart(); // This will no longer show a "Cart Cleared" toast
-      router.push(`/checkout/success/${newOrderRef.id}`); 
+      clearCart(); 
+      setConfirmedOrderId(newOrderRef.id);
+      setIsSuccessModalOpen(true);
+      // Do NOT redirect here, modal will handle next steps
+      toast({ title: "Order Placed!", description: `Your order #${newOrderRef.id.substring(0,8)}... is confirmed.`, duration: 6000});
+
     } catch (error: any) {
       console.error("Error placing order:", error);
       toast({ title: "Order Placement Failed", description: error.message || "Could not place your order. Please try again.", variant: "destructive" });
+    } finally {
       setIsPlacingOrder(false);
     }
   };
@@ -272,138 +278,145 @@ export default function ReviewOrderPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-2xl font-headline">Review Your Order</CardTitle>
-          <CardDescription>Please check your order details below before placing your order.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-8">
-          <section>
-            <h3 className="text-lg font-semibold mb-3">Shipping To:</h3>
-            <Card className="bg-muted/50 p-4">
-              <p><strong>{shippingAddress.fullName}</strong> ({shippingAddress.email})</p>
-              <p>{shippingAddress.addressLine1}</p>
-              {shippingAddress.addressLine2 && <p>{shippingAddress.addressLine2}</p>}
-              <p>{shippingAddress.city}, {shippingAddress.county} {shippingAddress.postalCode}</p>
-              <p>Phone: {shippingAddress.phone}</p>
-              <Link href="/checkout/shipping" className="text-sm text-primary hover:underline mt-2 inline-block">Edit Shipping Address</Link>
-            </Card>
-          </section>
-
-          {isGiftOrder && giftDetailsToSave && (
+    <>
+      <div className="max-w-4xl mx-auto">
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-2xl font-headline">Review Your Order</CardTitle>
+            <CardDescription>Please check your order details below before placing your order.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-8">
             <section>
-              <h3 className="text-lg font-semibold mb-3 flex items-center"><Gift className="mr-2 h-5 w-5 text-primary"/>Gift Details:</h3>
-              <Card className="bg-muted/50 p-4 text-sm">
-                <p>This order is a gift for: <strong>{giftDetailsToSave.recipientName}</strong></p>
-                {giftDetailsToSave.notifyRecipient && giftDetailsToSave.recipientContactValue && (
-                  <>
-                    <p>Recipient will be notified via {giftDetailsToSave.recipientContactMethod}: {giftDetailsToSave.recipientContactValue}</p>
-                    {giftDetailsToSave.giftMessage && <p>Message: <em>"{giftDetailsToSave.giftMessage}"</em></p>}
-                    <p>Prices {giftDetailsToSave.showPricesToRecipient ? "WILL" : "will NOT"} be shown in the notification.</p>
-                    <p>Recipient {giftDetailsToSave.recipientCanViewAndTrack ? "CAN" : "CANNOT"} view order details & track the gift.</p>
-                  </>
-                )}
-                {!giftDetailsToSave.notifyRecipient && <p>Recipient will not be notified directly by us.</p>}
-                <Link href="/checkout/shipping" className="text-sm text-primary hover:underline mt-2 inline-block">Edit Gift Details</Link>
+              <h3 className="text-lg font-semibold mb-3">Shipping To:</h3>
+              <Card className="bg-muted/50 p-4">
+                <p><strong>{shippingAddress.fullName}</strong> ({shippingAddress.email})</p>
+                <p>{shippingAddress.addressLine1}</p>
+                {shippingAddress.addressLine2 && <p>{shippingAddress.addressLine2}</p>}
+                <p>{shippingAddress.city}, {shippingAddress.county} {shippingAddress.postalCode}</p>
+                <p>Phone: {shippingAddress.phone}</p>
+                <Link href="/checkout/shipping" className="text-sm text-primary hover:underline mt-2 inline-block">Edit Shipping Address</Link>
               </Card>
             </section>
-          )}
 
-          <section>
-            <h3 className="text-lg font-semibold mb-3">Shipping Method:</h3>
-            <Card className="bg-muted/50 p-4">
-                <p className="font-semibold">{selectedShippingMethodInfo.name} ({selectedShippingMethodInfo.duration})</p>
-                <p>Cost: {formatPrice(selectedShippingMethodInfo.cost)}</p>
-                <Link href="/checkout/payment" className="text-sm text-primary hover:underline mt-2 inline-block">Change Shipping Method</Link>
-            </Card>
-          </section>
-
-          <section>
-            <h3 className="text-lg font-semibold mb-3">Payment Method:</h3>
-            <Card className="bg-muted/50 p-4">
-              <p className="capitalize">
-                {paymentMethod === 'cod' && 'Pay on Delivery'}
-                {paymentMethod === 'mpesa' && 'M-Pesa (Paybill/Till)'}
-                {paymentMethod === 'card' && 'Credit/Debit Card'}
-              </p>
-              <Link href="/checkout/payment" className="text-sm text-primary hover:underline mt-2 inline-block">Change Payment Method</Link>
-            </Card>
-          </section>
-
-          <section>
-            <h3 className="text-lg font-semibold mb-3">Items in Your Order:</h3>
-            {isLoadingOptions && <div className="text-center py-4"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto"/> <p className="text-sm text-muted-foreground">Loading item details...</p></div>}
-            {!isLoadingOptions && (
-              <ul role="list" className="divide-y divide-border border rounded-md">
-                {cartItems.map((item: CartItemType) => {
-                  const itemOptions = resolvedProductOptionsMap.get(item.cartItemId);
-                  return (
-                    <li key={item.cartItemId} className="flex py-4 px-4 items-start sm:items-center flex-col sm:flex-row">
-                      <Image
-                        src={item.imageUrl || 'https://placehold.co/64x64.png'}
-                        alt={item.name}
-                        width={64}
-                        height={64}
-                        className="w-16 h-16 rounded-md object-cover mr-0 sm:mr-4 mb-2 sm:mb-0 bg-muted flex-shrink-0"
-                        data-ai-hint="checkout review item"
-                      />
-                      <div className="flex-grow">
-                        <p className="font-semibold">{item.name}</p>
-                        <p className="text-sm text-muted-foreground">Qty: {item.quantity} x {formatPrice(item.currentPrice)}</p>
-                        {item.customizations && Object.keys(item.customizations).length > 0 && (
-                          <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
-                            {Object.entries(item.customizations).map(([optionId, selectedValue]) => {
-                              const details = getDisplayableCustomizationValue(optionId, selectedValue, itemOptions);
-                              return (
-                                <div key={optionId} className="flex items-center gap-1">
-                                  <span className="font-medium">{details.label}:</span> 
-                                  {details.isColor && details.colorHex && (
-                                    <span style={{ backgroundColor: details.colorHex }} className="inline-block w-3 h-3 rounded-full border border-muted-foreground mr-1"></span>
-                                  )}
-                                  <span>{details.value}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                      <p className="font-semibold mt-2 sm:mt-0 text-right sm:text-left">{formatPrice(item.currentPrice * item.quantity)}</p>
-                    </li>
-                  );
-                })}
-              </ul>
+            {isGiftOrder && giftDetailsToSave && (
+              <section>
+                <h3 className="text-lg font-semibold mb-3 flex items-center"><Gift className="mr-2 h-5 w-5 text-primary"/>Gift Details:</h3>
+                <Card className="bg-muted/50 p-4 text-sm">
+                  <p>This order is a gift for: <strong>{giftDetailsToSave.recipientName}</strong></p>
+                  {giftDetailsToSave.notifyRecipient && giftDetailsToSave.recipientContactValue && (
+                    <>
+                      <p>Recipient will be notified via {giftDetailsToSave.recipientContactMethod}: {giftDetailsToSave.recipientContactValue}</p>
+                      {giftDetailsToSave.giftMessage && <p>Message: <em>"{giftDetailsToSave.giftMessage}"</em></p>}
+                      <p>Prices {giftDetailsToSave.showPricesToRecipient ? "WILL" : "will NOT"} be shown in the notification.</p>
+                      <p>Recipient {giftDetailsToSave.recipientCanViewAndTrack ? "CAN" : "CANNOT"} view order details & track the gift.</p>
+                    </>
+                  )}
+                  {!giftDetailsToSave.notifyRecipient && <p>Recipient will not be notified directly by us.</p>}
+                  <Link href="/checkout/shipping" className="text-sm text-primary hover:underline mt-2 inline-block">Edit Gift Details</Link>
+                </Card>
+              </section>
             )}
-             <Link href="/orders/cart" className="text-sm text-primary hover:underline mt-3 inline-block">Edit Cart</Link>
-          </section>
 
-          <section className="pt-6 border-t">
-            <h3 className="text-lg font-semibold mb-4">Order Summary</h3>
-            <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span>{formatPrice(cartSubtotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Shipping ({selectedShippingMethodInfo.name})</span>
-                  <span>{formatPrice(shippingCost)}</span>
-                </div>
-                <Separator className="my-2"/>
-                <div className="flex justify-between text-xl font-bold">
-                  <span>Total</span>
-                  <span>{formatPrice(orderTotal)}</span>
-                </div>
-            </div>
-          </section>
+            <section>
+              <h3 className="text-lg font-semibold mb-3">Shipping Method:</h3>
+              <Card className="bg-muted/50 p-4">
+                  <p className="font-semibold">{selectedShippingMethodInfo.name} ({selectedShippingMethodInfo.duration})</p>
+                  <p>Cost: {formatPrice(selectedShippingMethodInfo.cost)}</p>
+                  <Link href="/checkout/payment" className="text-sm text-primary hover:underline mt-2 inline-block">Change Shipping Method</Link>
+              </Card>
+            </section>
 
-        </CardContent>
-        <CardFooter>
-          <Button size="lg" className="w-full" onClick={handlePlaceOrder} disabled={isPlacingOrder || isLoadingOptions}>
-            {isPlacingOrder ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PackageCheck className="mr-2 h-5 w-5" />}
-            {isPlacingOrder ? "Placing Order..." : "Place Order & Pay"}
-          </Button>
-        </CardFooter>
-      </Card>
-    </div>
+            <section>
+              <h3 className="text-lg font-semibold mb-3">Payment Method:</h3>
+              <Card className="bg-muted/50 p-4">
+                <p className="capitalize">
+                  {paymentMethod === 'cod' && 'Pay on Delivery'}
+                  {paymentMethod === 'mpesa' && 'M-Pesa (Paybill/Till)'}
+                  {paymentMethod === 'card' && 'Credit/Debit Card'}
+                </p>
+                <Link href="/checkout/payment" className="text-sm text-primary hover:underline mt-2 inline-block">Change Payment Method</Link>
+              </Card>
+            </section>
+
+            <section>
+              <h3 className="text-lg font-semibold mb-3">Items in Your Order:</h3>
+              {isLoadingOptions && <div className="text-center py-4"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto"/> <p className="text-sm text-muted-foreground">Loading item details...</p></div>}
+              {!isLoadingOptions && (
+                <ul role="list" className="divide-y divide-border border rounded-md">
+                  {cartItems.map((item: CartItemType) => {
+                    const itemOptions = resolvedProductOptionsMap.get(item.cartItemId);
+                    return (
+                      <li key={item.cartItemId} className="flex py-4 px-4 items-start sm:items-center flex-col sm:flex-row">
+                        <Image
+                          src={item.imageUrl || 'https://placehold.co/64x64.png'}
+                          alt={item.name}
+                          width={64}
+                          height={64}
+                          className="w-16 h-16 rounded-md object-cover mr-0 sm:mr-4 mb-2 sm:mb-0 bg-muted flex-shrink-0"
+                          data-ai-hint="checkout review item"
+                        />
+                        <div className="flex-grow">
+                          <p className="font-semibold">{item.name}</p>
+                          <p className="text-sm text-muted-foreground">Qty: {item.quantity} x {formatPrice(item.currentPrice)}</p>
+                          {item.customizations && Object.keys(item.customizations).length > 0 && (
+                            <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
+                              {Object.entries(item.customizations).map(([optionId, selectedValue]) => {
+                                const details = getDisplayableCustomizationValue(optionId, selectedValue, itemOptions);
+                                return (
+                                  <div key={optionId} className="flex items-center gap-1">
+                                    <span className="font-medium">{details.label}:</span> 
+                                    {details.isColor && details.colorHex && (
+                                      <span style={{ backgroundColor: details.colorHex }} className="inline-block w-3 h-3 rounded-full border border-muted-foreground mr-1"></span>
+                                    )}
+                                    <span>{details.value}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                        <p className="font-semibold mt-2 sm:mt-0 text-right sm:text-left">{formatPrice(item.currentPrice * item.quantity)}</p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <Link href="/orders/cart" className="text-sm text-primary hover:underline mt-3 inline-block">Edit Cart</Link>
+            </section>
+
+            <section className="pt-6 border-t">
+              <h3 className="text-lg font-semibold mb-4">Order Summary</h3>
+              <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>{formatPrice(cartSubtotal)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Shipping ({selectedShippingMethodInfo.name})</span>
+                    <span>{formatPrice(shippingCost)}</span>
+                  </div>
+                  <Separator className="my-2"/>
+                  <div className="flex justify-between text-xl font-bold">
+                    <span>Total</span>
+                    <span>{formatPrice(orderTotal)}</span>
+                  </div>
+              </div>
+            </section>
+
+          </CardContent>
+          <CardFooter>
+            <Button size="lg" className="w-full" onClick={handlePlaceOrder} disabled={isPlacingOrder || isLoadingOptions}>
+              {isPlacingOrder ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PackageCheck className="mr-2 h-5 w-5" />}
+              {isPlacingOrder ? "Placing Order..." : "Place Order & Pay"}
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+      <OrderSuccessModal
+        isOpen={isSuccessModalOpen}
+        onOpenChange={setIsSuccessModalOpen}
+        orderId={confirmedOrderId}
+      />
+    </>
   );
 }
