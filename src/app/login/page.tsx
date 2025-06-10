@@ -1,3 +1,4 @@
+
 "use client";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { Logo } from "@/components/common/Logo";
@@ -5,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import Link from "next/link"; // Import Link
+import { Loader2 } from "lucide-react"; // Import Loader2
 
 export default function LoginPage() {
   const { user, loading } = useAuth();
@@ -17,7 +20,7 @@ export default function LoginPage() {
   }, [user, loading, router]);
   
   if (loading || (!loading && user)) {
-    return <div className="flex items-center justify-center min-h-screen"><div className="animate-pulse">Loading...</div></div>;
+    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
   return (
@@ -37,7 +40,7 @@ export default function LoginPage() {
         </CardContent>
       </Card>
        <p className="mt-6 text-center text-sm text-muted-foreground">
-        New to Zellow Enterprises? <a href="#" className="font-medium text-primary hover:underline">Sign up</a>
+        New to Zellow Enterprises? <Link href="/signup" className="font-medium text-primary hover:underline">Sign up</Link>
       </p>
     </div>
   );

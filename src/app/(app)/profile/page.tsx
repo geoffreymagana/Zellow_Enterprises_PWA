@@ -46,10 +46,11 @@ export default function ProfilePage() {
   const getInitials = (name?: string | null) => {
     if (!name) return <UserCircle2 className="h-12 w-12" />;
     const names = name.split(' ');
-    if (names.length > 1) {
+    if (names.length > 1 && names[0] && names[names.length - 1]) {
       return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
     }
-    return name.substring(0, 2).toUpperCase();
+    if(names[0]) return names[0].substring(0, 2).toUpperCase();
+    return <UserCircle2 className="h-12 w-12" />;
   };
 
   async function onSubmit(data: ProfileFormValues) {
@@ -164,7 +165,7 @@ function RoleBadge({ role }: { role: string | null }) {
   if (role === 'Technician') colorClasses = "bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-200";
   if (role === 'Rider') colorClasses = "bg-purple-100 text-purple-700 dark:bg-purple-800 dark:text-purple-200";
   if (role === 'Supplier') colorClasses = "bg-yellow-100 text-yellow-700 dark:bg-yellow-800 dark:text-yellow-200";
-  if (role === 'SupplyManager') colorClasses = "bg-indigo-100 text-indigo-700 dark:bg-indigo-800 dark:text-indigo-200";
+  // Removed SupplyManager as it's not in UserRole type
   if (role === 'FinanceManager') colorClasses = "bg-pink-100 text-pink-700 dark:bg-pink-800 dark:text-pink-200";
   if (role === 'ServiceManager') colorClasses = "bg-teal-100 text-teal-700 dark:bg-teal-800 dark:text-teal-200";
   if (role === 'InventoryManager') colorClasses = "bg-orange-100 text-orange-700 dark:bg-orange-800 dark:text-orange-200";

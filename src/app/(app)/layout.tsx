@@ -325,7 +325,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
       } else {
         params.delete('q');
       }
-      // Only push to /products page for search
+      // Only push to /products or /gift-boxes page for search
       if (pathname === '/products' || pathname === '/gift-boxes') {
          router.push(`${pathname}?${params.toString()}`);
       } else if (newSearchTerm) { 
@@ -423,7 +423,7 @@ export default function AppGroupLayout({ children }: LayoutProps) {
 
   useEffect(() => {
     if (!loading) {
-      if (!user && !['/login', '/signup'].includes(pathname)) {
+      if (!user && !['/login', '/signup', '/track/order/[orderId]'].some(p => pathname.startsWith(p.replace('[orderId]', '')))) {
         router.replace('/login');
       }
       if (user && pathname === '/') {
@@ -433,11 +433,16 @@ export default function AppGroupLayout({ children }: LayoutProps) {
   }, [user, loading, pathname, router]);
 
 
-  if (loading || (!user && !['/login', '/signup'].includes(pathname)) || (user && pathname === '/')) {
+  if (loading || (!user && !['/login', '/signup', '/track/order/[orderId]'].some(p => pathname.startsWith(p.replace('[orderId]', '')))) || (user && pathname === '/')) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
   
   if (!user && (pathname === '/login' || pathname === '/signup')) {
+    return <>{children}</>;
+  }
+
+  // Allow public access to order tracking page even if no user
+  if (pathname.startsWith('/track/order/')) {
     return <>{children}</>;
   }
   
