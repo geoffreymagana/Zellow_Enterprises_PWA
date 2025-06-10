@@ -1,15 +1,16 @@
 
 'use server';
 /**
- * @fileOverview A Genkit flow to handle sending gift notifications (simulated).
+ * @fileOverview A Genkit flow to handle sending gift notifications.
  *
- * - sendGiftNotification - Simulates sending a notification to a gift recipient.
+ * - sendGiftNotification - Sends a notification to a gift recipient via email or simulates for other methods.
  * - GiftNotificationInput - Input type for the flow.
  * - GiftNotificationOutput - Output type for the flow.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import nodemailer from 'nodemailer';
 
 const GiftNotificationInputSchema = z.object({
   orderId: z.string().describe('The ID of the gift order.'),
@@ -51,48 +52,91 @@ const sendGiftNotificationFlow = ai.defineFlow(
       };
     }
 
-    const siteBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:9002'; // Fallback for local dev
+    const siteBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:9002'; 
     const trackingLink = `${siteBaseUrl}/track/order/${input.orderId}`;
 
-    let notificationMessage = `Hello ${input.recipientName},\n\n`;
-    notificationMessage += `${input.senderName} has sent you a gift!`;
-    if (input.giftMessage) {
-      notificationMessage += `\n\nTheir message: "${input.giftMessage}"`;
+    if (input.recipientContactMethod === 'email') {
+      // Email sending logic
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || "587", 10),
+        secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+
+      let emailHtmlBody = `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+          <p>Hello ${input.recipientName},</p>
+          <p>${input.senderName} has sent you a special gift from Zellow Enterprises!</p>
+      `;
+      if (input.giftMessage) {
+        emailHtmlBody += `<p><strong>Their message:</strong></p><p style="border-left: 3px solid #eee; padding-left: 10px; margin-left: 5px; font-style: italic;">${input.giftMessage}</p>`;
+      }
+
+      if (input.canViewAndTrack) {
+        emailHtmlBody += `<p>You can view your gift details and track its progress here: <a href="${trackingLink}" style="color: #34A7C1; text-decoration: none;">${trackingLink}</a></p>`;
+        if (input.showPricesToRecipient) {
+          emailHtmlBody += `<p><small>Price information will be visible when you view the order.</small></p>`;
+        } else {
+          emailHtmlBody += `<p><small>Price information for this gift has been hidden by the sender.</small></p>`;
+        }
+      } else {
+        emailHtmlBody += `<p>Your gift is being processed by Zellow Enterprises and will be on its way soon.</p>`;
+      }
+      
+      emailHtmlBody += `
+          <p>Thank you,<br/>The Zellow Enterprises Team</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;"/>
+          <p style="font-size: 0.8em; color: #777;">This is an automated notification. If you have any questions, please contact Zellow Enterprises support.</p>
+        </div>
+      `;
+
+      const mailOptions = {
+        from: `Zellow Enterprises <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER}>`,
+        to: input.recipientContactValue,
+        subject: `A special gift from ${input.senderName} is on its way!`,
+        html: emailHtmlBody,
+      };
+
+      try {
+        await transporter.sendMail(mailOptions);
+        console.log('[GiftNotificationFlow] Email sent successfully to:', input.recipientContactValue);
+        return {
+          success: true,
+          message: `Email notification sent to ${input.recipientContactValue}. Tracking link: ${input.canViewAndTrack ? trackingLink : 'N/A'}`,
+          trackingLink: input.canViewAndTrack ? trackingLink : undefined,
+        };
+      } catch (error: any) {
+        console.error('[GiftNotificationFlow] Error sending email:', error);
+        return {
+          success: false,
+          message: `Failed to send email notification: ${error.message}. Order was still placed.`,
+          trackingLink: input.canViewAndTrack ? trackingLink : undefined, // Still provide link if applicable
+        };
+      }
+
+    } else if (input.recipientContactMethod === 'phone') {
+      // Simulate SMS
+      let smsBody = `Hello ${input.recipientName}, ${input.senderName} sent you a gift from Zellow!`;
+      if (input.giftMessage) smsBody += ` Message: "${input.giftMessage.substring(0, 50)}..."`;
+      if (input.canViewAndTrack) smsBody += ` Track: ${trackingLink}`;
+      
+      console.log(`[GiftNotificationFlow] SIMULATING SMS to ${input.recipientContactValue}: ${smsBody}`);
+      return {
+        success: true,
+        message: `Simulated SMS notification sent to ${input.recipientContactValue}. Tracking link: ${input.canViewAndTrack ? trackingLink : 'N/A'}`,
+        trackingLink: input.canViewAndTrack ? trackingLink : undefined,
+      };
     }
 
-    if (input.canViewAndTrack) {
-      notificationMessage += `\n\nYou can view details and track your gift here: ${trackingLink}`;
-    } else {
-      notificationMessage += `\n\nYour gift is being processed.`;
-    }
-    
-    // Price information note (not directly in message unless showPricesToRecipient is true and implemented)
-    // For now, this flow doesn't construct a message showing prices.
-    if (input.showPricesToRecipient) {
-        console.log('[GiftNotificationFlow] Prices WOULD be included in the notification if a full template was used.');
-    }
-
-
-    console.log(`[GiftNotificationFlow] SIMULATING NOTIFICATION:`);
-    console.log(`--------------------------------------------------`);
-    console.log(`To: ${input.recipientContactValue} (via ${input.recipientContactMethod})`);
-    console.log(`From: Zellow Enterprises (on behalf of ${input.senderName})`);
-    console.log(`Subject: A special gift is on its way!`);
-    console.log(`Body:\n${notificationMessage}`);
-    console.log(`--------------------------------------------------`);
-
-    // Here you would integrate with an actual email/SMS service
-    // For example:
-    // if (input.recipientContactMethod === 'email') {
-    //   // await sendEmail(input.recipientContactValue, subject, emailBody);
-    // } else if (input.recipientContactMethod === 'phone') {
-    //   // await sendSms(input.recipientContactValue, smsBody);
-    // }
-
+    // Fallback or unhandled contact method
     return {
-      success: true,
-      message: `Simulated ${input.recipientContactMethod} notification sent to ${input.recipientContactValue}. Tracking link: ${input.canViewAndTrack ? trackingLink : 'N/A'}`,
-      trackingLink: input.canViewAndTrack ? trackingLink : undefined,
+      success: false,
+      message: `Notification method '${input.recipientContactMethod}' not supported or not implemented.`,
     };
   }
 );
+
