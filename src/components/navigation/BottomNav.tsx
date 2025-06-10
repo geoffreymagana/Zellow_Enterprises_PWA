@@ -124,19 +124,21 @@ export function BottomNav() {
           })();
 
           return (
-            <Link key={item.label} href={item.href} legacyBehavior>
-              <a className={cn(
+            <Link 
+              key={item.label} 
+              href={item.href} 
+              className={cn(
                 "flex flex-col items-center justify-center p-3 text-muted-foreground hover:text-primary transition-colors w-full relative",
                 isActive && "text-primary"
-              )}>
-                <item.icon className="h-6 w-6 mb-1" />
-                <span className="text-xs">{item.label}</span>
-                {item.showCartCount && cartTotalItems > 0 && (
-                   <span className="absolute top-1 right-1/2 translate-x-[120%] sm:translate-x-[150%] flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                    {cartTotalItems}
-                  </span>
-                )}
-              </a>
+              )}
+            >
+              <item.icon className="h-6 w-6 mb-1" />
+              <span className="text-xs">{item.label}</span>
+              {item.showCartCount && cartTotalItems > 0 && (
+                 <span className="absolute top-1 right-1/2 translate-x-[120%] sm:translate-x-[150%] flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                  {cartTotalItems}
+                </span>
+              )}
             </Link>
           );
         })}
