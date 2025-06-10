@@ -5,15 +5,20 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, DollarSign, ShoppingCart, TrendingUp, Coins, PackageIcon, PieChartIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, DollarSign, ShoppingCart, TrendingUp, Coins, PackageIcon, PieChartIcon, CalendarIcon, FilterX } from 'lucide-react';
 import Image from 'next/image';
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, Invoice, Product, OrderItem as FirestoreOrderItem } from '@/types';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isBefore, isAfter, parseISO, isValid } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isBefore, isAfter, isValid, parseISO, subMonths, addDays } from 'date-fns';
 import { MonthlyRevenueExpensesChart, type DailyDataPoint } from '@/components/charts/MonthlyRevenueExpensesChart';
 import { TopSellingProductsChart, type ProductSalesData } from '@/components/charts/TopSellingProductsChart';
 import { RevenueBreakdownChart, type RevenueSourceData } from '@/components/charts/RevenueBreakdownChart';
+import { DateRangePicker } from '@/components/common/DateRangePicker'; // Assuming you might create this
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -29,18 +34,19 @@ export default function FinancialsPage() {
   const [latestMonthNetChange, setLatestMonthNetChange] = useState<number>(0);
   const [targetMonthDateForChart, setTargetMonthDateForChart] = useState<Date>(new Date());
 
-
   const [topProductsData, setTopProductsData] = useState<ProductSalesData[]>([]);
   const [revenueBreakdownData, setRevenueBreakdownData] = useState<RevenueSourceData[]>([]);
 
-  const [totalRevenueAllTime, setTotalRevenueAllTime] = useState<number>(0);
-  const [totalSalesAllTime, setTotalSalesAllTime] = useState<number>(0);
-  const [totalExpensesAllTime, setTotalExpensesAllTime] = useState<number>(0);
-  const [netProfitAllTime, setNetProfitAllTime] = useState<number>(0);
+  const [totalRevenue, setTotalRevenue] = useState<number>(0);
+  const [totalSales, setTotalSales] = useState<number>(0);
+  const [totalExpenses, setTotalExpenses] = useState<number>(0);
+  const [netProfit, setNetProfit] = useState<number>(0);
 
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
 
-  const fetchFinancialData = useCallback(async () => {
+  const fetchFinancialData = useCallback(async (filterRange?: { start?: Date, end?: Date }) => {
     if (!db) {
       setIsLoadingStats(false);
       return;
@@ -48,13 +54,25 @@ export default function FinancialsPage() {
     setIsLoadingStats(true);
     try {
       const productsQuery = query(collection(db, 'products'));
-      const paidOrdersQuery = query(collection(db, 'orders'), where("paymentStatus", "==", "paid"));
-      const paidInvoicesQuery = query(collection(db, 'invoices'), where("status", "==", "paid"));
+      
+      let ordersBaseQuery = query(collection(db, 'orders'), where("paymentStatus", "==", "paid"));
+      let invoicesBaseQuery = query(collection(db, 'invoices'), where("status", "==", "paid"));
 
+      if (filterRange?.start) {
+        ordersBaseQuery = query(ordersBaseQuery, where("createdAt", ">=", Timestamp.fromDate(filterRange.start)));
+        invoicesBaseQuery = query(invoicesBaseQuery, where("invoiceDate", ">=", Timestamp.fromDate(filterRange.start)));
+      }
+      if (filterRange?.end) {
+        // For end date, we want to include the whole day, so add 1 day and use '<'
+        const exclusiveEndDate = addDays(filterRange.end, 1);
+        ordersBaseQuery = query(ordersBaseQuery, where("createdAt", "<", Timestamp.fromDate(exclusiveEndDate)));
+        invoicesBaseQuery = query(invoicesBaseQuery, where("invoiceDate", "<", Timestamp.fromDate(exclusiveEndDate)));
+      }
+      
       const [productsSnapshot, ordersSnapshot, invoicesSnapshot] = await Promise.all([
         getDocs(productsQuery),
-        getDocs(paidOrdersQuery),
-        getDocs(paidInvoicesQuery)
+        getDocs(ordersBaseQuery),
+        getDocs(invoicesBaseQuery)
       ]);
 
       const productsMap = new Map<string, Product>();
@@ -63,12 +81,12 @@ export default function FinancialsPage() {
       let revenueFromProductSales = 0;
       let revenueFromCustomizations = 0;
       let revenueFromDeliveryFees = 0;
-
-      let firstTransactionDate = new Date(2999, 0, 1); 
-      let lastTransactionDate = new Date(1970, 0, 1); 
       
       const monthlyRevenue: Record<string, number> = {};
       const monthlyExpenses: Record<string, number> = {};
+      
+      let firstTransactionDate = filterRange?.start || new Date(2999, 0, 1); 
+      let lastTransactionDate = filterRange?.end || new Date(1970, 0, 1); 
 
       ordersSnapshot.forEach((doc) => {
         const order = doc.data() as Order;
@@ -79,22 +97,15 @@ export default function FinancialsPage() {
         monthlyRevenue[monthKey] = (monthlyRevenue[monthKey] || 0) + order.totalAmount;
         revenueFromDeliveryFees += order.shippingCost || 0;
         
-        if (isBefore(orderDate, firstTransactionDate)) firstTransactionDate = orderDate;
-        if (isAfter(orderDate, lastTransactionDate)) lastTransactionDate = orderDate;
+        if (!filterRange?.start && isBefore(orderDate, firstTransactionDate)) firstTransactionDate = orderDate;
+        if (!filterRange?.end && isAfter(orderDate, lastTransactionDate)) lastTransactionDate = orderDate;
 
         order.items.forEach((item: FirestoreOrderItem) => {
           const product = productsMap.get(item.productId);
-          // Use item.price (which is unit price at time of sale including customizations)
-          // And product.price (base product price) to differentiate.
-          const baseProductPrice = product ? product.price : (item.price / item.quantity); // Fallback if product not found
-
+          const baseProductPrice = product ? product.price : (item.price / item.quantity);
           revenueFromProductSales += baseProductPrice * item.quantity;
-          
-          // Customization revenue is the difference between item's sale price and its base price, times quantity
           const customizationRevenueForItem = (item.price - baseProductPrice) * item.quantity;
-          if (customizationRevenueForItem > 0) {
-            revenueFromCustomizations += customizationRevenueForItem;
-          }
+          if (customizationRevenueForItem > 0) revenueFromCustomizations += customizationRevenueForItem;
         });
       });
 
@@ -105,16 +116,16 @@ export default function FinancialsPage() {
         const monthKey = format(invoiceDate, 'yyyy-MM');
         monthlyExpenses[monthKey] = (monthlyExpenses[monthKey] || 0) + invoice.totalAmount;
 
-        if (isBefore(invoiceDate, firstTransactionDate)) firstTransactionDate = invoiceDate;
-        if (isAfter(invoiceDate, lastTransactionDate)) lastTransactionDate = invoiceDate;
+        if (!filterRange?.start && isBefore(invoiceDate, firstTransactionDate)) firstTransactionDate = invoiceDate;
+        if (!filterRange?.end && isAfter(invoiceDate, lastTransactionDate)) lastTransactionDate = invoiceDate;
       });
 
-      const allTimeRevenueCalc = Object.values(monthlyRevenue).reduce((sum, val) => sum + val, 0);
-      const allTimeExpensesCalc = Object.values(monthlyExpenses).reduce((sum, val) => sum + val, 0);
-      setTotalRevenueAllTime(allTimeRevenueCalc);
-      setTotalSalesAllTime(ordersSnapshot.size);
-      setTotalExpensesAllTime(allTimeExpensesCalc);
-      setNetProfitAllTime(allTimeRevenueCalc - allTimeExpensesCalc);
+      const currentRangeRevenue = Object.values(monthlyRevenue).reduce((sum, val) => sum + val, 0);
+      const currentRangeExpenses = Object.values(monthlyExpenses).reduce((sum, val) => sum + val, 0);
+      setTotalRevenue(currentRangeRevenue);
+      setTotalSales(ordersSnapshot.size);
+      setTotalExpenses(currentRangeExpenses);
+      setNetProfit(currentRangeRevenue - currentRangeExpenses);
       
       setRevenueBreakdownData([
         { name: "Product Sales", value: revenueFromProductSales, color: "hsl(var(--chart-1))" },
@@ -122,27 +133,17 @@ export default function FinancialsPage() {
         { name: "Delivery Fees", value: revenueFromDeliveryFees, color: "hsl(var(--chart-3))" },
       ].filter(source => source.value > 0));
 
-
-      let targetMonthDate = new Date(); 
-      if (isValid(lastTransactionDate) && lastTransactionDate.getFullYear() !== 1970) {
-         targetMonthDate = lastTransactionDate;
-      } else if (isValid(firstTransactionDate) && firstTransactionDate.getFullYear() !== 2999) {
-         targetMonthDate = firstTransactionDate;
-      }
-      setTargetMonthDateForChart(targetMonthDate);
-      
-      setLatestMonthLabel(format(targetMonthDate, 'MMMM yyyy'));
+      let targetMonthForDailyChart = filterRange?.end ? filterRange.end : (isValid(lastTransactionDate) && lastTransactionDate.getFullYear() !== 1970 ? lastTransactionDate : new Date());
+      setTargetMonthDateForChart(targetMonthForDailyChart);
+      setLatestMonthLabel(format(targetMonthForDailyChart, 'MMMM yyyy'));
       
       const daysInTargetMonth = eachDayOfInterval({
-        start: startOfMonth(targetMonthDate),
-        end: (isSameMonth(targetMonthDate, new Date())) ? new Date() : endOfMonth(targetMonthDate)
+        start: startOfMonth(targetMonthForDailyChart),
+        end: (isSameMonth(targetMonthForDailyChart, new Date()) && (!filterRange || !filterRange.end || isSameMonth(filterRange.end, new Date()))) ? new Date() : endOfMonth(targetMonthForDailyChart)
       });
 
       const dailyDataForMonthChart: DailyDataPoint[] = daysInTargetMonth.map(day => ({
-        day: format(day, 'MMM dd'),
-        dateObject: day,
-        revenue: 0,
-        expenses: 0,
+        day: format(day, 'MMM dd'), dateObject: day, revenue: 0, expenses: 0,
       }));
 
       let currentMonthRevenue = 0;
@@ -152,13 +153,10 @@ export default function FinancialsPage() {
         const order = doc.data() as Order;
         const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date();
         if (!isValid(orderDate)) return;
-        if (isSameMonth(orderDate, targetMonthDate)) {
+        if (isSameMonth(orderDate, targetMonthForDailyChart)) {
           const dayKey = format(orderDate, 'MMM dd');
           const dayEntry = dailyDataForMonthChart.find(d => d.day === dayKey);
-          if (dayEntry) {
-            dayEntry.revenue += order.totalAmount;
-            currentMonthRevenue += order.totalAmount;
-          }
+          if (dayEntry) { dayEntry.revenue += order.totalAmount; currentMonthRevenue += order.totalAmount; }
         }
       });
 
@@ -166,28 +164,16 @@ export default function FinancialsPage() {
         const invoice = doc.data() as Invoice;
         const invoiceDate = invoice.invoiceDate?.toDate ? invoice.invoiceDate.toDate() : new Date();
         if (!isValid(invoiceDate)) return;
-         if (isSameMonth(invoiceDate, targetMonthDate)) {
+         if (isSameMonth(invoiceDate, targetMonthForDailyChart)) {
           const dayKey = format(invoiceDate, 'MMM dd');
           const dayEntry = dailyDataForMonthChart.find(d => d.day === dayKey);
-          if (dayEntry) {
-            dayEntry.expenses += invoice.totalAmount;
-            currentMonthExpenses += invoice.totalAmount;
-          }
+          if (dayEntry) { dayEntry.expenses += invoice.totalAmount; currentMonthExpenses += invoice.totalAmount;}
         }
       });
       
       setDailyChartData(dailyDataForMonthChart);
       setLatestMonthNetChange(currentMonthRevenue - currentMonthExpenses);
-      
-      const allMonthKeys = Array.from(new Set([...Object.keys(monthlyRevenue), ...Object.keys(monthlyExpenses)])).sort();
-      let cumulativeProfit = 0;
-      allMonthKeys.forEach(monthKey => {
-        const rev = monthlyRevenue[monthKey] || 0;
-        const exp = monthlyExpenses[monthKey] || 0;
-        cumulativeProfit += (rev - exp);
-      });
-      setOverallCumulativeNetProfit(cumulativeProfit);
-
+      setOverallCumulativeNetProfit(netProfit); // For filtered range, this is just the range's net profit.
 
       const productSalesAgg: Record<string, { name: string; totalRevenue: number; totalQuantity: number }> = {};
       ordersSnapshot.forEach((doc) => {
@@ -196,32 +182,42 @@ export default function FinancialsPage() {
           if (!productSalesAgg[item.productId]) {
             productSalesAgg[item.productId] = { name: item.name, totalRevenue: 0, totalQuantity: 0 };
           }
-          productSalesAgg[item.productId].totalRevenue += item.price; 
+          productSalesAgg[item.productId].totalRevenue += item.price * item.quantity; // Use item price * quantity
           productSalesAgg[item.productId].totalQuantity += item.quantity;
         });
       });
       const topProductsArray = Object.values(productSalesAgg)
         .sort((a,b) => b.totalRevenue - a.totalRevenue)
-        .slice(0, 5); // Get top 5 products
+        .slice(0, 5);
       setTopProductsData(topProductsArray);
-
 
     } catch (error) {
       console.error("Error fetching financial data:", error);
     } finally {
       setIsLoadingStats(false);
     }
-  }, []);
+  }, []); // startDate, endDate are not dependencies here as fetch is called explicitly with them
 
   useEffect(() => {
     if (!authLoading) {
       if (!user || !['FinanceManager', 'Admin'].includes(role || '')) {
         router.replace('/dashboard');
       } else {
-        fetchFinancialData();
+        fetchFinancialData({ start: startDate, end: endDate });
       }
     }
-  }, [user, role, authLoading, router, fetchFinancialData]);
+  }, [user, role, authLoading, router, fetchFinancialData, startDate, endDate]);
+  
+  const handleDateFilterApply = () => {
+     fetchFinancialData({ start: startDate, end: endDate });
+  };
+
+  const handleClearFilter = () => {
+    setStartDate(undefined);
+    setEndDate(undefined);
+    // fetchFinancialData(); // fetchFinancialData is already called by useEffect on startDate/endDate change
+  };
+
 
   if (authLoading || isLoadingStats) {
     return (
@@ -231,53 +227,115 @@ export default function FinancialsPage() {
     );
   }
 
+  const filterActive = startDate || endDate;
+
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-headline font-semibold">Financials</h1>
-        <p className="text-muted-foreground mt-1">
-          Overview of key financial metrics and performance.
-        </p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 className="text-3xl font-headline font-semibold">Financials</h1>
+            <p className="text-muted-foreground mt-1">
+            {filterActive 
+                ? `Showing data from ${startDate ? format(startDate, 'PP') : 'start'} to ${endDate ? format(endDate, 'PP') : 'today'}.` 
+                : "Overview of key financial metrics and performance (All Time)."
+            }
+            </p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+             <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="dateStart"
+                    variant={"outline"}
+                    className={cn(
+                      "w-full sm:w-[180px] justify-start text-left font-normal h-9",
+                      !startDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {startDate ? format(startDate, "LLL dd, y") : <span>Start date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={startDate}
+                    onSelect={setStartDate}
+                    initialFocus
+                    disabled={(date) => (endDate ? date > endDate : false) || date > new Date()}
+                  />
+                </PopoverContent>
+              </Popover>
+            <Popover>
+            <PopoverTrigger asChild>
+                <Button
+                id="dateEnd"
+                variant={"outline"}
+                className={cn(
+                    "w-full sm:w-[180px] justify-start text-left font-normal h-9",
+                    !endDate && "text-muted-foreground"
+                )}
+                >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {endDate ? format(endDate, "LLL dd, y") : <span>End date</span>}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                mode="single"
+                selected={endDate}
+                onSelect={setEndDate}
+                initialFocus
+                disabled={(date) => (startDate ? date < startDate : false) || date > new Date()}
+                />
+            </PopoverContent>
+            </Popover>
+             {filterActive && (
+                <Button onClick={handleClearFilter} variant="ghost" size="icon" className="h-9 w-9">
+                    <FilterX className="h-4 w-4" /> <span className="sr-only">Clear Filter</span>
+                </Button>
+            )}
+        </div>
       </div>
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Revenue {filterActive && "(Filtered)"}</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatPrice(totalRevenueAllTime)}</div>
-            <p className="text-xs text-muted-foreground">From all paid orders</p>
+            <div className="text-2xl font-bold">{formatPrice(totalRevenue)}</div>
+            <p className="text-xs text-muted-foreground">From paid orders {filterActive ? "in range" : "all time"}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Sales {filterActive && "(Filtered)"}</CardTitle>
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalSalesAllTime}</div>
-            <p className="text-xs text-muted-foreground">Number of paid orders</p>
+            <div className="text-2xl font-bold">{totalSales}</div>
+            <p className="text-xs text-muted-foreground">Number of paid orders {filterActive ? "in range" : "all time"}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Expenses {filterActive && "(Filtered)"}</CardTitle>
             <Coins className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatPrice(totalExpensesAllTime)}</div>
-            <p className="text-xs text-muted-foreground">From paid supplier invoices</p>
+            <div className="text-2xl font-bold">{formatPrice(totalExpenses)}</div>
+            <p className="text-xs text-muted-foreground">From paid supplier invoices {filterActive ? "in range" : "all time"}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Net Profit (All Time)</CardTitle>
+            <CardTitle className="text-sm font-medium">Net Profit {filterActive ? "(Selected Range)" : "(All Time)"}</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatPrice(netProfitAllTime)}</div>
+            <div className="text-2xl font-bold">{formatPrice(netProfit)}</div>
             <p className="text-xs text-muted-foreground">Revenue - Expenses</p>
           </CardContent>
         </Card>
@@ -286,20 +344,20 @@ export default function FinancialsPage() {
       <Card>
           <CardHeader>
             <CardTitle className="font-headline text-lg">Monthly Revenue vs Expenses</CardTitle>
-            <CardDescription>Daily trend for the latest active month.</CardDescription>
+            <CardDescription>Daily trend for {filterActive ? format(targetMonthDateForChart, 'MMMM yyyy') : "latest active month"}.</CardDescription>
           </CardHeader>
           <CardContent className="h-[360px] sm:h-[420px] md:h-[480px] lg:h-[520px] pb-0">
            {dailyChartData.length > 0 ? (
               <MonthlyRevenueExpensesChart 
                 dailyData={dailyChartData} 
-                overallCumulativeNetProfit={overallCumulativeNetProfit}
+                overallCumulativeNetProfit={overallCumulativeNetProfit} // This is net profit for the range or all time
                 latestMonthNetChange={latestMonthNetChange}
                 latestMonthLabel={latestMonthLabel}
                 targetMonthDate={targetMonthDateForChart}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
-                No data available for the selected month.
+                No data available for the selected month/range.
               </div>
             )}
           </CardContent>
@@ -308,7 +366,7 @@ export default function FinancialsPage() {
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline text-lg">Revenue Breakdown by Source</CardTitle>
+            <CardTitle className="font-headline text-lg">Revenue Breakdown by Source {filterActive && "(Filtered)"}</CardTitle>
             <CardDescription>Contribution of different revenue streams.</CardDescription>
           </CardHeader>
           <CardContent className="h-[360px] sm:h-[420px] md:h-[480px] lg:h-[520px] w-full pb-0">
@@ -317,14 +375,14 @@ export default function FinancialsPage() {
              ) : (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 text-center">
                     <PieChartIcon className="h-10 w-10 mb-2 text-muted-foreground/70" />
-                    No revenue breakdown data available.
+                    No revenue breakdown data available {filterActive && "for this range"}.
                 </div>
              )}
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline text-lg">Top Selling Products (by Revenue)</CardTitle>
+            <CardTitle className="font-headline text-lg">Top Selling Products (Revenue) {filterActive && "(Filtered)"}</CardTitle>
             <CardDescription>Performance of best-selling items based on revenue from paid orders.</CardDescription>
           </CardHeader>
           <CardContent className="h-[360px] sm:h-[420px] md:h-[480px] lg:h-[520px] w-full pb-0">
@@ -333,7 +391,7 @@ export default function FinancialsPage() {
              ) : (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 text-center">
                     <PackageIcon className="h-10 w-10 mb-2 text-muted-foreground/70"/>
-                    No sales data available for top products.
+                    No sales data available for top products {filterActive && "in this range"}.
                 </div>
              )}
           </CardContent>
@@ -342,7 +400,7 @@ export default function FinancialsPage() {
       
        <Card>
           <CardHeader>
-            <CardTitle className="font-headline text-lg">Expense Breakdown by Category</CardTitle>
+            <CardTitle className="font-headline text-lg">Expense Breakdown by Category {filterActive && "(Filtered)"}</CardTitle>
             <CardDescription>Spending across different operational categories. (Placeholder)</CardDescription>
           </CardHeader>
           <CardContent className="h-[350px] sm:h-[400px] flex items-center justify-center bg-muted/50 rounded-md">

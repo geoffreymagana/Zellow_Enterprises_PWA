@@ -3,8 +3,8 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useCallback } from 'react';
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { useEffect, useState, useCallback, useMemo } from 'react'; // Added useMemo
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"; // Removed CardHeader
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PlusCircle, Edit, Trash2, Eye, EyeOff, UserCheck, UserX } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Eye, EyeOff, UserCheck, UserX, Search } from 'lucide-react'; // Added Search
 import type { User, UserRole } from '@/types';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -55,6 +55,7 @@ export default function AdminUsersPage() {
   const [userToEdit, setUserToEdit] = useState<User | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [showDefaultPassword, setShowDefaultPassword] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(""); // State for search term
   
 
   const createUserForm = useForm<CreateUserFormValues>({
@@ -95,6 +96,20 @@ export default function AdminUsersPage() {
       }
     }
   }, [adminUser, adminRole, authLoading, router, fetchUsers]);
+  
+  // Filter users based on search term
+  const filteredUsers = useMemo(() => {
+    if (!searchTerm) return users;
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    return users.filter(user =>
+      (user.displayName?.toLowerCase() || "").includes(lowerSearchTerm) ||
+      (user.email?.toLowerCase() || "").includes(lowerSearchTerm) ||
+      (user.firstName?.toLowerCase() || "").includes(lowerSearchTerm) ||
+      (user.lastName?.toLowerCase() || "").includes(lowerSearchTerm) ||
+      (user.role?.toLowerCase() || "").includes(lowerSearchTerm)
+    );
+  }, [users, searchTerm]);
+
 
   const checkEmailExists = async (email: string): Promise<boolean> => {
     if (!db) return true; 
@@ -234,6 +249,7 @@ export default function AdminUsersPage() {
     try {
       const userDocRef = doc(db, 'users', userToDelete.uid);
       await deleteDoc(userDocRef);
+      // Note: This does NOT delete the Firebase Auth user. That's a separate, more complex operation.
       toast({ title: "User Record Deleted", description: `User ${userToDelete.displayName || userToDelete.email}'s record removed from Firestore. Their auth account still exists.` });
       setUserToDelete(null); 
       fetchUsers();
@@ -260,8 +276,11 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-headline font-semibold">User Management</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-headline font-semibold">User Management</h1>
+          <p className="text-muted-foreground mt-1">View, add, edit, and manage user accounts.</p>
+        </div>
         <Dialog open={isCreateUserOpen} onOpenChange={setIsCreateUserOpen}>
           <DialogTrigger asChild>
             <Button onClick={() => setIsCreateUserOpen(true)}>
@@ -319,14 +338,26 @@ export default function AdminUsersPage() {
           </DialogContent>
         </Dialog>
       </div>
-      <p className="text-muted-foreground">View, add, edit, and manage user accounts and their roles within the system.</p>
-
+      
       <Card>
+        <CardHeader className="p-4 border-b">
+           <div className="relative w-full max-w-md">
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search users (Name, Email, Role)..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8 h-9"
+            />
+          </div>
+        </CardHeader>
         <CardContent className="p-0">
-          {isLoading && users.length === 0 ? (
+          {isLoading && filteredUsers.length === 0 ? (
             <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
-          ) : users.length === 0 ? (
-            <p className="p-6 text-center text-muted-foreground">No users found.</p>
+          ) : filteredUsers.length === 0 ? (
+            <p className="p-6 text-center text-muted-foreground">
+              {users.length === 0 ? "No users found." : "No users match your search criteria."}
+            </p>
           ) : (
             <Table>
               <TableHeader>
@@ -339,7 +370,7 @@ export default function AdminUsersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => (
+                {filteredUsers.map((user) => (
                   <TableRow key={user.uid} className={user.disabled ? "opacity-60" : ""}>
                     <TableCell className={`font-medium ${user.disabled ? 'line-through' : ''}`}>{formatDisplayName(user)}</TableCell>
                     <TableCell>{user.email || '-'}</TableCell>
@@ -399,7 +430,7 @@ export default function AdminUsersPage() {
             </Table>
           )}
         </CardContent>
-        {users.length > 0 && <CardFooter className="pt-4"><p className="text-xs text-muted-foreground">Showing {users.length} users.</p></CardFooter>}
+        {filteredUsers.length > 0 && <CardFooter className="pt-4"><p className="text-xs text-muted-foreground">Showing {filteredUsers.length} of {users.length} users.</p></CardFooter>}
       </Card>
 
       <Dialog open={isEditUserOpen} onOpenChange={(isOpen) => {
@@ -471,4 +502,3 @@ export default function AdminUsersPage() {
     </div>
   );
 }
-

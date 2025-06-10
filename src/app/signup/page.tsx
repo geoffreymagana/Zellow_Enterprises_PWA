@@ -21,7 +21,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
-import { Progress } from "@/components/ui/progress"; // Import Progress component
+import { Progress } from "@/components/ui/progress"; 
+import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
   fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }).max(100),
@@ -33,7 +34,7 @@ const formSchema = z.object({
   confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
   message: "Passwords don't match",
-  path: ["confirmPassword"], // Path of error
+  path: ["confirmPassword"], 
 });
 
 export default function SignUpPage() {
@@ -67,19 +68,23 @@ export default function SignUpPage() {
   const calculateStrength = (password: string) => {
     const length = password.length;
     if (length === 0) return 0;
-    if (length < 8) return (length / 8) * 30;
-    if (length === 8) return 40;
-    if (length === 9) return 50;
-    if (length === 10) return 70;
-    if (length === 11) return 85;
-    return 100;
+    if (length < 8) return (length / 8) * 30; // Scale up to 30% for under 8 chars
+    
+    // From 8 characters onwards
+    let strength = 40; // Base for 8 chars
+    if (length >= 9) strength += 10; // +10 for 9th char
+    if (length >= 10) strength += 20; // +20 for 10th char (total +30 from 8)
+    if (length >= 11) strength += 15; // +15 for 11th char (total +45 from 8)
+    if (length >= 12) strength += 15; // +15 for 12th char (total +60 from 8, reaching 100%)
+    
+    return Math.min(strength, 100); // Cap at 100
   };
 
   const handlePasswordChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newPassword = event.target.value;
     setCurrentPassword(newPassword);
     setPasswordStrength(calculateStrength(newPassword));
-    form.setValue("password", newPassword, { shouldValidate: true }); // Update form value
+    form.setValue("password", newPassword, { shouldValidate: true }); 
   };
 
 
@@ -91,7 +96,6 @@ export default function SignUpPage() {
     setIsLoading(true);
     console.log("Form submitted with:", values);
     // TODO: Implement actual signup logic using useAuth().signup or similar
-    // For now, just a placeholder:
     await new Promise(resolve => setTimeout(resolve, 1500)); 
     alert("Sign Up Submitted (Not Implemented Yet) - Check console for values.");
     setIsLoading(false);
@@ -99,6 +103,8 @@ export default function SignUpPage() {
 
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
   const toggleConfirmPasswordVisibility = () => setShowConfirmPassword(!showConfirmPassword);
+  
+  const progressColor = passwordStrength >= 40 ? "bg-green-500" : "bg-primary";
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4 py-12">
@@ -185,7 +191,7 @@ export default function SignUpPage() {
               <FormField
                 control={form.control}
                 name="password"
-                render={({ field }) => ( // field is passed but we use handlePasswordChange for value updates
+                render={({ field }) => ( 
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
@@ -193,9 +199,9 @@ export default function SignUpPage() {
                         <Input
                           type={showPassword ? "text" : "password"}
                           placeholder="••••••••"
-                          {...field} // Spread field props for RHF integration
-                          value={currentPassword} // Controlled by local state for strength calc
-                          onChange={handlePasswordChange} // Custom handler
+                          {...field} 
+                          value={currentPassword} 
+                          onChange={handlePasswordChange} 
                           className="pr-10"
                         />
                         <Button
@@ -212,7 +218,7 @@ export default function SignUpPage() {
                     </FormControl>
                     {currentPassword.length > 0 && (
                       <div className="mt-1.5">
-                        <Progress value={passwordStrength} className="h-2 [&>div]:bg-primary" />
+                        <Progress value={passwordStrength} className={cn("h-1.5", progressColor === "bg-primary" ? "[&>div]:bg-primary" : "[&>div]:bg-green-500")} />
                         <p className="text-xs text-muted-foreground mt-1 text-right">
                           {passwordStrength < 40 && "Weak"}
                           {passwordStrength >= 40 && passwordStrength < 70 && "Okay"}
@@ -268,4 +274,3 @@ export default function SignUpPage() {
     </div>
   );
 }
-
