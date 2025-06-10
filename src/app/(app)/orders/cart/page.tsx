@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Trash2, PlusCircle, MinusCircle, ShoppingCart, ArrowLeft, CreditCard, Image as ImageIcon } from 'lucide-react';
+import { Trash2, PlusCircle, MinusCircle, ShoppingCart, ArrowLeft, CreditCard, Image as ImageIcon, ListOrdered } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Separator } from '@/components/ui/separator';
@@ -46,6 +46,13 @@ export default function CartPage() {
                 <ShoppingCart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
                 <p className="text-xl font-semibold">Your cart is empty.</p>
                 <p className="text-muted-foreground mt-2">Looks like you haven't added anything to your cart yet.</p>
+                <div className="mt-6">
+                  <Link href="/orders" passHref>
+                    <Button variant="outline">
+                      <ListOrdered className="mr-2 h-4 w-4" /> My Orders
+                    </Button>
+                  </Link>
+                </div>
               </CardContent>
             </Card>
           ) : (
