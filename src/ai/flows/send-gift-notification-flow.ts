@@ -60,10 +60,10 @@ const sendGiftNotificationFlow = ai.defineFlow(
       const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: parseInt(process.env.SMTP_PORT || "587", 10),
-        secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+        secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports (like 587 with STARTTLS)
         auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
+          user: process.env.SMTP_USER, // Use SMTP_USER for the username/email
+          pass: process.env.SMTP_PASS, // Use SMTP_PASS for the password/app password
         },
       });
 
@@ -93,9 +93,14 @@ const sendGiftNotificationFlow = ai.defineFlow(
           <p style="font-size: 0.8em; color: #777;">This is an automated notification. If you have any questions, please contact Zellow Enterprises support.</p>
         </div>
       `;
+      
+      // Construct the 'from' field using SMTP_FROM_NAME and SMTP_FROM_EMAIL
+      // Fallback to SMTP_USER for the email if SMTP_FROM_EMAIL is not set.
+      const fromName = process.env.SMTP_FROM_NAME || "Zellow Enterprises";
+      const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
 
       const mailOptions = {
-        from: `Zellow Enterprises <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER}>`,
+        from: `"${fromName}" <${fromEmail}>`,
         to: input.recipientContactValue,
         subject: `A special gift from ${input.senderName} is on its way!`,
         html: emailHtmlBody,
