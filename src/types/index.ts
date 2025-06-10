@@ -124,6 +124,7 @@ export interface OrderRating {
 }
 
 export interface Order {
+  senderName: string | undefined;
   id: string;
   customerId: string | null;
   customerName: string;
