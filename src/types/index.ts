@@ -1,5 +1,4 @@
 
-
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -156,7 +155,7 @@ export interface Order {
   isGift?: boolean;
   giftDetails?: GiftDetails | null;
   rating?: OrderRating | null;
-  giftTrackingToken?: string; // Added for public gift tracking
+  // giftTrackingToken?: string; // Removed this line
 }
 
 export interface CartItem {

@@ -31,10 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('current-year').textContent = new Date().getFullYear();
 
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
+    const token = params.get('token'); // This token is now the orderId
 
     if (!token) {
-        showError("No tracking token provided. Please check the link.");
+        showError("No tracking token (order ID) provided. Please check the link.");
         return;
     }
 
@@ -43,23 +43,17 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     
-    // Query Firestore for the order using the giftTrackingToken
-    const ordersRef = db.collection("orders");
-    const q = ordersRef.where("giftTrackingToken", "==", token).limit(1);
+    // Fetch the order document directly using the token (orderId)
+    const orderRef = db.collection("orders").doc(token);
 
-    q.onSnapshot((snapshot) => {
+    orderRef.onSnapshot((docSnapshot) => {
         loader.style.display = 'none';
-        if (snapshot.empty) {
+        if (!docSnapshot.exists) {
             showError("Gift tracking information not found. The link may be invalid or expired.");
             return;
         }
 
-        let orderData;
-        snapshot.forEach(doc => {
-            orderData = doc.data();
-            // Store orderId if needed globally, e.g., for further actions not shown here
-            // window.currentTrackingOrderId = doc.id; 
-        });
+        const orderData = docSnapshot.data();
 
         if (orderData) {
             orderDetailsDiv.style.display = 'block';

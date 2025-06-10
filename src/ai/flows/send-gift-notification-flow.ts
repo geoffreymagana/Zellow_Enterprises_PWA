@@ -21,7 +21,7 @@ const GiftNotificationInputSchema = z.object({
   senderName: z.string().describe("The sender's name."),
   canViewAndTrack: z.boolean().describe('Whether the recipient can view order details and track the gift.'),
   showPricesToRecipient: z.boolean().describe('Whether to show prices to the recipient in the notification.'),
-  giftTrackingToken: z.string().optional().describe('The unique token for public gift tracking if recipientCanViewAndTrack is true.'),
+  giftTrackingToken: z.string().optional().describe('Optional unique token (orderId is used by default for public gift tracking if this is not provided).'),
 });
 export type GiftNotificationInput = z.infer<typeof GiftNotificationInputSchema>;
 
@@ -56,16 +56,9 @@ const sendGiftNotificationFlow = ai.defineFlow(
     const siteBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://zellow-enterprises.vercel.app';
     let trackingLink = "";
 
-    if (input.canViewAndTrack) {
-      if (input.giftTrackingToken) {
-        // This link should point to your new gift-tracking mini-site
-        trackingLink = `${siteBaseUrl}/gift-tracking?token=${input.giftTrackingToken}`;
-      } else {
-        // Fallback or internal tracking if token is not available, but ideally it should be
-        // This link points to the main app's authenticated tracking.
-        trackingLink = `${siteBaseUrl}/track/order/${input.orderId}?ctx=gift_recipient`;
-        console.warn(`[GiftNotificationFlow] giftTrackingToken not provided for order ${input.orderId}, but recipient can view/track. Falling back to authenticated link.`);
-      }
+    if (input.canViewAndTrack && input.orderId) {
+      // The public gift tracking link will use the orderId as the token.
+      trackingLink = `${siteBaseUrl}/gift-tracking?token=${input.orderId}`;
     }
 
 
@@ -99,13 +92,6 @@ const sendGiftNotificationFlow = ai.defineFlow(
             </a>
           </p>
         `;
-        // Price visibility note is only relevant if they can track and the system would show prices.
-        // The new mini-site probably won't show prices by default.
-        // if (input.showPricesToRecipient) {
-        //   emailHtmlBody += `<p style="font-size: 0.9em; color: #555; text-align: center; margin-top: 5px;"><small>Price information may be visible when you view the order.</small></p>`;
-        // } else {
-        //   emailHtmlBody += `<p style="font-size: 0.9em; color: #555; text-align: center; margin-top: 5px;"><small>Price information for this gift has been hidden by the sender.</small></p>`;
-        // }
       } else {
         emailHtmlBody += `<p style="margin-top: 20px;">Your gift is being processed by Zellow Enterprises and will be on its way soon.</p>`;
       }
