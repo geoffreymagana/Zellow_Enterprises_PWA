@@ -52,7 +52,7 @@ const sendGiftNotificationFlow = ai.defineFlow(
       };
     }
 
-    const siteBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:9002'; 
+    const siteBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:9002';
     // Add ctx=gift_recipient to the tracking link
     const trackingLink = `${siteBaseUrl}/track/order/${input.orderId}?ctx=gift_recipient`;
 
@@ -60,7 +60,7 @@ const sendGiftNotificationFlow = ai.defineFlow(
       const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: parseInt(process.env.SMTP_PORT || "587", 10),
-        secure: process.env.SMTP_SECURE === 'true', 
+        secure: process.env.SMTP_SECURE === 'true',
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS,
@@ -149,4 +149,6 @@ const sendGiftNotificationFlow = ai.defineFlow(
     };
   }
 );
+    
+
     

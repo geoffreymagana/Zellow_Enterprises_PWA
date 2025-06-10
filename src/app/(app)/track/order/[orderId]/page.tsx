@@ -91,7 +91,6 @@ export default function TrackOrderPage() {
       if (docSnapshot.exists()) {
         const orderData = { id: docSnapshot.id, ...docSnapshot.data() } as Order;
         
-        // If it's a gift recipient view AND they are not allowed to track, show error.
         if (isGiftRecipientView && orderData.isGift && orderData.giftDetails && !orderData.giftDetails.recipientCanViewAndTrack) {
           setOrder(null); 
           setError("Access to detailed tracking for this gift is restricted by the sender.");
@@ -119,7 +118,6 @@ export default function TrackOrderPage() {
   }, [orderId, isGiftRecipientView]);
 
   const handleFeedbackSubmit = async () => {
-    // Feedback can only be submitted by the logged-in customer who placed the order.
     if (!orderId || !db || !user || (order && order.customerId !== user.uid) || selectedRating === 0) {
       toast({ title: "Feedback Error", description: "Please select a rating. Only the order placer can leave feedback.", variant: "destructive"});
       return;
@@ -146,16 +144,26 @@ export default function TrackOrderPage() {
   };
 
   if (loading) {
-    return (
+    const loadingContent = (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
         <p className="text-muted-foreground">Loading order tracking information...</p>
       </div>
     );
+    if (isGiftRecipientView) {
+      return (
+        <div className="flex flex-col min-h-screen bg-muted/40">
+          <MinimalHeader />
+          <main className="flex-grow">{loadingContent}</main>
+          <MinimalFooter />
+        </div>
+      );
+    }
+    return loadingContent; // Render within main app layout if not gift recipient
   }
 
   if (error && !order) { 
-    const mainContent = (
+    const errorContent = (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
         <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
         <h1 className="text-xl font-semibold mb-2">Tracking Unavailable</h1>
@@ -173,16 +181,16 @@ export default function TrackOrderPage() {
       return (
         <div className="flex flex-col min-h-screen bg-muted/40">
           <MinimalHeader />
-          <main className="flex-grow">{mainContent}</main>
+          <main className="flex-grow">{errorContent}</main>
           <MinimalFooter />
         </div>
       );
     }
-    return mainContent; // For non-gift recipient view, let the main layout handle header/footer
+    return errorContent;
   }
   
   if (!order) { 
-     const mainContent = (
+     const noOrderContent = (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
         <Package className="h-12 w-12 text-muted-foreground mb-4" />
         <p className="text-muted-foreground mb-6">Order details could not be loaded.</p>
@@ -197,12 +205,12 @@ export default function TrackOrderPage() {
       return (
         <div className="flex flex-col min-h-screen bg-muted/40">
           <MinimalHeader />
-          <main className="flex-grow">{mainContent}</main>
+          <main className="flex-grow">{noOrderContent}</main>
           <MinimalFooter />
         </div>
       );
     }
-    return mainContent;
+    return noOrderContent;
   }
 
   const currentStatusEntry = order.deliveryHistory && order.deliveryHistory.length > 0 
@@ -213,7 +221,6 @@ export default function TrackOrderPage() {
   const hasBeenRated = !isGiftRecipientView && user && order.customerId === user.uid && !!order.rating;
 
 
-  // Content for Gift Recipient when order is delivered
   if (isGiftRecipientView && order.status === 'delivered') {
     return (
       <div className="flex flex-col min-h-screen bg-muted/40">
@@ -226,7 +233,7 @@ export default function TrackOrderPage() {
                 <CardDescription>Order ID: {order.id.substring(0,12)}...</CardDescription>
             </CardHeader>
             <CardContent>
-                <p className="text-muted-foreground">We hope you enjoy your special gift from {order.senderName || "your sender"}!</p>
+                <p className="text-muted-foreground">We hope you enjoy your special gift from {order.giftDetails?.recipientName || order.senderName || "your sender"}!</p>
                 {order.actualDeliveryTime && (
                     <p className="text-xs text-muted-foreground mt-2">Delivered on: {formatDate(order.actualDeliveryTime)}</p>
                 )}
@@ -243,7 +250,6 @@ export default function TrackOrderPage() {
     );
   }
   
-  // Main tracking content for logged-in user or non-delivered gift
   const trackingContent = (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <Card className="shadow-lg">
@@ -312,7 +318,7 @@ export default function TrackOrderPage() {
               <h4 className="font-semibold mb-2">Delivery History:</h4>
               <ul className="space-y-2 text-xs">
                 {order.deliveryHistory.slice().reverse().map((entry, index) => (
-                  <li key={index} className="pb-2 border-b last:border-b-0">
+                  <li key={`history-item-${index}`} className="pb-2 border-b last:border-b-0">
                     <p className="font-medium capitalize">{entry.status.replace(/_/g, ' ')} - {formatDate(entry.timestamp)}</p>
                     {entry.notes && <p className="text-muted-foreground pl-2">- {entry.notes}</p>}
                   </li>
@@ -393,6 +399,8 @@ export default function TrackOrderPage() {
     );
   }
 
-  return trackingContent; // Regular view uses main app layout
+  return trackingContent;
 }
+    
+
     
