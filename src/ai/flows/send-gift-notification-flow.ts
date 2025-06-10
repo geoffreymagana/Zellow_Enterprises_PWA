@@ -52,7 +52,7 @@ const sendGiftNotificationFlow = ai.defineFlow(
       };
     }
 
-    const siteBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:9002';
+    const siteBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://6000-firebase-studio-1749074119747.cluster-l6vkdperq5ebaqo3qy4ksvoqom.cloudworkstations.dev';
     // Add ctx=gift_recipient to the tracking link
     const trackingLink = `${siteBaseUrl}/track/order/${input.orderId}?ctx=gift_recipient`;
 
