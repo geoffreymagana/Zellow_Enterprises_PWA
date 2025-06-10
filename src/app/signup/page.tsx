@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+import { Progress } from "@/components/ui/progress"; // Import Progress component
 
 const formSchema = z.object({
   fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }).max(100),
@@ -35,24 +36,14 @@ const formSchema = z.object({
   path: ["confirmPassword"], // Path of error
 });
 
-// A basic list of Kenyan counties for potential future use or simple validation.
-// For now, county and town are text inputs.
-const kenyanCounties = [
-  "Mombasa", "Kwale", "Kilifi", "Tana River", "Lamu", "Taita-Taveta", "Garissa", "Wajir", "Mandera",
-  "Marsabit", "Isiolo", "Meru", "Tharaka-Nithi", "Embu", "Kitui", "Machakos", "Makueni", "Nyandarua",
-  "Nyeri", "Kirinyaga", "Murang'a", "Kiambu", "Turkana", "West Pokot", "Samburu", "Trans Nzoia",
-  "Uasin Gishu", "Elgeyo-Marakwet", "Nandi", "Baringo", "Laikipia", "Nakuru", "Narok", "Kajiado",
-  "Kericho", "Bomet", "Kakamega", "Vihiga", "Bungoma", "Busia", "Siaya", "Kisumu", "Homa Bay",
-  "Migori", "Kisii", "Nyamira", "Nairobi"
-];
-
-
 export default function SignUpPage() {
   const { user, loading: authLoading, /* signup function will be needed here later */ } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0);
+  const [currentPassword, setCurrentPassword] = useState("");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -73,6 +64,25 @@ export default function SignUpPage() {
     }
   }, [user, authLoading, router]);
 
+  const calculateStrength = (password: string) => {
+    const length = password.length;
+    if (length === 0) return 0;
+    if (length < 8) return (length / 8) * 30;
+    if (length === 8) return 40;
+    if (length === 9) return 50;
+    if (length === 10) return 70;
+    if (length === 11) return 85;
+    return 100;
+  };
+
+  const handlePasswordChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newPassword = event.target.value;
+    setCurrentPassword(newPassword);
+    setPasswordStrength(calculateStrength(newPassword));
+    form.setValue("password", newPassword, { shouldValidate: true }); // Update form value
+  };
+
+
   if (authLoading || (!authLoading && user)) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
@@ -85,11 +95,6 @@ export default function SignUpPage() {
     await new Promise(resolve => setTimeout(resolve, 1500)); 
     alert("Sign Up Submitted (Not Implemented Yet) - Check console for values.");
     setIsLoading(false);
-    // On successful signup:
-    // router.push('/dashboard'); 
-    // Or:
-    // toast({ title: "Account Created", description: "Please check your email for verification." });
-    // router.push('/login');
   }
 
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
@@ -180,7 +185,7 @@ export default function SignUpPage() {
               <FormField
                 control={form.control}
                 name="password"
-                render={({ field }) => (
+                render={({ field }) => ( // field is passed but we use handlePasswordChange for value updates
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
@@ -188,7 +193,9 @@ export default function SignUpPage() {
                         <Input
                           type={showPassword ? "text" : "password"}
                           placeholder="••••••••"
-                          {...field}
+                          {...field} // Spread field props for RHF integration
+                          value={currentPassword} // Controlled by local state for strength calc
+                          onChange={handlePasswordChange} // Custom handler
                           className="pr-10"
                         />
                         <Button
@@ -203,6 +210,17 @@ export default function SignUpPage() {
                         </Button>
                       </div>
                     </FormControl>
+                    {currentPassword.length > 0 && (
+                      <div className="mt-1.5">
+                        <Progress value={passwordStrength} className="h-2 [&>div]:bg-primary" />
+                        <p className="text-xs text-muted-foreground mt-1 text-right">
+                          {passwordStrength < 40 && "Weak"}
+                          {passwordStrength >= 40 && passwordStrength < 70 && "Okay"}
+                          {passwordStrength >= 70 && passwordStrength < 100 && "Good"}
+                          {passwordStrength === 100 && "Strong"}
+                        </p>
+                      </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
