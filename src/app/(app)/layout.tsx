@@ -120,7 +120,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                 </SheetHeader>
                 <ScrollArea className="flex-1">
                   <SidebarMenu className="p-2">
-                    {mainAdminNavItems.map((item) => { // Use mainAdminNavItems here which has Admin filtering applied
+                    {mainAdminNavItems.map((item) => { 
                        const isActive = (() => {
                         if (item.href === '/inventory' && pathname.startsWith('/inventory/receivership')) {
                           return false; 
@@ -132,15 +132,15 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                       })();
                       return (
                       <SidebarMenuItem key={item.label}>
-                        <Link href={item.href} passHref legacyBehavior>
+                        <Link href={item.href!}>
                           <SidebarMenuButton
-                            asChild
                             className="w-full justify-start"
                             variant="ghost"
                             onClick={() => setOpenMobile(false)}
                             isActive={isActive}
                            >
-                            <a><item.icon className="mr-2 h-4 w-4" /><span>{item.label}</span></a>
+                            <item.icon className="mr-2 h-4 w-4" />
+                            <span>{item.label}</span>
                           </SidebarMenuButton>
                         </Link>
                       </SidebarMenuItem>
@@ -153,15 +153,15 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                       const isActive = item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
                       return (
                       <SidebarMenuItem key={item.label}>
-                        <Link href={item.href} passHref legacyBehavior>
+                        <Link href={item.href}>
                           <SidebarMenuButton
-                            asChild
                             className="w-full justify-start"
                             variant="ghost"
                             onClick={() => setOpenMobile(false)}
                             isActive={isActive}
                           >
-                            <a><item.icon className="mr-2 h-4 w-4" /><span>{item.label}</span></a>
+                            <item.icon className="mr-2 h-4 w-4" />
+                            <span>{item.label}</span>
                           </SidebarMenuButton>
                         </Link>
                       </SidebarMenuItem>
@@ -208,9 +208,9 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
           <AdminSidebarHeader className="h-[calc(var(--header-height) - 1px)] border-b border-sidebar flex-shrink-0" />
           <SidebarContent className="flex-1 overflow-y-auto">
             <ScrollArea className="h-full">
-              {mainAdminNavItems.length > 0 ? ( // Use mainAdminNavItems here
+              {mainAdminNavItems.length > 0 ? ( 
                 <SidebarMenu className="p-2">
-                  {mainAdminNavItems.map((item) => { // Use mainAdminNavItems here
+                  {mainAdminNavItems.map((item) => { 
                     const isActive = (() => {
                       if (item.href === '/inventory' && pathname.startsWith('/inventory/receivership')) {
                         return false; 
@@ -222,18 +222,15 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                     })();
                     return (
                     <SidebarMenuItem key={item.label}>
-                      <Link href={item.href!} passHref legacyBehavior>
+                      <Link href={item.href!}>
                         <SidebarMenuButton
-                          asChild
                           tooltip={item.label}
                           className="w-full justify-start"
                           variant="ghost"
                           isActive={isActive}
                         >
-                          <a>
-                            <item.icon className="mr-2 h-4 w-4" />
-                            <span>{item.label}</span>
-                          </a>
+                          <item.icon className="mr-2 h-4 w-4" />
+                          <span>{item.label}</span>
                         </SidebarMenuButton>
                       </Link>
                     </SidebarMenuItem>
@@ -253,18 +250,15 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                  const isActive = item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
                   return (
                   <SidebarMenuItem key={item.label}>
-                    <Link href={item.href} passHref legacyBehavior>
+                    <Link href={item.href}>
                       <SidebarMenuButton
-                        asChild
                         tooltip={item.label}
                         className="w-full justify-start"
                         variant="ghost"
                         isActive={isActive}
                       >
-                        <a>
-                          <item.icon className="mr-2 h-4 w-4" />
-                          <span>{item.label}</span>
-                        </a>
+                        <item.icon className="mr-2 h-4 w-4" />
+                        <span>{item.label}</span>
                       </SidebarMenuButton>
                     </Link>
                   </SidebarMenuItem>
@@ -353,7 +347,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
           <div className="flex items-center gap-2">
             {role !== 'Customer' && <ThemeToggle />}
             {user && role === 'Customer' && (
-              <Link href="/orders/cart" passHref>
+              <Link href="/orders/cart">
                 <Button variant="ghost" size="icon" aria-label="Cart" className="relative">
                   <ShoppingCart className="h-5 w-5" />
                   {cartTotalItems > 0 && (
@@ -460,3 +454,4 @@ export default function AppGroupLayout({ children }: LayoutProps) {
 
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
+
