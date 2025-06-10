@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, PackageCheck, Gift, Image as ImageIconPlaceholder, Palette } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { sendGiftNotification, GiftNotificationInput } from '@/ai/flows/send-gift-notification-flow'; 
-import { OrderSuccessModal } from '@/components/checkout/OrderSuccessModal'; // Import the new modal
+import { OrderSuccessModal } from '@/components/checkout/OrderSuccessModal'; 
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -50,8 +50,8 @@ export default function ReviewOrderPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false); // State for modal
-  const [confirmedOrderId, setConfirmedOrderId] = useState<string | null>(null); // State for order ID
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false); 
+  const [confirmedOrderId, setConfirmedOrderId] = useState<string | null>(null); 
 
   const [resolvedProductOptionsMap, setResolvedProductOptionsMap] = useState<Map<string, ProductCustomizationOption[]>>(new Map());
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
@@ -65,7 +65,7 @@ export default function ReviewOrderPage() {
         recipientName: giftRecipientName,
         recipientContactMethod: giftRecipientContactMethod,
         recipientContactValue: giftRecipientContactValue,
-        giftMessage: giftMessage || "", // Changed from undefined to empty string
+        giftMessage: giftMessage || "", // Ensure empty string if not provided
         notifyRecipient: notifyRecipient,
         showPricesToRecipient: notifyRecipient ? showPricesToRecipient : false,
         recipientCanViewAndTrack: notifyRecipient ? giftRecipientCanViewAndTrack : true, 
@@ -115,18 +115,17 @@ export default function ReviewOrderPage() {
 
   useEffect(() => {
     if (!shippingAddress || !paymentMethod || !selectedShippingMethodInfo || cartItems.length === 0) {
-      if (cartItems.length === 0 && !isSuccessModalOpen) { // Don't redirect if success modal is about to show
+      if (cartItems.length === 0 && !isSuccessModalOpen) { 
         router.replace('/orders/cart');
       } else if (!shippingAddress) {
         router.replace('/checkout/shipping');
       } else if (!selectedShippingMethodInfo || !paymentMethod) {
         router.replace('/checkout/payment');
       }
-      if (!isPlacingOrder && !isSuccessModalOpen && (cartItems.length > 0 || !!shippingAddress)) { 
-        toast({ title: "Missing Information", description: "Please complete all previous steps.", variant: "destructive" });
-      }
+      // Removed the "Missing Information" toast here to avoid it firing when cart is legitimately cleared after order success.
+      // The individual pages should handle their own validation toasts if a user tries to proceed without filling details.
     }
-  }, [shippingAddress, paymentMethod, selectedShippingMethodInfo, cartItems, router, toast, isPlacingOrder, isSuccessModalOpen]);
+  }, [shippingAddress, paymentMethod, selectedShippingMethodInfo, cartItems, router, isSuccessModalOpen]);
 
   const getDisplayableCustomizationValue = (
     optionId: string, 
@@ -254,10 +253,11 @@ export default function ReviewOrderPage() {
         }
       }
 
-      clearCart(); 
+      // Critical: Set modal state BEFORE clearing cart
       setConfirmedOrderId(newOrderRef.id);
-      setIsSuccessModalOpen(true);
-      // Do NOT redirect here, modal will handle next steps
+      setIsSuccessModalOpen(true);       
+      clearCart(); 
+      
       toast({ title: "Order Placed!", description: `Your order #${newOrderRef.id.substring(0,8)}... is confirmed.`, duration: 6000});
 
     } catch (error: any) {
@@ -420,3 +420,6 @@ export default function ReviewOrderPage() {
     </>
   );
 }
+
+
+    
