@@ -1,446 +1,65 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Track Your Gift - Zellow Enterprises</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f8f9fa;
-            color: #333;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            padding: 40px 20px;
-        }
-
-        .container {
-            background: white;
-            width: 100%;
-            max-width: 420px;
-            border-radius: 16px;
-            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
-            overflow: hidden;
-        }
-
-        .header {
-            text-align: center;
-            padding: 40px 30px 30px;
-        }
-
-        .status-icon {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #4CAF50, #81C784);
-            border-radius: 50%;
-            margin: 0 auto 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32px;
-            position: relative;
-        }
-
-        .status-icon::after {
-            content: '';
-            position: absolute;
-            width: 100px;
-            height: 100px;
-            background: rgba(76, 175, 80, 0.1);
-            border-radius: 50%;
-            z-index: -1;
-        }
-
-        .header h1 {
-            font-size: 24px;
-            font-weight: 600;
-            color: #1a1a1a;
-            margin-bottom: 8px;
-        }
-
-        .header p {
-            color: #666;
-            font-size: 16px;
-        }
-
-        .content {
-            padding: 0 30px 30px;
-        }
-
-        .order-item {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 24px;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .item-image {
-            width: 60px;
-            height: 60px;
-            background: #e9ecef;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            flex-shrink: 0;
-        }
-
-        .item-details {
-            flex: 1;
-        }
-
-        .item-name {
-            font-weight: 600;
-            color: #1a1a1a;
-            margin-bottom: 4px;
-            font-size: 16px;
-        }
-
-        .item-meta {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 2px;
-        }
-
-        .item-price {
-            font-weight: 600;
-            color: #1a1a1a;
-            font-size: 16px;
-        }
-
-        .summary-section {
-            margin-top: 8px;
-        }
-
-        .summary-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1a1a1a;
-            margin-bottom: 16px;
-        }
-
-        .summary-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .summary-row:last-child {
-            border-bottom: none;
-        }
-
-        .summary-label {
-            color: #666;
-            font-size: 14px;
-        }
-
-        .summary-value {
-            color: #1a1a1a;
-            font-size: 14px;
-            font-weight: 500;
-            text-align: right;
-        }
-
-        .loader {
-            text-align: center;
-            padding: 60px 30px;
-            color: #666;
-        }
-
-        .loader-icon {
-            width: 40px;
-            height: 40px;
-            border: 3px solid #f0f0f0;
-            border-top: 3px solid #4CAF50;
-            border-radius: 50%;
-            margin: 0 auto 16px;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .error-message {
-            text-align: center;
-            padding: 40px 30px;
-            color: #d32f2f;
-            background: #ffebee;
-            margin: 20px;
-            border-radius: 12px;
-        }
-
-        .footer {
-            text-align: center;
-            padding: 20px;
-            color: #999;
-            font-size: 12px;
-            border-top: 1px solid #f0f0f0;
-        }
-
-        /* Status-specific colors */
-        .status-processing .status-icon {
-            background: linear-gradient(135deg, #FF9800, #FFB74D);
-        }
-        
-        .status-processing .status-icon::after {
-            background: rgba(255, 152, 0, 0.1);
-        }
-
-        .status-shipped .status-icon {
-            background: linear-gradient(135deg, #2196F3, #64B5F6);
-        }
-        
-        .status-shipped .status-icon::after {
-            background: rgba(33, 150, 243, 0.1);
-        }
-
-        .status-delivered .status-icon {
-            background: linear-gradient(135deg, #4CAF50, #81C784);
-        }
-        
-        .status-delivered .status-icon::after {
-            background: rgba(76, 175, 80, 0.1);
-        }
-
-        /* Responsive */
-        @media (max-width: 480px) {
-            body {
-                padding: 20px 15px;
-            }
-            
-            .header {
-                padding: 30px 20px 20px;
-            }
-            
-            .content {
-                padding: 0 20px 20px;
-            }
-            
-            .container {
-                border-radius: 12px;
-            }
-        }
-
-        /* Hidden by default */
-        #order-details {
-            display: none;
-        }
-    </style>
-
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Track Your Zellow Gift</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Lato:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <div id="loader" class="loader">
-            <div class="loader-icon"></div>
-            <p>Loading your gift details...</p>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <img src="https://zellow-enterprises.vercel.app/icons/Zellow-icon-192.png" alt="Zellow Enterprises Logo" />
+        <h1>Zellow Enterprises</h1>
+      </div>
+      <h2>Your Gift Status</h2>
+    </header>
+
+    <main id="trackingInfo" class="card">
+      <div id="loadingMessage">Loading gift details...</div>
+      
+      <div id="orderDetails" class="hidden">
+        <section id="statusSection">
+          <h3>Current Status:</h3>
+          <p id="orderStatus" class="status-badge"></p>
+          <p id="statusTimestamp" class="timestamp"></p>
+          <p id="statusNotes" class="notes"></p>
+        </section>
+
+        <div id="giftItemsContainer" class="items-container">
+          {/* Item thumbnails will be dynamically inserted here by script.js */}
         </div>
-        
-        <div id="error-message" class="error-message" style="display: none;"></div>
-        
-        <div id="order-details">
-            <div class="header status-processing">
-                <div class="status-icon">🎁</div>
-                <h1 id="order-status-title">Order Status</h1>
-                <p id="order-status-subtitle">Your package is on the way</p>
-            </div>
-            
-            <div class="content">
-                <div class="order-item">
-                    <div class="item-image">🎁</div>
-                    <div class="item-details">
-                        <div class="item-name">Gift Package</div>
-                        <div class="item-meta">For: <span id="recipient-name">Valued Recipient</span></div>
-                    </div>
-                </div>
-                
-                <div class="summary-section">
-                    <h3 class="summary-title">Order Summary</h3>
-                    
-                    <div class="summary-row">
-                        <span class="summary-label">Order ID</span>
-                        <span class="summary-value" id="order-id">Loading...</span>
-                    </div>
-                    
-                    <div class="summary-row">
-                        <span class="summary-label">Status</span>
-                        <span class="summary-value" id="order-status">Processing</span>
-                    </div>
-                    
-                    <div class="summary-row">
-                        <span class="summary-label">Delivery Date</span>
-                        <span class="summary-value" id="expected-delivery-date">Calculating...</span>
-                    </div>
-                    
-                    <div class="summary-row" id="message-row" style="display: none;">
-                        <span class="summary-label">Message</span>
-                        <span class="summary-value" id="message-from-sender" style="max-width: 200px; text-align: right; word-wrap: break-word;"></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="footer">
-            <p>&copy; <span id="current-year">2025</span> Zellow Enterprises. All rights reserved.</p>
-        </div>
-    </div>
 
-    <script>
-        // Firebase configuration and initialization
-        const firebaseConfig = {
-            apiKey: "AIzaSyDzUlYdqqdkTxcHJHChsX6zM-U_7N92xec",
-            authDomain: "zellowlive.firebaseapp.com",
-            projectId: "zellowlive",
-            storageBucket: "zellowlive.firebasestorage.app",
-            messagingSenderId: "943761891650",
-            appId: "1:943761891650:web:e8c12f77ea9d5edf0b68db",
-        };
+        <section id="recipientInfo" class="info-section">
+          <h3>Recipient:</h3>
+          <p id="recipientName"></p>
+        </section>
 
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
+        <section id="giftMessageSection" class="gift-message-section">
+          <h3>Message from Sender:</h3>
+          <p id="giftMessageText"></p>
+        </section>
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const loader = document.getElementById('loader');
-            const errorMessageDiv = document.getElementById('error-message');
-            const orderDetailsDiv = document.getElementById('order-details');
-            
-            const recipientNameEl = document.getElementById('recipient-name');
-            const orderStatusEl = document.getElementById('order-status');
-            const orderStatusTitleEl = document.getElementById('order-status-title');
-            const orderStatusSubtitleEl = document.getElementById('order-status-subtitle');
-            const expectedDeliveryEl = document.getElementById('expected-delivery-date');
-            const orderIdEl = document.getElementById('order-id');
-            const messageRowEl = document.getElementById('message-row');
-            const messageFromSenderEl = document.getElementById('message-from-sender');
-            const headerEl = document.querySelector('.header');
-            
-            document.getElementById('current-year').textContent = new Date().getFullYear();
+        <section id="deliveryDateSection" class="info-section">
+          <h3>Expected Delivery:</h3>
+          <p id="deliveryDate"></p>
+        </section>
+      </div>
+      <div id="errorMessage" class="error-message hidden"></div>
+    </main>
 
-            const params = new URLSearchParams(window.location.search);
-            const token = params.get('token');
+    <footer>
+      <p>&copy; <span id="currentYear"></span> Zellow Enterprises. All rights reserved.</p>
+    </footer>
+  </div>
 
-            if (!token) {
-                showError("No tracking token (order ID) provided. Please check the link.");
-                return;
-            }
-
-            // Set the order ID immediately
-            if (orderIdEl) orderIdEl.textContent = token;
-
-            const orderRef = db.collection("orders").doc(token);
-
-            orderRef.onSnapshot((docSnapshot) => {
-                loader.style.display = 'none';
-                if (!docSnapshot.exists) {
-                    showError("Gift tracking information not found. The link may be invalid or expired.");
-                    return;
-                }
-
-                const orderData = docSnapshot.data();
-
-                if (orderData) {
-                    orderDetailsDiv.style.display = 'block';
-                    errorMessageDiv.style.display = 'none';
-
-                    // Update recipient name
-                    if (recipientNameEl) {
-                        recipientNameEl.textContent = orderData.giftDetails?.recipientName || 'Valued Recipient';
-                    }
-
-                    // Update status and header styling
-                    const status = orderData.status || 'processing';
-                    if (orderStatusEl) orderStatusEl.textContent = status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    
-                    // Update header based on status
-                    headerEl.className = `header status-${status.toLowerCase()}`;
-                    
-                    const statusMessages = {
-                        'processing': 'Your gift is being prepared',
-                        'shipped': 'Your package is on the way',
-                        'out_for_delivery': 'Out for delivery',
-                        'delivered': 'Your gift has been delivered'
-                    };
-                    
-                    const statusIcons = {
-                        'processing': '📦',
-                        'shipped': '🚚',
-                        'out_for_delivery': '🏃‍♂️',
-                        'delivered': '✅'
-                    };
-                    
-                    if (orderStatusSubtitleEl) {
-                        orderStatusSubtitleEl.textContent = statusMessages[status] || 'Your package is being processed';
-                    }
-                    
-                    // Update status icon
-                    const statusIcon = document.querySelector('.status-icon');
-                    if (statusIcon) {
-                        statusIcon.textContent = statusIcons[status] || '🎁';
-                    }
-                    
-                    // Update delivery date
-                    if (expectedDeliveryEl) {
-                        if (orderData.estimatedDeliveryTime && orderData.estimatedDeliveryTime.toDate) {
-                            expectedDeliveryEl.textContent = orderData.estimatedDeliveryTime.toDate().toLocaleDateString('en-US', { 
-                                month: 'short', 
-                                day: 'numeric',
-                                year: 'numeric'
-                            });
-                        } else if (orderData.status === 'delivered' && orderData.actualDeliveryTime && orderData.actualDeliveryTime.toDate) {
-                            expectedDeliveryEl.textContent = orderData.actualDeliveryTime.toDate().toLocaleDateString('en-US', { 
-                                month: 'short', 
-                                day: 'numeric',
-                                year: 'numeric'
-                            });
-                        } else {
-                            expectedDeliveryEl.textContent = 'To be updated';
-                        }
-                    }
-
-                    // Handle gift message
-                    if (orderData.giftDetails?.giftMessage) {
-                        if (messageRowEl) messageRowEl.style.display = 'flex';
-                        if (messageFromSenderEl) messageFromSenderEl.textContent = orderData.giftDetails.giftMessage;
-                    } else {
-                        if (messageRowEl) messageRowEl.style.display = 'none';
-                    }
-                } else {
-                    showError("Could not retrieve gift details at this time.");
-                }
-
-            }, (error) => {
-                console.error("Error fetching gift details:", error);
-                showError("An error occurred while fetching gift details. Please try again later.");
-            });
-
-            function showError(message) {
-                loader.style.display = 'none';
-                orderDetailsDiv.style.display = 'none';
-                if (errorMessageDiv) {
-                    errorMessageDiv.textContent = message;
-                    errorMessageDiv.style.display = 'block';
-                }
-            }
-        });
-    </script>
-    <script src="script.js"></script> 
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>

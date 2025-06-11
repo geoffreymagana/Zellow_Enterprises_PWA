@@ -1,126 +1,212 @@
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: #f0f8fa; /* Light cyan-blue, similar to globals.css background */
-    color: #334155; /* Dark grayish blue, similar to globals.css foreground */
-    margin: 0;
-    padding: 20px;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    min-height: 100vh;
+  font-family: 'Lato', sans-serif;
+  background-color: #f0f4f8; /* Light grayish blue */
+  color: #333;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* Align to top for scroll */
+  min-height: 100vh;
+  line-height: 1.6;
 }
 
 .container {
-    background-color: #ffffff;
-    padding: 20px 30px;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    width: 100%;
-    max-width: 500px;
-    text-align: center;
+  background-color: #ffffff;
+  padding: 20px 30px;
+  border-radius: 10px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 600px;
+  margin: 20px;
+  text-align: center;
 }
 
 header {
-    margin-bottom: 25px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid #e2e8f0; /* Light border */
+  margin-bottom: 25px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 15px;
 }
 
-header #logo {
-    max-height: 40px;
-    margin-bottom: 10px;
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.logo img {
+  width: 40px;
+  height: 40px;
+  margin-right: 10px;
 }
 
 header h1 {
-    color: #34A7C1; /* Primary color from globals.css */
-    font-size: 1.8em;
-    margin: 0;
+  font-family: 'Poppins', sans-serif;
+  color: #2c3e50; /* Darker blue */
+  font-size: 1.8em;
+  margin: 0;
+}
+header h2 {
+  font-family: 'Poppins', sans-serif;
+  color: #34A7C1; /* Primary color */
+  font-size: 1.4em;
+  margin-top: 5px;
+  margin-bottom: 0;
 }
 
-.loader {
-    padding: 20px;
-    font-size: 1.1em;
-    color: #555;
+.card {
+  background-color: #f9f9f9;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+#orderDetails section {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px dashed #ddd;
+}
+#orderDetails section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+#orderDetails h3 {
+  font-family: 'Poppins', sans-serif;
+  color: #34A7C1; /* Primary color */
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 1.1em;
+}
+
+#orderStatus {
+  font-weight: bold;
+  font-size: 1.3em;
+  padding: 8px 15px;
+  border-radius: 20px;
+  display: inline-block;
+  margin-bottom: 5px;
+  color: white;
+}
+
+/* Item Thumbnails Styling */
+.items-container h3 {
+  font-family: 'Poppins', sans-serif;
+  color: #34A7C1;
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 1.1em;
+  text-align: left;
+}
+
+#giftItemsContainer {
+  list-style-type: none;
+  padding-left: 0;
+  margin-bottom: 15px;
+}
+
+.gift-item {
+  display: flex;
+  align-items: center;
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.gift-item-thumbnail {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-right: 15px;
+  background-color: #eee; /* Placeholder bg */
+}
+
+.gift-item-info {
+  text-align: left;
+  font-size: 0.9em;
+}
+
+.gift-item-info .item-name {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.gift-item-info .item-quantity {
+  color: #555;
+  font-size: 0.85em;
+}
+
+
+/* Status Badge Colors */
+.status-pending, .status-awaiting_assignment, .status-processing { background-color: #ffc107; /* Amber */ }
+.status-assigned { background-color: #29B6F6; /* Light Blue for Assigned */ }
+.status-out_for_delivery { background-color: #03a9f4; /* Light Blue */ }
+.status-shipped { background-color: #3f51b5; /* Indigo */ }
+.status-delivered { background-color: #4caf50; /* Green */ }
+.status-delivered.custom-checkmark::before {
+  /* If using a custom SVG/image for the checkmark */
+  /* content: url('/icons/verified-checkmark.svg'); */
+  /* display: inline-block; width: 1em; height: 1em; margin-right: 0.3em; vertical-align: middle; */
+  content: "✔ "; /* Unicode checkmark */
+  font-weight: bold;
+  color: white; /* Or adjust as needed */
+}
+.status-delivery_attempted { background-color: #9c27b0; /* Purple */ }
+.status-cancelled, .status-rejected { background-color: #f44336; /* Red */ }
+
+.timestamp, .notes {
+  font-size: 0.85em;
+  color: #666;
+}
+.notes {
+  margin-top: 3px;
+  font-style: italic;
+}
+
+.gift-message-section h3 {
+    text-align: center; /* Center the "Message from Sender" title */
+}
+
+#giftMessageText {
+  background-color: #e9f5f9; /* Light cyan background */
+  padding: 15px;
+  border-radius: 5px;
+  border-left: 4px solid #34A7C1;
+  font-style: italic;
+  text-align: justify; /* Justify the gift message text */
+  white-space: pre-wrap; /* Preserve line breaks from message */
+  color: #405d70;
+}
+
+.info-section p {
+  font-size: 1em;
+  color: #555;
 }
 
 .error-message {
-    padding: 20px;
-    background-color: #ffebee; /* Light red for errors */
-    color: #c62828; /* Darker red text */
-    border: 1px solid #ef9a9a;
-    border-radius: 6px;
-    margin-bottom: 20px;
-}
-
-#order-details p {
-    font-size: 1.1em;
-    line-height: 1.6;
-    margin-bottom: 15px;
-}
-
-.status-card {
-    background-color: #e0f7fa; /* Light cyan background */
-    border: 1px solid #b2ebf2; /* Cyan border */
-    border-radius: 6px;
-    padding: 15px;
-    margin-top: 20px;
-    margin-bottom: 25px;
-}
-
-.status-card h2 {
-    font-size: 1em;
-    color: #00796b; /* Darker cyan */
-    margin-top: 0;
-    margin-bottom: 5px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.status-text {
-    font-size: 1.4em !important;
-    font-weight: bold;
-    color: #004d40; /* Very dark cyan */
-    margin-bottom: 0 !important;
-    text-transform: capitalize;
-}
-
-.detail-card {
-    background-color: #f9fafb; /* Very light gray */
-    border: 1px solid #f0f0f0;
-    border-radius: 6px;
-    padding: 12px;
-    margin-bottom: 15px;
-    text-align: left;
-}
-
-.detail-card h3 {
-    font-size: 0.9em;
-    color: #34A7C1; /* Primary color */
-    margin-top: 0;
-    margin-bottom: 5px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.detail-card p {
-    font-size: 1em !important;
-    margin-bottom: 0 !important;
-    color: #4a5568; /* Medium gray text */
-}
-
-.gift-message {
-    font-style: italic;
-    background-color: #fffde7; /* Light yellow for message */
-    padding: 10px;
-    border-left: 3px solid #ffc107; /* Amber border */
-    border-radius: 0 4px 4px 0;
+  color: #D8000C; /* Error red */
+  background-color: #FFD2D2; /* Light red background */
+  border: 1px solid #D8000C;
+  padding: 15px;
+  border-radius: 5px;
+  margin-top: 20px;
 }
 
 footer {
-    margin-top: 30px;
-    padding-top: 15px;
-    border-top: 1px solid #e2e8f0;
-    font-size: 0.85em;
-    color: #718096; /* Gray text for footer */
+  margin-top: 30px;
+  padding-top: 15px;
+  border-top: 1px solid #eee;
+  font-size: 0.8em;
+  color: #777;
+}
+
+.hidden {
+  display: none;
 }
