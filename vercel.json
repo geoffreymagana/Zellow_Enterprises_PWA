@@ -1,16 +1,17 @@
+
 {
   "rewrites": [
+    // Rule for specific asset types (CSS, JS, images, etc.)
+    // This ensures that requests like /gift-tracking/style.css are correctly mapped.
     {
-      "source": "/gift-tracking",
-      "destination": "/gift-tracking-site/index.html"
+      "source": "/gift-tracking/:assetPath(.+\\.(?:css|js|svg|png|jpg|jpeg|gif|ico|json|txt|map|webmanifest))$",
+      "destination": "/gift-tracking-site/:assetPath"
     },
+    // Rule for the base /gift-tracking path (serving index.html)
+    // Matches both /gift-tracking and /gift-tracking/
     {
-      "source": "/gift-tracking/",
+      "source": "/gift-tracking{/}?",
       "destination": "/gift-tracking-site/index.html"
-    },
-    {
-      "source": "/gift-tracking/:path*",
-      "destination": "/gift-tracking-site/:path*"
     }
   ]
 }
