@@ -1,126 +1,150 @@
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: #f0f8fa; /* Light cyan-blue, similar to globals.css background */
-    color: #334155; /* Dark grayish blue, similar to globals.css foreground */
-    margin: 0;
-    padding: 20px;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+  background-color: #f4f7f6; /* Light tealish gray */
+  color: #333;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* Align to top for long content */
+  min-height: 100vh;
+  padding-top: 2rem;
+  padding-bottom: 2rem;
 }
 
 .container {
-    background-color: #ffffff;
-    padding: 20px 30px;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    width: 100%;
-    max-width: 500px;
-    text-align: center;
+  background-color: #fff;
+  padding: 20px 30px;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 550px;
+  text-align: center;
 }
 
 header {
-    margin-bottom: 25px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid #e2e8f0; /* Light border */
+  margin-bottom: 25px;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 20px;
 }
 
-header #logo {
-    max-height: 40px;
-    margin-bottom: 10px;
+.logo {
+  font-size: 1.8em;
+  font-weight: bold;
+  color: #34A7C1; /* Zellow primary */
+  margin-bottom: 0.5rem;
 }
 
 header h1 {
-    color: #34A7C1; /* Primary color from globals.css */
-    font-size: 1.8em;
-    margin: 0;
+  color: #34A7C1; /* Zellow primary */
+  font-size: 1.6em;
+  font-weight: 600;
+  margin: 0;
 }
 
-.loader {
-    padding: 20px;
-    font-size: 1.1em;
-    color: #555;
+#tracking-info {
+  margin-bottom: 25px;
 }
 
-.error-message {
-    padding: 20px;
-    background-color: #ffebee; /* Light red for errors */
-    color: #c62828; /* Darker red text */
-    border: 1px solid #ef9a9a;
-    border-radius: 6px;
-    margin-bottom: 20px;
+.detail-item {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  border: 1px solid #eee;
 }
 
-#order-details p {
-    font-size: 1.1em;
-    line-height: 1.6;
-    margin-bottom: 15px;
+.detail-item h2, .detail-item h3 {
+  font-size: 0.9em;
+  color: #555;
+  margin-top: 0;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
 }
 
-.status-card {
-    background-color: #e0f7fa; /* Light cyan background */
-    border: 1px solid #b2ebf2; /* Cyan border */
-    border-radius: 6px;
-    padding: 15px;
-    margin-top: 20px;
-    margin-bottom: 25px;
+.highlight {
+  color: #2c3e50; /* Darker text for content */
+  font-weight: 500;
+  font-size: 1.1em;
 }
 
-.status-card h2 {
-    font-size: 1em;
-    color: #00796b; /* Darker cyan */
-    margin-top: 0;
-    margin-bottom: 5px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+/* Styling for gift message */
+.message-section {
+  text-align: center; /* Center the "Message from Sender" heading */
+}
+.message-content {
+  text-align: justify; /* Justify the actual message content */
+  hyphens: auto; /* Optional: for better justification */
+  font-style: italic;
+  background-color: #e8f5e9; /* Light green accent for message */
+  padding: 12px;
+  border-radius: 6px;
+  color: #2e7d32; /* Darker green for message text */
 }
 
-.status-text {
-    font-size: 1.4em !important;
-    font-weight: bold;
-    color: #004d40; /* Very dark cyan */
-    margin-bottom: 0 !important;
-    text-transform: capitalize;
+.status-section #order-status[data-status-value="Delivered"]::before {
+  content: "✔ "; /* Unicode checkmark */
+  color: green;
+  font-weight: bold;
+  margin-right: 5px;
 }
 
-.detail-card {
-    background-color: #f9fafb; /* Very light gray */
-    border: 1px solid #f0f0f0;
-    border-radius: 6px;
-    padding: 12px;
-    margin-bottom: 15px;
-    text-align: left;
+.error-display {
+  color: #c0392b; /* Destructive color */
+  background-color: #fdecea;
+  border: 1px solid #f5c6cb;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
 }
 
-.detail-card h3 {
-    font-size: 0.9em;
-    color: #34A7C1; /* Primary color */
-    margin-top: 0;
-    margin-bottom: 5px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+.gift-image-section {
+  margin-bottom: 20px;
+  text-align: center; /* Center the image container */
 }
 
-.detail-card p {
-    font-size: 1em !important;
-    margin-bottom: 0 !important;
-    color: #4a5568; /* Medium gray text */
+#gift-image {
+  max-width: 100%;
+  max-height: 300px; /* Control max height */
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background-color: #f0f0f0; /* Placeholder background */
+  object-fit: contain; /* Ensure image fits well, use 'cover' if you prefer cropping */
 }
 
-.gift-message {
-    font-style: italic;
-    background-color: #fffde7; /* Light yellow for message */
-    padding: 10px;
-    border-left: 3px solid #ffc107; /* Amber border */
-    border-radius: 0 4px 4px 0;
-}
 
 footer {
-    margin-top: 30px;
-    padding-top: 15px;
-    border-top: 1px solid #e2e8f0;
-    font-size: 0.85em;
-    color: #718096; /* Gray text for footer */
+  text-align: center;
+  margin-top: 30px;
+  padding-top: 15px;
+  border-top: 1px solid #e0e0e0;
+  font-size: 0.85em;
+  color: #777;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  body {
+    padding: 1rem;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+  .container {
+    margin: 0 10px;
+    padding: 15px 20px;
+  }
+  header h1 {
+    font-size: 1.4em;
+  }
+  .logo {
+    font-size: 1.6em;
+  }
+  .highlight {
+    font-size: 1em;
+  }
 }
