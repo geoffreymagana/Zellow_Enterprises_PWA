@@ -119,9 +119,9 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent className="p-6 md:p-8 space-y-3">
           {role === 'Customer' && (
-             <Link href="/orders" passHref legacyBehavior>
-                <Button asChild variant="outline" className="w-full justify-start">
-                  <a><ShoppingCart className="mr-2 h-4 w-4" /> My Orders</a>
+             <Link href="/orders" asChild>
+                <Button variant="outline" className="w-full justify-start">
+                  <ShoppingCart className="mr-2 h-4 w-4" /> My Orders
                 </Button>
               </Link>
           )}
@@ -132,19 +132,19 @@ export default function ProfilePage() {
             <p className="text-sm font-medium">Dark Mode</p>
             <ThemeToggle />
           </div>
-           <Link href="/help" passHref legacyBehavior>
-            <Button asChild variant="outline" className="w-full justify-start">
-              <a><HelpCircle className="mr-2 h-4 w-4" /> Help Center</a>
+           <Link href="/help" asChild>
+            <Button variant="outline" className="w-full justify-start">
+              <HelpCircle className="mr-2 h-4 w-4" /> Help Center
             </Button>
           </Link>
-          <Link href="/support" passHref legacyBehavior>
-              <Button asChild variant="outline" className="w-full justify-start">
-                <a><ShieldQuestion className="mr-2 h-4 w-4" /> Contact Support</a>
+          <Link href="/support" asChild>
+              <Button variant="outline" className="w-full justify-start">
+                <ShieldQuestion className="mr-2 h-4 w-4" /> Contact Support
               </Button>
           </Link>
-          <Link href="/about" passHref legacyBehavior>
-            <Button asChild variant="outline" className="w-full justify-start">
-              <a><Info className="mr-2 h-4 w-4" /> About Zellow</a>
+          <Link href="/about" asChild>
+            <Button variant="outline" className="w-full justify-start">
+              <Info className="mr-2 h-4 w-4" /> About Zellow
             </Button>
           </Link>
           <Button variant="destructive" className="w-full justify-start" onClick={logout} disabled={authLoading}>
