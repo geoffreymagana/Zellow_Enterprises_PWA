@@ -1,77 +1,390 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Track Your Gift - Zellow Enterprises</title>
-    <link rel="stylesheet" href="style.css">
-    <!-- Add your Firebase SDK version 8.x.x scripts here -->
-    <!-- It's recommended to use the latest compatible v9+ modular SDKs if possible,
-         but for simplicity with plain JS, v8 is sometimes easier for beginners.
-         For v9+, you'd use import maps or a build step.
-         This example will assume v9+ modular SDK loaded globally for simplicity of demonstration,
-         though that's not best practice for production without a bundler.
-    -->
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #334155;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Animated background elements */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 2px,
+                rgba(255, 255, 255, 0.03) 2px,
+                rgba(255, 255, 255, 0.03) 4px
+            );
+            animation: float 20s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes float {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200px 0; }
+            100% { background-position: 200px 0; }
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.1),
+                0 8px 25px rgba(0, 0, 0, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+            animation: slideInUp 0.8s ease-out;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        header {
+            margin-bottom: 35px;
+            padding-bottom: 25px;
+            border-bottom: 2px solid rgba(52, 167, 193, 0.1);
+            position: relative;
+        }
+
+        header::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 3px;
+            background: linear-gradient(90deg, #34A7C1, #667eea);
+            border-radius: 2px;
+        }
+
+        #logo {
+            max-height: 50px;
+            margin-bottom: 15px;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+            transition: transform 0.3s ease;
+        }
+
+        #logo:hover {
+            transform: scale(1.05);
+        }
+
+        header h1 {
+            background: linear-gradient(135deg, #34A7C1, #667eea);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: -0.5px;
+        }
+
+        .loader {
+            padding: 40px 20px;
+            font-size: 1.2em;
+            color: #667eea;
+            position: relative;
+            animation: pulse 2s infinite;
+        }
+
+        .loader::after {
+            content: '';
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, #667eea, transparent);
+            animation: shimmer 1.5s infinite;
+        }
+
+        .error-message {
+            padding: 20px;
+            background: linear-gradient(135deg, #ffebee, #fce4ec);
+            color: #c62828;
+            border: 1px solid rgba(198, 40, 40, 0.2);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(198, 40, 40, 0.1);
+        }
+
+        #order-details {
+            animation: slideInUp 0.6s ease-out 0.2s both;
+        }
+
+        #order-details p {
+            font-size: 1.2em;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            color: #4a5568;
+        }
+
+        .status-card {
+            background: linear-gradient(135deg, #e0f7fa, #b2ebf2);
+            border: 1px solid rgba(0, 150, 136, 0.2);
+            border-radius: 16px;
+            padding: 25px;
+            margin: 25px 0;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 25px rgba(0, 150, 136, 0.1);
+        }
+
+        .status-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            animation: shimmer 3s infinite;
+        }
+
+        .status-card h2 {
+            font-size: 1.1em;
+            color: #00695c;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .status-text {
+            font-size: 1.6em;
+            font-weight: 800;
+            background: linear-gradient(135deg, #00695c, #004d40);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-transform: capitalize;
+            margin: 0;
+        }
+
+        .detail-card {
+            background: rgba(249, 250, 251, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(52, 167, 193, 0.1);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: left;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .detail-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(52, 167, 193, 0.15);
+            border-color: rgba(52, 167, 193, 0.3);
+        }
+
+        .detail-card h3 {
+            font-size: 1em;
+            background: linear-gradient(135deg, #34A7C1, #667eea);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            font-weight: 600;
+        }
+
+        .detail-card p {
+            font-size: 1.1em;
+            margin: 0;
+            color: #4a5568;
+            line-height: 1.5;
+        }
+
+        .gift-message {
+            font-style: italic;
+            background: linear-gradient(135deg, #fffde7, #fff9c4);
+            padding: 20px;
+            border-left: 4px solid #ffc107;
+            border-radius: 0 12px 12px 0;
+            box-shadow: 0 4px 12px rgba(255, 193, 7, 0.1);
+            position: relative;
+        }
+
+        .gift-message::before {
+            content: '"';
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            font-size: 3em;
+            color: rgba(255, 193, 7, 0.3);
+            font-family: serif;
+        }
+
+        footer {
+            margin-top: 40px;
+            padding-top: 25px;
+            border-top: 2px solid rgba(226, 232, 240, 0.5);
+            font-size: 0.9em;
+            color: #718096;
+            position: relative;
+        }
+
+        footer::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #718096, transparent);
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            body {
+                padding: 15px;
+            }
+            
+            .container {
+                padding: 30px 25px;
+                border-radius: 20px;
+            }
+            
+            header h1 {
+                font-size: 1.8em;
+            }
+            
+            .status-card, .detail-card {
+                padding: 20px 15px;
+            }
+        }
+
+        /* Loading skeleton styles */
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+
+        .skeleton-text {
+            height: 20px;
+            margin-bottom: 10px;
+        }
+
+        .skeleton-title {
+            height: 24px;
+            width: 60%;
+            margin-bottom: 15px;
+        }
+    </style>
     <script type="module">
-        // Import the functions you need from the SDKs you need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-analytics.js";
-        // TODO: Add SDKs for Firebase products that you want to use
-        // https://firebase.google.com/docs/web/setup#available-libraries
-      
-        // Your web app's Firebase configuration
-        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+        
         const firebaseConfig = {
-          apiKey: "AIzaSyDzUlYdqqdkTxcHJHChsX6zM-U_7N92xec",
-          authDomain: "zellowlive.firebaseapp.com",
-          databaseURL: "https://zellowlive-default-rtdb.firebaseio.com",
-          projectId: "zellowlive",
-          storageBucket: "zellowlive.firebasestorage.app",
-          messagingSenderId: "943761891650",
-          appId: "1:943761891650:web:e8c12f77ea9d5edf0b68db",
-          measurementId: "G-46MZ5BWTGD"
+            apiKey: "AIzaSyDzUlYdqqdkTxcHJHChsX6zM-U_7N92xec",
+            authDomain: "zellowlive.firebaseapp.com",
+            databaseURL: "https://zellowlive-default-rtdb.firebaseio.com",
+            projectId: "zellowlive",
+            storageBucket: "zellowlive.firebasestorage.app",
+            messagingSenderId: "943761891650",
+            appId: "1:943761891650:web:e8c12f77ea9d5edf0b68db",
+            measurementId: "G-46MZ5BWTGD"
         };
-      
-        // Initialize Firebase
+        
         const app = initializeApp(firebaseConfig);
         const analytics = getAnalytics(app);
-      </script>
+    </script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
-            <img src="https://placehold.co/150x50.png?text=ZellowLogo" alt="Zellow Enterprises Logo" id="logo" data-ai-hint="logo company">
+            <img src="https://placehold.co/150x50/34A7C1/ffffff.png?text=Zellow" alt="Zellow Enterprises Logo" id="logo">
             <h1>Your Gift Status</h1>
         </header>
+        
         <main id="tracking-info">
-            <div id="loader" class="loader">Loading gift details...</div>
+            <div id="loader" class="loader">
+                <div>🎁 Loading your gift details...</div>
+            </div>
+            
             <div id="error-message" class="error-message" style="display: none;"></div>
+            
             <div id="order-details" style="display: none;">
-                <p>Hello <strong id="recipient-name"></strong>,</p>
+                <p>Hello <strong id="recipient-name">Valued Customer</strong>,</p>
                 
                 <div class="status-card">
-                    <h2>Current Status:</h2>
-                    <p id="order-status" class="status-text"></p>
+                    <h2>Current Status</h2>
+                    <p id="order-status" class="status-text">Processing</p>
                 </div>
-
+                
                 <div class="detail-card">
-                    <h3>Expected Delivery:</h3>
-                    <p id="expected-delivery-date"></p>
+                    <h3>Expected Delivery</h3>
+                    <p id="expected-delivery-date">Calculating delivery time...</p>
                 </div>
-
+                
                 <div class="detail-card" id="message-card" style="display: none;">
-                    <h3>Message from Sender:</h3>
+                    <h3>Message from Sender</h3>
                     <p id="message-from-sender" class="gift-message"></p>
                 </div>
             </div>
         </main>
+        
         <footer>
-            <p>&copy; <span id="current-year"></span> Zellow Enterprises. All rights reserved.</p>
+            <p>&copy; <span id="current-year">2025</span> Zellow Enterprises. All rights reserved.</p>
         </footer>
     </div>
-    <script src="script.js"></script>
+
+    
 </body>
 </html>
