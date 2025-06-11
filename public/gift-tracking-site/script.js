@@ -1,12 +1,17 @@
 
-// IMPORTANT: REPLACE WITH YOUR ACTUAL FIREBASE CONFIGURATION
+// Ensure you have configured Firebase in your project and included the SDKs in index.html
+// For v9 modular SDK, the initialization would look like:
+// import { initializeApp } from "firebase/app";
+// import { getFirestore, doc, onSnapshot, query, collection, where, limit } from "firebase/firestore";
+
+// ** IMPORTANT: Replace with your actual Firebase project configuration **
 const firebaseConfig = {
   apiKey: "AIzaSyDzUlYdqqdkTxcHJHChsX6zM-U_7N92xec",
   authDomain: "zellowlive.firebaseapp.com",
   projectId: "zellowlive",
   storageBucket: "zellowlive.firebasestorage.app",
   messagingSenderId: "943761891650",
-  appId: "1:943761891650:web:e8c12f77ea9d5edf0b68db", // Optional
+  appId: "1:943761891650:web:e8c12f77ea9d5edf0b68db",
 };
 
 let app;
@@ -14,149 +19,154 @@ let db;
 
 try {
   app = firebase.initializeApp(firebaseConfig);
-  db = firebase.firestore();
-  console.log("Firebase Initialized Successfully (Gift Tracker)");
-} catch (e) {
-  console.error("Error initializing Firebase (Gift Tracker):", e);
-  const loadingMessage = document.getElementById('loading-message');
-  const errorMessageElement = document.getElementById('error-message');
-  if (loadingMessage) loadingMessage.style.display = 'none';
-  if (errorMessageElement) {
-    errorMessageElement.textContent = 'Error connecting to tracking service. Please try again later or contact support. (Firebase Init Failed)';
-    errorMessageElement.style.display = 'block';
+  db = firebase.firestore(app);
+  console.log("Firebase initialized for gift tracking.");
+} catch (error) {
+  console.error("Error initializing Firebase for gift tracking:", error);
+  const statusDiv = document.getElementById('status');
+  const detailsDiv = document.getElementById('gift-details');
+  if (statusDiv) statusDiv.textContent = 'Error initializing. Cannot load details.';
+  if (detailsDiv) detailsDiv.innerHTML = '<p>Could not connect to the tracking service. Please try again later.</p>';
+}
+
+function formatDate(timestamp) {
+  if (!timestamp) return 'N/A';
+  let date;
+  if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+    date = timestamp.toDate(); // Firestore Timestamp
+  } else if (timestamp instanceof Date) {
+    date = timestamp; // JavaScript Date object
+  } else {
+    try {
+      date = new Date(timestamp); // Try parsing if it's a string or number
+    } catch (e) {
+      console.warn("Could not parse date:", timestamp, e);
+      return "Invalid Date";
+    }
   }
+
+  if (isNaN(date.getTime())) {
+    console.warn("Formatted date is invalid:", date);
+    return "Invalid Date";
+  }
+
+  // Example format: "January 1, 2023, 10:30 AM"
+  // You can customize this using options for toLocaleString
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const recipientNameElement = document.getElementById('recipient-name');
-  const orderStatusElement = document.getElementById('order-status');
-  const deliveryDateElement = document.getElementById('delivery-date');
-  const messageFromSenderElement = document.getElementById('message-from-sender');
-  const loadingMessage = document.getElementById('loading-message');
-  const giftDetailsContainer = document.getElementById('gift-details-container');
-  const errorMessageElement = document.getElementById('error-message');
-  const giftImageElement = document.getElementById('gift-image');
-  const giftImageContainer = document.getElementById('gift-image-container');
-
-  document.getElementById('current-year').textContent = new Date().getFullYear();
+  if (!db) {
+    console.log("Firestore (db) not initialized. Exiting script.");
+    return;
+  }
 
   const params = new URLSearchParams(window.location.search);
-  const token = params.get('token'); // This is the orderId
+  const token = params.get('token'); // This token is the orderId
 
-  const formatDate = (timestampInput) => {
-    if (!timestampInput) return "To be confirmed";
-    let date;
-    if (timestampInput.toDate && typeof timestampInput.toDate === 'function') {
-      date = timestampInput.toDate(); // Firestore Timestamp
-    } else if (timestampInput instanceof Date) {
-      date = timestampInput; // JavaScript Date
-    } else {
-      date = new Date(timestampInput); // Try to parse if it's a string/number
-    }
-    
-    if (isNaN(date.getTime())) {
-      return "Date not available";
-    }
-    // Format: e.g., "Mon, Jan 15, 2024"
-    return date.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
-  };
+  const statusDiv = document.getElementById('status');
+  const recipientNameDiv = document.getElementById('recipient-name');
+  const expectedDeliveryDiv = document.getElementById('expected-delivery');
+  const messageDiv = document.getElementById('message-from-sender');
+  const detailsDiv = document.getElementById('gift-details');
+  const loadingDiv = document.getElementById('loading-message');
 
-  if (token && db) {
-    const orderRef = db.collection('orders').doc(token);
-
-    orderRef.onSnapshot((doc) => {
-      if (loadingMessage) loadingMessage.style.display = 'none';
-      if (errorMessageElement) errorMessageElement.style.display = 'none';
-
-      if (doc.exists) {
-        const orderData = doc.data();
-        console.log("Fetched Order Data:", orderData); // For debugging
-
-        if (orderData.isGift !== true) {
-          if (errorMessageElement) {
-            errorMessageElement.textContent = 'This order is not marked as a trackable gift.';
-            errorMessageElement.style.display = 'block';
-          }
-          if (giftDetailsContainer) giftDetailsContainer.style.display = 'none';
-          return;
-        }
-        
-        if (!orderData.giftDetails) {
-            if (errorMessageElement) {
-                errorMessageElement.textContent = 'Gift details are not available for this order.';
-                errorMessageElement.style.display = 'block';
-            }
-            if (giftDetailsContainer) giftDetailsContainer.style.display = 'none';
-            return;
-        }
-
-
-        if (recipientNameElement) recipientNameElement.textContent = orderData.giftDetails.recipientName || 'Valued Recipient';
-        
-        if (orderStatusElement) {
-          orderStatusElement.textContent = orderData.status ? orderData.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Status Unknown';
-          orderStatusElement.setAttribute('data-status-value', orderData.status || '');
-          if (orderData.status === 'delivered') {
-            orderStatusElement.setAttribute('data-delivered', 'true');
-          } else {
-            orderStatusElement.removeAttribute('data-delivered');
-          }
-        }
-        
-        if (deliveryDateElement) {
-          if (orderData.status === 'delivered' && orderData.actualDeliveryTime) {
-            deliveryDateElement.textContent = `Delivered on ${formatDate(orderData.actualDeliveryTime)}`;
-          } else if (orderData.estimatedDeliveryTime) {
-            deliveryDateElement.textContent = `ETA: ${formatDate(orderData.estimatedDeliveryTime)}`;
-          } else {
-            deliveryDateElement.textContent = 'To be confirmed';
-          }
-        }
-        
-        if (messageFromSenderElement) messageFromSenderElement.textContent = orderData.giftDetails.giftMessage || 'Enjoy your gift!';
-        
-        // Display gift image
-        const firstItem = orderData.items && orderData.items.length > 0 ? orderData.items[0] : null;
-        if (giftImageElement && giftImageContainer) {
-          if (firstItem && firstItem.imageUrl) {
-            giftImageElement.src = firstItem.imageUrl;
-            giftImageElement.alt = firstItem.name || "Your Gift";
-            giftImageContainer.style.display = 'block';
-          } else {
-            // Optionally, show a placeholder or hide the image section if no image
-            giftImageElement.src = 'https://placehold.co/300x200.png?text=Gift+Image'; // Placeholder
-            giftImageElement.alt = "Gift Image Placeholder";
-            giftImageContainer.style.display = 'block'; // Show placeholder
-            // giftImageContainer.style.display = 'none'; // Or hide if no image
-          }
-        }
-
-        if (giftDetailsContainer) giftDetailsContainer.style.display = 'block';
-
-      } else {
-        if (errorMessageElement) {
-          errorMessageElement.textContent = 'Sorry, we could not find tracking information for this gift. Please check the link or contact the sender.';
-          errorMessageElement.style.display = 'block';
-        }
-        if (giftDetailsContainer) giftDetailsContainer.style.display = 'none';
-        console.error("Order not found for token:", token);
-      }
-    }, (error) => {
-      if (loadingMessage) loadingMessage.style.display = 'none';
-      if (errorMessageElement) {
-        errorMessageElement.textContent = 'There was an error retrieving gift details. Please try again later.';
-        errorMessageElement.style.display = 'block';
-      }
-      if (giftDetailsContainer) giftDetailsContainer.style.display = 'none';
-      console.error("Error fetching order:", error);
-    });
-  } else {
-    if (loadingMessage) loadingMessage.style.display = 'none';
-    if (errorMessageElement) {
-      errorMessageElement.textContent = !db ? 'Tracking service connection error.' : 'No gift tracking token provided. Please use the link from your notification.';
-      errorMessageElement.style.display = 'block';
-    }
-    if (giftDetailsContainer) giftDetailsContainer.style.display = 'none';
-    if (!token) console.error("No token found in URL.");
+  if (!token) {
+    if (loadingDiv) loadingDiv.style.display = 'none';
+    if (detailsDiv) detailsDiv.innerHTML = '<p class="error">No tracking token provided in the URL.</p>';
+    return;
   }
+
+  const orderRef = db.collection('orders').doc(token);
+
+  orderRef.onSnapshot((doc) => {
+    if (loadingDiv) loadingDiv.style.display = 'none'; // Hide loading once we get a response
+
+    if (doc.exists) {
+      const orderData = doc.data();
+      console.log("Fetched Order Data:", orderData);
+
+      if (orderData.isGift !== true) {
+        if (detailsDiv) detailsDiv.innerHTML = '<p>This order is not marked as a trackable gift.</p>';
+        return;
+      }
+      
+      // Check if recipient can view order details
+      if (orderData.giftDetails && orderData.giftDetails.recipientCanViewAndTrack === false) {
+        if (statusDiv) statusDiv.textContent = orderData.status ? orderData.status.replace(/_/g, ' ') : 'Status Unavailable';
+        if (recipientNameDiv) recipientNameDiv.textContent = orderData.giftDetails.recipientName || 'Valued Recipient';
+        if (expectedDeliveryDiv && orderData.estimatedDeliveryTime) {
+            expectedDeliveryDiv.textContent = formatDate(orderData.estimatedDeliveryTime);
+        } else if (expectedDeliveryDiv) {
+            expectedDeliveryDiv.textContent = 'To be confirmed';
+        }
+        if (messageDiv && orderData.giftDetails.giftMessage) {
+            messageDiv.textContent = orderData.giftDetails.giftMessage;
+        } else if (messageDiv) {
+            messageDiv.textContent = 'A special gift is on its way!';
+        }
+        if (detailsDiv) {
+            // Show minimal info if tracking is restricted
+            detailsDiv.style.display = 'block';
+            const minimalInfoHTML = `
+                <p><strong>Status:</strong> <span id="status-val">${orderData.status ? orderData.status.replace(/_/g, ' ') : 'Status Unavailable'}</span></p>
+                <p>Hello ${orderData.giftDetails.recipientName || 'Valued Recipient'}, your gift from ${orderData.senderName || 'a friend'} is being prepared!</p>
+                ${orderData.giftDetails.giftMessage ? `<p class="message"><strong>Message:</strong> ${orderData.giftDetails.giftMessage}</p>` : ''}
+                <p class="note">Detailed tracking is not available for this gift as per sender's preference.</p>
+            `;
+            detailsDiv.innerHTML = minimalInfoHTML;
+        }
+        return;
+      }
+
+
+      if (detailsDiv) detailsDiv.style.display = 'block'; // Show details section
+
+      if (statusDiv) statusDiv.textContent = orderData.status ? orderData.status.replace(/_/g, ' ') : 'Status Unavailable';
+
+      if (recipientNameDiv) {
+        recipientNameDiv.textContent = orderData.giftDetails?.recipientName || 'Valued Recipient';
+      } else {
+        console.warn("recipientNameDiv not found");
+      }
+
+      if (expectedDeliveryDiv) {
+        if (orderData.status === 'delivered' && orderData.actualDeliveryTime) {
+            expectedDeliveryDiv.innerHTML = `Delivered on: <strong>${formatDate(orderData.actualDeliveryTime)}</strong>`;
+        } else if (orderData.estimatedDeliveryTime) {
+            expectedDeliveryDiv.textContent = formatDate(orderData.estimatedDeliveryTime);
+        } else {
+            expectedDeliveryDiv.textContent = 'To be confirmed';
+        }
+      } else {
+        console.warn("expectedDeliveryDiv not found");
+      }
+
+      if (messageDiv) {
+        if (orderData.giftDetails?.giftMessage) {
+          messageDiv.textContent = orderData.giftDetails.giftMessage;
+        } else {
+          messageDiv.textContent = 'A special gift is on its way!';
+        }
+      } else {
+        console.warn("messageDiv not found");
+      }
+
+    } else {
+      console.log("No such document for order ID:", token);
+      if (detailsDiv) detailsDiv.innerHTML = '<p class="error">Invalid tracking link or gift details not found.</p>';
+    }
+  }, (error) => {
+    console.error("Error getting order details: ", error);
+    if (loadingDiv) loadingDiv.style.display = 'none';
+    if (detailsDiv) detailsDiv.innerHTML = '<p class="error">Could not load gift tracking information. Please try again later.</p>';
+  });
 });
+    
