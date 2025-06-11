@@ -23,6 +23,7 @@ import { Loader2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { Progress } from "@/components/ui/progress"; 
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast"; // Import useToast
 
 const formSchema = z.object({
   fullName: z.string().min(3, { message: "Full name must be at least 3 characters." }).max(100),
@@ -38,8 +39,9 @@ const formSchema = z.object({
 });
 
 export default function SignUpPage() {
-  const { user, loading: authLoading, /* signup function will be needed here later */ } = useAuth();
+  const { user, loading: authLoading, signup } = useAuth(); // Use signup from useAuth
   const router = useRouter();
+  const { toast } = useToast(); // Initialize useToast
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -61,23 +63,24 @@ export default function SignUpPage() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      router.replace('/dashboard');
+      // If user is already logged in, redirect to dashboard.
+      // This covers cases where they might navigate back to signup page.
+      router.replace('/products'); // Or /dashboard if that's preferred landing after login
     }
   }, [user, authLoading, router]);
 
   const calculateStrength = (password: string) => {
     const length = password.length;
     if (length === 0) return 0;
-    if (length < 8) return (length / 8) * 30; // Scale up to 30% for under 8 chars
+    if (length < 8) return (length / 8) * 30; 
     
-    // From 8 characters onwards
-    let strength = 40; // Base for 8 chars
-    if (length >= 9) strength += 10; // +10 for 9th char
-    if (length >= 10) strength += 20; // +20 for 10th char (total +30 from 8)
-    if (length >= 11) strength += 15; // +15 for 11th char (total +45 from 8)
-    if (length >= 12) strength += 15; // +15 for 12th char (total +60 from 8, reaching 100%)
+    let strength = 40; 
+    if (length >= 9) strength += 10; 
+    if (length >= 10) strength += 20; 
+    if (length >= 11) strength += 15; 
+    if (length >= 12) strength += 15; 
     
-    return Math.min(strength, 100); // Cap at 100
+    return Math.min(strength, 100); 
   };
 
   const handlePasswordChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,17 +91,32 @@ export default function SignUpPage() {
   };
 
 
-  if (authLoading || (!authLoading && user)) {
+  if (authLoading) { // Only show loader if auth is still loading and no user yet.
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
+  // If user becomes available (e.g., after signup or if already logged in), useEffect will redirect.
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    console.log("Form submitted with:", values);
-    // TODO: Implement actual signup logic using useAuth().signup or similar
-    await new Promise(resolve => setTimeout(resolve, 1500)); 
-    alert("Sign Up Submitted (Not Implemented Yet) - Check console for values.");
-    setIsLoading(false);
+    try {
+      await signup({
+        email: values.email,
+        password: values.password,
+        fullName: values.fullName,
+        phone: values.phone,
+        county: values.county,
+        town: values.town,
+      });
+      // onAuthStateChanged in AuthContext will handle setting the user and role,
+      // then the useEffect above will redirect.
+      // Or, we can explicitly redirect here after a short delay if onAuthStateChanged is too slow.
+      router.replace('/products'); // Redirect to customer homepage
+    } catch (error) {
+      // Error toast is handled by the signup function in AuthContext
+      console.error("Signup page caught error:", error);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   const togglePasswordVisibility = () => setShowPassword(!showPassword);

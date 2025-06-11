@@ -4,17 +4,33 @@
 import type { User, UserRole } from '@/types';
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import type { User as FirebaseUser } from 'firebase/auth';
-import { onAuthStateChanged, signOut as firebaseSignOut, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { 
+  onAuthStateChanged, 
+  signOut as firebaseSignOut, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, // Added
+  updateProfile 
+} from 'firebase/auth';
 import { auth, db } from '@/lib/firebase'; 
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore'; // Added setDoc, serverTimestamp
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+
+interface SignupData {
+  email: string;
+  password: string;
+  fullName: string;
+  phone: string;
+  county: string;
+  town: string;
+}
 
 interface AuthContextType {
   user: User | null;
   role: UserRole | null;
   loading: boolean;
   login: (email: string, pass: string) => Promise<void>;
+  signup: (data: SignupData) => Promise<void>; // Added signup
   logout: () => Promise<void>;
   updateUserProfile: (newDisplayName: string) => Promise<void>;
 }
@@ -50,7 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (userDoc.exists()) {
           const userData = userDoc.data();
           if (userData?.disabled === true) {
-            await firebaseSignOut(auth); // Sign out the disabled user from Firebase Auth
+            await firebaseSignOut(auth); 
             setUser(null);
             setRole(null);
             setLoading(false);
@@ -60,7 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               variant: "destructive",
               duration: 7000,
             });
-            router.replace('/login'); // Ensure redirect to login if disabled
+            router.replace('/login'); 
             return;
           }
 
@@ -125,9 +141,62 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       toast({ title: "Login Failed", description: errorMessage, variant: "destructive" });
       setLoading(false); 
-      // Do not re-throw common auth errors to prevent Next.js overlay for these cases.
-      // If it's an unexpected error, you might still choose to throw it or handle differently.
-      // For now, all login errors will just result in a toast.
+    }
+  };
+
+  const signup = async (data: SignupData) => {
+    if (!auth || !db) {
+      toast({ title: "Signup Failed", description: "Firebase services not available.", variant: "destructive" });
+      throw new Error("Firebase services not available.");
+    }
+    const { email, password, fullName, phone, county, town } = data;
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+
+      // Update Firebase Auth profile
+      await updateProfile(firebaseUser, { displayName: fullName });
+
+      // Create Firestore user document
+      const nameParts = fullName.split(' ');
+      const firstName = nameParts[0];
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+      
+      await setDoc(doc(db, 'users', firebaseUser.uid), {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: fullName,
+        firstName,
+        lastName,
+        phone,
+        county,
+        town,
+        role: 'Customer',
+        createdAt: serverTimestamp(),
+        disabled: false,
+      });
+      
+      // User state will be updated by onAuthStateChanged listener
+      toast({ title: "Signup Successful", description: `Welcome, ${fullName}! Your account has been created.` });
+
+    } catch (error: any) {
+      console.error("Signup failed:", error);
+      let errorMessage = "An unexpected error occurred. Please try again.";
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          errorMessage = "This email address is already in use. Please try a different email or login.";
+          break;
+        case 'auth/weak-password':
+          errorMessage = "The password is too weak. Please choose a stronger password.";
+          break;
+        case 'auth/invalid-email':
+          errorMessage = "The email address is not valid. Please enter a correct email.";
+          break;
+        default:
+          errorMessage = error.message || "Failed to create account. Please try again.";
+      }
+      toast({ title: "Signup Failed", description: errorMessage, variant: "destructive" });
+      throw error; // Re-throw to be caught by the calling component
     }
   };
 
@@ -170,7 +239,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, loading, login, logout, updateUserProfile }}>
+    <AuthContext.Provider value={{ user, role, loading, login, signup, logout, updateUserProfile }}>
       {children}
     </AuthContext.Provider>
   );
