@@ -242,24 +242,7 @@
             display: none;
         }
     </style>
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-analytics.js";
-        
-        const firebaseConfig = {
-            apiKey: "AIzaSyDzUlYdqqdkTxcHJHChsX6zM-U_7N92xec",
-            authDomain: "zellowlive.firebaseapp.com",
-            databaseURL: "https://zellowlive-default-rtdb.firebaseio.com",
-            projectId: "zellowlive",
-            storageBucket: "zellowlive.firebasestorage.app",
-            messagingSenderId: "943761891650",
-            appId: "1:943761891650:web:e8c12f77ea9d5edf0b68db",
-            measurementId: "G-46MZ5BWTGD"
-        };
-        
-        const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app);
-    </script>
+
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
 </head>
@@ -320,7 +303,16 @@
     </div>
 
     <script>
-       
+        // Firebase configuration and initialization
+        const firebaseConfig = {
+            apiKey: "AIzaSyDzUlYdqqdkTxcHJHChsX6zM-U_7N92xec",
+            authDomain: "zellowlive.firebaseapp.com",
+            projectId: "zellowlive",
+            storageBucket: "zellowlive.firebasestorage.app",
+            messagingSenderId: "943761891650",
+            appId: "1:943761891650:web:e8c12f77ea9d5edf0b68db",
+        };
+
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
