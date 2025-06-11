@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/gift-tracking",
+      "destination": "/gift-tracking-site/index.html"
+    },
+    {
+      "source": "/gift-tracking/",
+      "destination": "/gift-tracking-site/index.html"
+    },
+    {
+      "source": "/gift-tracking/:path*",
+      "destination": "/gift-tracking-site/:path*"
+    }
+  ]
+}
