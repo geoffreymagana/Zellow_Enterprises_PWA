@@ -13,316 +13,233 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #334155;
+            background-color: #f8f9fa;
+            color: #333;
             min-height: 100vh;
-            padding: 20px;
             display: flex;
             justify-content: center;
-            align-items: center;
-            position: relative;
-            overflow-x: hidden;
-        }
-
-        /* Animated background elements */
-        body::before {
-            content: '';
-            position: fixed;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: repeating-linear-gradient(
-                45deg,
-                transparent,
-                transparent 2px,
-                rgba(255, 255, 255, 0.03) 2px,
-                rgba(255, 255, 255, 0.03) 4px
-            );
-            animation: float 20s linear infinite;
-            pointer-events: none;
-        }
-
-        @keyframes float {
-            0% { transform: translate(-50%, -50%) rotate(0deg); }
-            100% { transform: translate(-50%, -50%) rotate(360deg); }
-        }
-
-        @keyframes slideInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-
-        @keyframes shimmer {
-            0% { background-position: -200px 0; }
-            100% { background-position: 200px 0; }
+            align-items: flex-start;
+            padding: 40px 20px;
         }
 
         .container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            padding: 40px;
-            border-radius: 24px;
-            box-shadow: 
-                0 20px 60px rgba(0, 0, 0, 0.1),
-                0 8px 25px rgba(0, 0, 0, 0.08),
-                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            background: white;
             width: 100%;
-            max-width: 500px;
-            text-align: center;
-            animation: slideInUp 0.8s ease-out;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 420px;
+            border-radius: 16px;
+            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
         }
 
-        header {
-            margin-bottom: 35px;
-            padding-bottom: 25px;
-            border-bottom: 2px solid rgba(52, 167, 193, 0.1);
+        .header {
+            text-align: center;
+            padding: 40px 30px 30px;
+        }
+
+        .status-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #4CAF50, #81C784);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
             position: relative;
         }
 
-        header::after {
+        .status-icon::after {
             content: '';
             position: absolute;
-            bottom: -2px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 80px;
-            height: 3px;
-            background: linear-gradient(90deg, #34A7C1, #667eea);
-            border-radius: 2px;
+            width: 100px;
+            height: 100px;
+            background: rgba(76, 175, 80, 0.1);
+            border-radius: 50%;
+            z-index: -1;
         }
 
-        #logo {
-            max-height: 50px;
-            margin-bottom: 15px;
-            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
-            transition: transform 0.3s ease;
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 8px;
         }
 
-        #logo:hover {
-            transform: scale(1.05);
+        .header p {
+            color: #666;
+            font-size: 16px;
         }
 
-        header h1 {
-            background: linear-gradient(135deg, #34A7C1, #667eea);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            font-size: 2.2em;
-            font-weight: 700;
-            margin: 0;
-            letter-spacing: -0.5px;
+        .content {
+            padding: 0 30px 30px;
+        }
+
+        .order-item {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .item-image {
+            width: 60px;
+            height: 60px;
+            background: #e9ecef;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .item-details {
+            flex: 1;
+        }
+
+        .item-name {
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+            font-size: 16px;
+        }
+
+        .item-meta {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .item-price {
+            font-weight: 600;
+            color: #1a1a1a;
+            font-size: 16px;
+        }
+
+        .summary-section {
+            margin-top: 8px;
+        }
+
+        .summary-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 16px;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .summary-row:last-child {
+            border-bottom: none;
+        }
+
+        .summary-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .summary-value {
+            color: #1a1a1a;
+            font-size: 14px;
+            font-weight: 500;
+            text-align: right;
         }
 
         .loader {
-            padding: 40px 20px;
-            font-size: 1.2em;
-            color: #667eea;
-            position: relative;
-            animation: pulse 2s infinite;
+            text-align: center;
+            padding: 60px 30px;
+            color: #666;
         }
 
-        .loader::after {
-            content: '';
-            position: absolute;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 60px;
-            height: 4px;
-            background: linear-gradient(90deg, transparent, #667eea, transparent);
-            animation: shimmer 1.5s infinite;
+        .loader-icon {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f0f0f0;
+            border-top: 3px solid #4CAF50;
+            border-radius: 50%;
+            margin: 0 auto 16px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         .error-message {
-            padding: 20px;
-            background: linear-gradient(135deg, #ffebee, #fce4ec);
-            color: #c62828;
-            border: 1px solid rgba(198, 40, 40, 0.2);
+            text-align: center;
+            padding: 40px 30px;
+            color: #d32f2f;
+            background: #ffebee;
+            margin: 20px;
             border-radius: 12px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 12px rgba(198, 40, 40, 0.1);
         }
 
-        #order-details {
-            animation: slideInUp 0.6s ease-out 0.2s both;
-        }
-
-        #order-details p {
-            font-size: 1.2em;
-            line-height: 1.6;
-            margin-bottom: 20px;
-            color: #4a5568;
-        }
-
-        .status-card {
-            background: linear-gradient(135deg, #e0f7fa, #b2ebf2);
-            border: 1px solid rgba(0, 150, 136, 0.2);
-            border-radius: 16px;
-            padding: 25px;
-            margin: 25px 0;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 8px 25px rgba(0, 150, 136, 0.1);
-        }
-
-        .status-card::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-            animation: shimmer 3s infinite;
-        }
-
-        .status-card h2 {
-            font-size: 1.1em;
-            color: #00695c;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-weight: 600;
-        }
-
-        .status-text {
-            font-size: 1.6em;
-            font-weight: 800;
-            background: linear-gradient(135deg, #00695c, #004d40);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            text-transform: capitalize;
-            margin: 0;
-        }
-
-        .detail-card {
-            background: rgba(249, 250, 251, 0.8);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(52, 167, 193, 0.1);
-            border-radius: 16px;
+        .footer {
+            text-align: center;
             padding: 20px;
-            margin-bottom: 20px;
-            text-align: left;
-            transition: all 0.3s ease;
-            position: relative;
+            color: #999;
+            font-size: 12px;
+            border-top: 1px solid #f0f0f0;
         }
 
-        .detail-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 25px rgba(52, 167, 193, 0.15);
-            border-color: rgba(52, 167, 193, 0.3);
+        /* Status-specific colors */
+        .status-processing .status-icon {
+            background: linear-gradient(135deg, #FF9800, #FFB74D);
+        }
+        
+        .status-processing .status-icon::after {
+            background: rgba(255, 152, 0, 0.1);
         }
 
-        .detail-card h3 {
-            font-size: 1em;
-            background: linear-gradient(135deg, #34A7C1, #667eea);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            font-weight: 600;
+        .status-shipped .status-icon {
+            background: linear-gradient(135deg, #2196F3, #64B5F6);
+        }
+        
+        .status-shipped .status-icon::after {
+            background: rgba(33, 150, 243, 0.1);
         }
 
-        .detail-card p {
-            font-size: 1.1em;
-            margin: 0;
-            color: #4a5568;
-            line-height: 1.5;
+        .status-delivered .status-icon {
+            background: linear-gradient(135deg, #4CAF50, #81C784);
+        }
+        
+        .status-delivered .status-icon::after {
+            background: rgba(76, 175, 80, 0.1);
         }
 
-        .gift-message {
-            font-style: italic;
-            background: linear-gradient(135deg, #fffde7, #fff9c4);
-            padding: 20px;
-            border-left: 4px solid #ffc107;
-            border-radius: 0 12px 12px 0;
-            box-shadow: 0 4px 12px rgba(255, 193, 7, 0.1);
-            position: relative;
-        }
-
-        .gift-message::before {
-            content: '"';
-            position: absolute;
-            top: -10px;
-            left: 10px;
-            font-size: 3em;
-            color: rgba(255, 193, 7, 0.3);
-            font-family: serif;
-        }
-
-        footer {
-            margin-top: 40px;
-            padding-top: 25px;
-            border-top: 2px solid rgba(226, 232, 240, 0.5);
-            font-size: 0.9em;
-            color: #718096;
-            position: relative;
-        }
-
-        footer::before {
-            content: '';
-            position: absolute;
-            top: -2px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 60px;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #718096, transparent);
-        }
-
-        /* Responsive design */
-        @media (max-width: 768px) {
+        /* Responsive */
+        @media (max-width: 480px) {
             body {
-                padding: 15px;
+                padding: 20px 15px;
+            }
+            
+            .header {
+                padding: 30px 20px 20px;
+            }
+            
+            .content {
+                padding: 0 20px 20px;
             }
             
             .container {
-                padding: 30px 25px;
-                border-radius: 20px;
-            }
-            
-            header h1 {
-                font-size: 1.8em;
-            }
-            
-            .status-card, .detail-card {
-                padding: 20px 15px;
+                border-radius: 12px;
             }
         }
 
-        /* Loading skeleton styles */
-        .skeleton {
-            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-            border-radius: 8px;
-        }
-
-        .skeleton-text {
-            height: 20px;
-            margin-bottom: 10px;
-        }
-
-        .skeleton-title {
-            height: 24px;
-            width: 60%;
-            margin-bottom: 15px;
+        /* Hidden by default */
+        #order-details {
+            display: none;
         }
     </style>
     <script type="module">
@@ -348,43 +265,189 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <img src="https://placehold.co/150x50/34A7C1/ffffff.png?text=Zellow" alt="Zellow Enterprises Logo" id="logo">
-            <h1>Your Gift Status</h1>
-        </header>
+        <div id="loader" class="loader">
+            <div class="loader-icon"></div>
+            <p>Loading your gift details...</p>
+        </div>
         
-        <main id="tracking-info">
-            <div id="loader" class="loader">
-                <div>🎁 Loading your gift details...</div>
+        <div id="error-message" class="error-message" style="display: none;"></div>
+        
+        <div id="order-details">
+            <div class="header status-processing">
+                <div class="status-icon">🎁</div>
+                <h1 id="order-status-title">Order Status</h1>
+                <p id="order-status-subtitle">Your package is on the way</p>
             </div>
             
-            <div id="error-message" class="error-message" style="display: none;"></div>
-            
-            <div id="order-details" style="display: none;">
-                <p>Hello <strong id="recipient-name">Valued Customer</strong>,</p>
-                
-                <div class="status-card">
-                    <h2>Current Status</h2>
-                    <p id="order-status" class="status-text">Processing</p>
+            <div class="content">
+                <div class="order-item">
+                    <div class="item-image">🎁</div>
+                    <div class="item-details">
+                        <div class="item-name">Gift Package</div>
+                        <div class="item-meta">For: <span id="recipient-name">Valued Recipient</span></div>
+                    </div>
                 </div>
                 
-                <div class="detail-card">
-                    <h3>Expected Delivery</h3>
-                    <p id="expected-delivery-date">Calculating delivery time...</p>
-                </div>
-                
-                <div class="detail-card" id="message-card" style="display: none;">
-                    <h3>Message from Sender</h3>
-                    <p id="message-from-sender" class="gift-message"></p>
+                <div class="summary-section">
+                    <h3 class="summary-title">Order Summary</h3>
+                    
+                    <div class="summary-row">
+                        <span class="summary-label">Order ID</span>
+                        <span class="summary-value" id="order-id">Loading...</span>
+                    </div>
+                    
+                    <div class="summary-row">
+                        <span class="summary-label">Status</span>
+                        <span class="summary-value" id="order-status">Processing</span>
+                    </div>
+                    
+                    <div class="summary-row">
+                        <span class="summary-label">Delivery Date</span>
+                        <span class="summary-value" id="expected-delivery-date">Calculating...</span>
+                    </div>
+                    
+                    <div class="summary-row" id="message-row" style="display: none;">
+                        <span class="summary-label">Message</span>
+                        <span class="summary-value" id="message-from-sender" style="max-width: 200px; text-align: right; word-wrap: break-word;"></span>
+                    </div>
                 </div>
             </div>
-        </main>
+        </div>
         
-        <footer>
+        <div class="footer">
             <p>&copy; <span id="current-year">2025</span> Zellow Enterprises. All rights reserved.</p>
-        </footer>
+        </div>
     </div>
 
-    
+    <script>
+       
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const loader = document.getElementById('loader');
+            const errorMessageDiv = document.getElementById('error-message');
+            const orderDetailsDiv = document.getElementById('order-details');
+            
+            const recipientNameEl = document.getElementById('recipient-name');
+            const orderStatusEl = document.getElementById('order-status');
+            const orderStatusTitleEl = document.getElementById('order-status-title');
+            const orderStatusSubtitleEl = document.getElementById('order-status-subtitle');
+            const expectedDeliveryEl = document.getElementById('expected-delivery-date');
+            const orderIdEl = document.getElementById('order-id');
+            const messageRowEl = document.getElementById('message-row');
+            const messageFromSenderEl = document.getElementById('message-from-sender');
+            const headerEl = document.querySelector('.header');
+            
+            document.getElementById('current-year').textContent = new Date().getFullYear();
+
+            const params = new URLSearchParams(window.location.search);
+            const token = params.get('token');
+
+            if (!token) {
+                showError("No tracking token (order ID) provided. Please check the link.");
+                return;
+            }
+
+            // Set the order ID immediately
+            if (orderIdEl) orderIdEl.textContent = token;
+
+            const orderRef = db.collection("orders").doc(token);
+
+            orderRef.onSnapshot((docSnapshot) => {
+                loader.style.display = 'none';
+                if (!docSnapshot.exists) {
+                    showError("Gift tracking information not found. The link may be invalid or expired.");
+                    return;
+                }
+
+                const orderData = docSnapshot.data();
+
+                if (orderData) {
+                    orderDetailsDiv.style.display = 'block';
+                    errorMessageDiv.style.display = 'none';
+
+                    // Update recipient name
+                    if (recipientNameEl) {
+                        recipientNameEl.textContent = orderData.giftDetails?.recipientName || 'Valued Recipient';
+                    }
+
+                    // Update status and header styling
+                    const status = orderData.status || 'processing';
+                    if (orderStatusEl) orderStatusEl.textContent = status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    
+                    // Update header based on status
+                    headerEl.className = `header status-${status.toLowerCase()}`;
+                    
+                    const statusMessages = {
+                        'processing': 'Your gift is being prepared',
+                        'shipped': 'Your package is on the way',
+                        'out_for_delivery': 'Out for delivery',
+                        'delivered': 'Your gift has been delivered'
+                    };
+                    
+                    const statusIcons = {
+                        'processing': '📦',
+                        'shipped': '🚚',
+                        'out_for_delivery': '🏃‍♂️',
+                        'delivered': '✅'
+                    };
+                    
+                    if (orderStatusSubtitleEl) {
+                        orderStatusSubtitleEl.textContent = statusMessages[status] || 'Your package is being processed';
+                    }
+                    
+                    // Update status icon
+                    const statusIcon = document.querySelector('.status-icon');
+                    if (statusIcon) {
+                        statusIcon.textContent = statusIcons[status] || '🎁';
+                    }
+                    
+                    // Update delivery date
+                    if (expectedDeliveryEl) {
+                        if (orderData.estimatedDeliveryTime && orderData.estimatedDeliveryTime.toDate) {
+                            expectedDeliveryEl.textContent = orderData.estimatedDeliveryTime.toDate().toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric',
+                                year: 'numeric'
+                            });
+                        } else if (orderData.status === 'delivered' && orderData.actualDeliveryTime && orderData.actualDeliveryTime.toDate) {
+                            expectedDeliveryEl.textContent = orderData.actualDeliveryTime.toDate().toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric',
+                                year: 'numeric'
+                            });
+                        } else {
+                            expectedDeliveryEl.textContent = 'To be updated';
+                        }
+                    }
+
+                    // Handle gift message
+                    if (orderData.giftDetails?.giftMessage) {
+                        if (messageRowEl) messageRowEl.style.display = 'flex';
+                        if (messageFromSenderEl) messageFromSenderEl.textContent = orderData.giftDetails.giftMessage;
+                    } else {
+                        if (messageRowEl) messageRowEl.style.display = 'none';
+                    }
+                } else {
+                    showError("Could not retrieve gift details at this time.");
+                }
+
+            }, (error) => {
+                console.error("Error fetching gift details:", error);
+                showError("An error occurred while fetching gift details. Please try again later.");
+            });
+
+            function showError(message) {
+                loader.style.display = 'none';
+                orderDetailsDiv.style.display = 'none';
+                if (errorMessageDiv) {
+                    errorMessageDiv.textContent = message;
+                    errorMessageDiv.style.display = 'block';
+                }
+            }
+        });
+    </script>
 </body>
 </html>
