@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useAuth } from '@/hooks/useAuth';
@@ -10,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useEffect, useState, useCallback } from 'react';
 import { collection, getDocs, query, where, onSnapshot, Unsubscribe, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { User, Order, OrderStatus, Product, StockRequest, Invoice, InvoiceStatus, Task } from '@/types';
+import type { User as AppUser, Order, OrderStatus, Product, StockRequest, Invoice, InvoiceStatus, Task } from '@/types';
 import { useRouter } from 'next/navigation'; 
 
 const formatPrice = (price: number): string => {
@@ -105,6 +106,8 @@ export default function DashboardPage() {
   const [isLoadingTechnicianActiveTasks, setIsLoadingTechnicianActiveTasks] = useState(true);
   const [technicianCompletedToday, setTechnicianCompletedToday] = useState<number | string>("...");
   const [isLoadingTechnicianCompletedToday, setIsLoadingTechnicianCompletedToday] = useState(true);
+  const [technicianColleagues, setTechnicianColleagues] = useState<AppUser[]>([]);
+  const [isLoadingTechnicianColleagues, setIsLoadingTechnicianColleagues] = useState(false);
 
   // Service Manager specific state
   const [smTotalActiveTasks, setSmTotalActiveTasks] = useState<number | string>("...");
@@ -389,13 +392,27 @@ export default function DashboardPage() {
           console.error("Error fetching technician completed tasks:", error); setTechnicianCompletedToday("Error"); setIsLoadingTechnicianCompletedToday(false);
         });
         unsubscribers.push(unsubTechCompleted);
+
+        setIsLoadingTechnicianColleagues(true);
+        const qTechs = query(usersCol, where('role', '==', 'Technician'), where('disabled', '!=', true), orderBy('displayName'));
+        const unsubTechs = onSnapshot(qTechs, (snapshot) => {
+            const colleagues: AppUser[] = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
+            setTechnicianColleagues(colleagues);
+            setIsLoadingTechnicianColleagues(false);
+        }, (error) => {
+            console.error("Error fetching technician colleagues:", error);
+            setIsLoadingTechnicianColleagues(false);
+        });
+        unsubscribers.push(unsubTechs);
+
       } else {
         setIsLoadingTechnicianActiveTasks(false); setIsLoadingTechnicianCompletedToday(false);
+        setIsLoadingTechnicianColleagues(false);
       }
 
       if (role === 'ServiceManager' || role === 'Admin') { // Admin also gets these for completeness
         setIsLoadingSmTotalActiveTasks(true); setIsLoadingSmTasksNeedingAction(true); setIsLoadingSmActiveTechnicians(true);
-        const qSmActiveTasks = query(tasksCol, where('status', 'in', ['pending', 'in-progress']));
+        const qSmActiveTasks = query(tasksCol, where('status', 'in', ['pending', 'in-progress', 'needs_approval']));
         const unsubSmActiveTasks = onSnapshot(qSmActiveTasks, (snapshot) => {
           setSmTotalActiveTasks(snapshot.size); setIsLoadingSmTotalActiveTasks(false);
         }, (error) => {
@@ -515,6 +532,27 @@ export default function DashboardPage() {
             <DashboardItem title="My Active Tasks" value={technicianActiveTasks} icon={Wrench} link="/tasks" isLoadingValue={isLoadingTechnicianActiveTasks} description="Tasks pending or in-progress."/>
             <DashboardItem title="Tasks Completed Today" value={technicianCompletedToday} icon={CheckCircle2} isLoadingValue={isLoadingTechnicianCompletedToday} description="Tasks you finished today."/>
             <DashboardItem title="Awaiting My Review" value={"0"} icon={AlertTriangle} isLoadingValue={false} description="Items needing your approval (Future)."/>
+            <Card className="md:col-span-2 lg:col-span-4">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><UsersRound className="h-5 w-5"/> Active Technicians</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoadingTechnicianColleagues ? (
+                  <div className="flex justify-center"><Loader2 className="h-6 w-6 animate-spin"/></div>
+                ) : technicianColleagues.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {technicianColleagues.map(tech => (
+                      <div key={tech.uid} className="flex items-center gap-2">
+                         <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">{tech.displayName?.substring(0,2).toUpperCase()}</div>
+                         <span className="text-sm font-medium truncate">{tech.displayName}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No other active technicians found.</p>
+                )}
+              </CardContent>
+            </Card>
           </>
         );
        case 'Rider':
@@ -528,7 +566,7 @@ export default function DashboardPage() {
       case 'ServiceManager':
         return (
           <>
-            <DashboardItem title="Total Active Prod. Tasks" value={smTotalActiveTasks} icon={ListChecks} link="/tasks" isLoadingValue={isLoadingSmTotalActiveTasks} description="All 'pending' or 'in-progress' tasks."/>
+            <DashboardItem title="Total Active Prod. Tasks" value={smTotalActiveTasks} icon={ListChecks} link="/tasks" isLoadingValue={isLoadingSmTotalActiveTasks} description="All 'pending', 'in-progress', or 'needs_approval' tasks."/>
             <DashboardItem title="Tasks Needing Action" value={smTasksNeedingAction} icon={AlertTriangle} link="/tasks?filter=action" isLoadingValue={isLoadingSmTasksNeedingAction} description="Tasks 'pending' or 'needs_approval'."/>
             <DashboardItem title="Active Technicians" value={smActiveTechnicians} icon={UsersIcon} link="/admin/users?role=Technician" isLoadingValue={isLoadingSmActiveTechnicians} description="Count of enabled technicians."/>
           </>
@@ -663,4 +701,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

@@ -1,4 +1,5 @@
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -180,6 +181,8 @@ export interface Task {
   assigneeId?: string;
   assigneeName?: string;
   status: 'pending' | 'in-progress' | 'completed' | 'needs_approval' | 'blocked' | 'rejected';
+  proofOfWorkUrl?: string | null;
+  serviceManagerNotes?: string | null;
   relatedDocId?: string;
   createdAt: any;
   updatedAt: any;
