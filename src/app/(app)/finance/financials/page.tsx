@@ -10,12 +10,13 @@ import { Loader2, DollarSign, ShoppingCart, TrendingUp, Coins, PackageIcon, PieC
 import Image from 'next/image';
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order, Invoice, Product, OrderItem as FirestoreOrderItem } from '@/types';
+import type { Order, Invoice, Product, OrderItem as FirestoreOrderItem, StockRequest } from '@/types';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isBefore, isAfter, isValid, parseISO, subMonths, addDays } from 'date-fns';
 import { MonthlyRevenueExpensesChart, type DailyDataPoint } from '@/components/charts/MonthlyRevenueExpensesChart';
 import { TopSellingProductsChart, type ProductSalesData } from '@/components/charts/TopSellingProductsChart';
 import { RevenueBreakdownChart, type RevenueSourceData } from '@/components/charts/RevenueBreakdownChart';
-import { DateRangePicker } from '@/components/common/DateRangePicker'; // Assuming you might create this
+import { ExpenseBreakdownChart, type ExpenseSourceData } from '@/components/charts/ExpenseBreakdownChart';
+import { Coins as CoinsIcon } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -36,6 +37,7 @@ export default function FinancialsPage() {
 
   const [topProductsData, setTopProductsData] = useState<ProductSalesData[]>([]);
   const [revenueBreakdownData, setRevenueBreakdownData] = useState<RevenueSourceData[]>([]);
+  const [expenseBreakdownData, setExpenseBreakdownData] = useState<ExpenseSourceData[]>([]);
 
   const [totalRevenue, setTotalRevenue] = useState<number>(0);
   const [totalSales, setTotalSales] = useState<number>(0);
@@ -54,6 +56,7 @@ export default function FinancialsPage() {
     setIsLoadingStats(true);
     try {
       const productsQuery = query(collection(db, 'products'));
+      const stockRequestsQuery = query(collection(db, 'stockRequests'));
       
       let ordersBaseQuery = query(collection(db, 'orders'), where("paymentStatus", "==", "paid"));
       let invoicesBaseQuery = query(collection(db, 'invoices'), where("status", "==", "paid"));
@@ -68,14 +71,18 @@ export default function FinancialsPage() {
         invoicesBaseQuery = query(invoicesBaseQuery, where("invoiceDate", "<", Timestamp.fromDate(exclusiveEndDate)));
       }
       
-      const [productsSnapshot, ordersSnapshot, invoicesSnapshot] = await Promise.all([
+      const [productsSnapshot, stockRequestsSnapshot, ordersSnapshot, invoicesSnapshot] = await Promise.all([
         getDocs(productsQuery),
+        getDocs(stockRequestsQuery),
         getDocs(ordersBaseQuery),
         getDocs(invoicesBaseQuery)
       ]);
 
       const productsMap = new Map<string, Product>();
       productsSnapshot.forEach(doc => productsMap.set(doc.id, { id: doc.id, ...doc.data() } as Product));
+      
+      const stockRequestsMap = new Map<string, StockRequest>();
+      stockRequestsSnapshot.forEach(doc => stockRequestsMap.set(doc.id, { id: doc.id, ...doc.data()} as StockRequest));
       
       let revenueFromProductSales = 0;
       let revenueFromCustomizations = 0;
@@ -111,11 +118,12 @@ export default function FinancialsPage() {
         });
       });
 
+      const expenseCategories: Record<string, number> = {};
       invoicesSnapshot.forEach((doc) => {
         const invoice = doc.data() as Invoice;
         if (!invoice.invoiceDate?.toDate || !isValid(invoice.invoiceDate.toDate())) {
             console.warn(`Skipping invoice ${invoice.id} due to invalid invoiceDate.`);
-            return; // Skip this invoice if invoiceDate is invalid
+            return;
         }
         const invoiceDate = invoice.invoiceDate.toDate();
         const monthKey = format(invoiceDate, 'yyyy-MM');
@@ -123,6 +131,21 @@ export default function FinancialsPage() {
 
         if (!filterRange?.start && isBefore(invoiceDate, firstTransactionDate)) firstTransactionDate = invoiceDate;
         if (!filterRange?.end && isAfter(invoiceDate, lastTransactionDate)) lastTransactionDate = invoiceDate;
+        
+        // Expense categorization
+        let category = "Other Expenses";
+        if (invoice.stockRequestId) {
+          const stockRequest = stockRequestsMap.get(invoice.stockRequestId);
+          if (stockRequest) {
+            const product = productsMap.get(stockRequest.productId);
+            if (product && product.categories && product.categories.length > 0) {
+              category = product.categories[0].split(' (')[0];
+            } else {
+              category = "Stock Procurement";
+            }
+          }
+        }
+        expenseCategories[category] = (expenseCategories[category] || 0) + invoice.totalAmount;
       });
 
       const currentRangeRevenue = Object.values(monthlyRevenue).reduce((sum, val) => sum + val, 0);
@@ -132,13 +155,20 @@ export default function FinancialsPage() {
       setTotalRevenue(currentRangeRevenue);
       setTotalSales(ordersSnapshot.size);
       setTotalExpenses(currentRangeExpenses);
-      setNetProfit(currentNetProfit); // This updates the summary card Net Profit
+      setNetProfit(currentNetProfit);
       
       setRevenueBreakdownData([
         { name: "Product Sales", value: revenueFromProductSales, color: "hsl(var(--chart-1))" },
         { name: "Customizations", value: revenueFromCustomizations, color: "hsl(var(--chart-2))" },
         { name: "Delivery Fees", value: revenueFromDeliveryFees, color: "hsl(var(--chart-3))" },
       ].filter(source => source.value > 0));
+
+      const expenseChartColors = ["hsl(var(--chart-5))", "hsl(var(--destructive))", "hsl(var(--chart-4))", "hsl(var(--chart-3))", "hsl(var(--chart-2))"];
+      setExpenseBreakdownData(
+        Object.entries(expenseCategories).map(([name, value], index) => ({
+          name, value, color: expenseChartColors[index % expenseChartColors.length],
+        })).sort((a,b) => b.value - a.value)
+      );
 
       let targetMonthForDailyChart = filterRange?.end ? filterRange.end : (isValid(lastTransactionDate) && lastTransactionDate.getFullYear() !== 1970 ? lastTransactionDate : new Date());
       setTargetMonthDateForChart(targetMonthForDailyChart);
@@ -180,7 +210,6 @@ export default function FinancialsPage() {
       
       setDailyChartData(dailyDataForMonthChart);
       setLatestMonthNetChange(currentMonthRevenue - currentMonthExpenses);
-      // This is the value passed to the chart for "Total Balance"
       setOverallCumulativeNetProfit(currentNetProfit); 
 
       const productSalesAgg: Record<string, { name: string; totalRevenue: number; totalQuantity: number }> = {};
@@ -408,10 +437,17 @@ export default function FinancialsPage() {
        <Card>
           <CardHeader>
             <CardTitle className="font-headline text-lg">Expense Breakdown by Category {filterActive && "(Filtered)"}</CardTitle>
-            <CardDescription>Spending across different operational categories. (Placeholder)</CardDescription>
+            <CardDescription>Spending across different operational categories.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[350px] sm:h-[400px] flex items-center justify-center bg-muted/50 rounded-md">
-            <Image src="https://placehold.co/600x300.png?text=Expense+Categories+Chart" alt="Expense Categories Chart Placeholder" width={600} height={300} className="opacity-50" data-ai-hint="expense categories chart"/>
+          <CardContent className="h-[360px] sm:h-[420px] md:h-[480px] lg:h-[520px] w-full pb-0">
+             {expenseBreakdownData.length > 0 ? (
+                <ExpenseBreakdownChart data={expenseBreakdownData} />
+             ) : (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 text-center">
+                    <CoinsIcon className="h-10 w-10 mb-2 text-muted-foreground/70"/>
+                    No expense data available {filterActive && "in this range"}.
+                </div>
+             )}
           </CardContent>
         </Card>
     </div>
