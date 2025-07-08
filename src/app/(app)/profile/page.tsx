@@ -118,7 +118,7 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent className="p-6 md:p-8 space-y-3">
           {role === 'Customer' && (
-             <Button  variant="outline" className="w-full justify-start">
+             <Button asChild variant="outline" className="w-full justify-start">
                 <Link href="/orders">
                   <ShoppingCart className="mr-2 h-4 w-4" /> My Orders
                 </Link>
@@ -131,17 +131,17 @@ export default function ProfilePage() {
             <p className="text-sm font-medium">Dark Mode</p>
             <ThemeToggle />
           </div>
-           <Button  variant="outline" className="w-full justify-start">
+           <Button asChild variant="outline" className="w-full justify-start">
             <Link href="/help">
               <HelpCircle className="mr-2 h-4 w-4" /> Help Center
             </Link>
           </Button>
-          <Button  variant="outline" className="w-full justify-start">
+          <Button asChild variant="outline" className="w-full justify-start">
               <Link href="/support">
                 <ShieldQuestion className="mr-2 h-4 w-4" /> Contact Support
               </Link>
           </Button>
-          <Button  variant="outline" className="w-full justify-start">
+          <Button asChild variant="outline" className="w-full justify-start">
             <Link href="/about">
               <Info className="mr-2 h-4 w-4" /> About Zellow
             </Link>
