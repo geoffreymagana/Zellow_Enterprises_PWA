@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Save, ArrowLeft, UploadCloud, ExternalLink, ImageOff, Construction } from 'lucide-react';
 import type { Product as ProductType, CustomizationGroupDefinition } from '@/types';
@@ -41,6 +42,7 @@ const productFormSchema = z.object({
   imageUrl: z.string().url({ message: "Please enter a valid URL" }).optional().or(z.literal('')),
   supplier: z.string().optional(),
   customizationGroupId: z.string().optional().nullable(),
+  published: z.boolean().optional(),
 });
 
 type ProductFormValues = z.infer<typeof productFormSchema>;
@@ -65,7 +67,7 @@ export default function AdminEditProductPage() {
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
-      name: "", description: "", price: 0, stock: 0, categories: [], imageUrl: "", supplier: "", customizationGroupId: null
+      name: "", description: "", price: 0, stock: 0, categories: [], imageUrl: "", supplier: "", customizationGroupId: null, published: true,
     },
   });
 
@@ -90,6 +92,7 @@ export default function AdminEditProductPage() {
           imageUrl: fetchedProductData.imageUrl || "",
           supplier: fetchedProductData.supplier || "",
           customizationGroupId: fetchedProductData.customizationGroupId || null,
+          published: fetchedProductData.published ?? true,
         });
       } else {
         toast({ title: "Error", description: "Product not found.", variant: "destructive" });
@@ -148,6 +151,7 @@ export default function AdminEditProductPage() {
       categories: values.categories,
       imageUrl: values.imageUrl,
       supplier: values.supplier,
+      published: values.published,
       customizationGroupId: values.customizationGroupId === NONE_GROUP_SENTINEL_VALUE ? null : values.customizationGroupId,
       updatedAt: serverTimestamp(),
     };
@@ -243,6 +247,34 @@ export default function AdminEditProductPage() {
 
             {/* Right Column (Side Content) */}
             <div className="lg:col-span-1 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Status & Visibility</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <FormField
+                    control={form.control}
+                    name="published"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5">
+                          <FormLabel>Show to Customers</FormLabel>
+                          <FormDescription className="text-xs">
+                            If unchecked, this product will be hidden.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader><CardTitle>Supplier</CardTitle></CardHeader>
                 <CardContent>

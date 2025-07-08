@@ -10,7 +10,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation"; 
 import { useEffect, useState, useCallback, useMemo } from "react"; 
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/CartContext"; 
@@ -42,7 +42,11 @@ export default function ProductsPage() {
     setIsLoadingProducts(true);
     setFetchError(null);
     try {
-      const productsQuery = query(collection(db, "products"), orderBy("createdAt", "desc"));
+      const productsQuery = query(
+        collection(db, "products"),
+        where("published", "==", true),
+        orderBy("createdAt", "desc")
+      );
       const querySnapshot = await getDocs(productsQuery);
       const fetchedProducts: Product[] = [];
       querySnapshot.forEach((doc) => {

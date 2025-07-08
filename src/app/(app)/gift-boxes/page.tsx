@@ -46,6 +46,7 @@ export default function GiftBoxesPage() {
       const productsQuery = query(
         collection(db, "products"), 
         where("categories", "array-contains", GIFT_BOX_CATEGORY_KEY),
+        where("published", "==", true),
         orderBy("createdAt", "desc")
       );
       const querySnapshot = await getDocs(productsQuery);

@@ -1,5 +1,6 @@
 
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -54,6 +55,7 @@ export interface Product {
   name: string;
   description: string;
   price: number;
+  published?: boolean;
   imageUrl?: string;
   stock: number;
   categories?: string[];
