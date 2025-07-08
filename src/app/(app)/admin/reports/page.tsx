@@ -277,7 +277,7 @@ export default function AdminReportsPage() {
 
       <Card>
         <CardHeader>
-            <CardTitle className="font-headline text-xl">Other Reports (Placeholders)</CardTitle>
+            <CardTitle className="font-headline text-xl">Other Reports</CardTitle>
             <CardDescription>
                 These sections will be implemented in future updates.
             </CardDescription>
@@ -296,10 +296,10 @@ export default function AdminReportsPage() {
                     </CardHeader>
                     <CardContent className="space-y-2 pl-8">
                         <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                            {section.reports.map(report => <li key={report}>{report} (Coming Soon)</li>)}
+                            {section.reports.map(report => <li key={report}>{report}</li>)}
                         </ul>
                          <Button variant="outline" size="sm" disabled className="mt-2">
-                            <Download className="mr-2 h-4 w-4" /> Download (Disabled)
+                            <Download className="mr-2 h-4 w-4" /> Download
                         </Button>
                     </CardContent>
                 </Card>
@@ -310,5 +310,3 @@ export default function AdminReportsPage() {
     </div>
   );
 }
-
-    
