@@ -106,6 +106,8 @@ export default function DashboardPage() {
   const [isLoadingTechnicianActiveTasks, setIsLoadingTechnicianActiveTasks] = useState(true);
   const [technicianCompletedToday, setTechnicianCompletedToday] = useState<number | string>("...");
   const [isLoadingTechnicianCompletedToday, setIsLoadingTechnicianCompletedToday] = useState(true);
+  
+  // State for ServiceManager's view of technicians
   const [technicianColleagues, setTechnicianColleagues] = useState<AppUser[]>([]);
   const [isLoadingTechnicianColleagues, setIsLoadingTechnicianColleagues] = useState(false);
 
@@ -393,23 +395,10 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubTechCompleted);
 
-        setIsLoadingTechnicianColleagues(true);
-        const qTechs = query(usersCol, where('role', '==', 'Technician'), where('disabled', '!=', true), orderBy('displayName'));
-        const unsubTechs = onSnapshot(qTechs, (snapshot) => {
-            const colleagues: AppUser[] = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
-            setTechnicianColleagues(colleagues);
-            setIsLoadingTechnicianColleagues(false);
-        }, (error) => {
-            console.error("Error fetching technician colleagues:", error);
-            setIsLoadingTechnicianColleagues(false);
-        });
-        unsubscribers.push(unsubTechs);
-
       } else {
         setIsLoadingTechnicianActiveTasks(false); setIsLoadingTechnicianCompletedToday(false);
-        setIsLoadingTechnicianColleagues(false);
       }
-
+      
       if (role === 'ServiceManager' || role === 'Admin') { // Admin also gets these for completeness
         setIsLoadingSmTotalActiveTasks(true); setIsLoadingSmTasksNeedingAction(true); setIsLoadingSmActiveTechnicians(true);
         const qSmActiveTasks = query(tasksCol, where('status', 'in', ['pending', 'in-progress', 'needs_approval']));
@@ -435,8 +424,23 @@ export default function DashboardPage() {
           console.error("Error fetching SM active technicians:", error); setSmActiveTechnicians("Error"); setIsLoadingSmActiveTechnicians(false);
         });
         unsubscribers.push(unsubSmTechnicians);
+        
+        // Fetch technician colleagues list for Service Manager
+        setIsLoadingTechnicianColleagues(true);
+        const qTechs = query(usersCol, where('role', '==', 'Technician'), where('disabled', '!=', true), orderBy('displayName'));
+        const unsubTechs = onSnapshot(qTechs, (snapshot) => {
+            const colleagues: AppUser[] = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
+            setTechnicianColleagues(colleagues);
+            setIsLoadingTechnicianColleagues(false);
+        }, (error) => {
+            console.error("Error fetching technician colleagues:", error);
+            setIsLoadingTechnicianColleagues(false);
+        });
+        unsubscribers.push(unsubTechs);
+
       } else {
         setIsLoadingSmTotalActiveTasks(false); setIsLoadingSmTasksNeedingAction(false); setIsLoadingSmActiveTechnicians(false);
+        setIsLoadingTechnicianColleagues(false);
       }
     }
     return () => unsubscribers.forEach(unsub => unsub());
@@ -531,7 +535,22 @@ export default function DashboardPage() {
           <>
             <DashboardItem title="My Active Tasks" value={technicianActiveTasks} icon={Wrench} link="/tasks" isLoadingValue={isLoadingTechnicianActiveTasks} description="Tasks pending or in-progress."/>
             <DashboardItem title="Tasks Completed Today" value={technicianCompletedToday} icon={CheckCircle2} isLoadingValue={isLoadingTechnicianCompletedToday} description="Tasks you finished today."/>
-            <DashboardItem title="Awaiting My Review" value={"0"} icon={AlertTriangle} isLoadingValue={false} description="Items needing your approval (Future)."/>
+          </>
+        );
+       case 'Rider':
+        return (
+          <>
+            <DashboardItem title="Active Deliveries" value={riderActiveDeliveriesCount} icon={Truck} link="/deliveries" isLoadingValue={isLoadingRiderActiveDeliveries} description="Your current deliveries."/>
+            <DashboardItem title="Completed Today" value={riderCompletedTodayCount} icon={CheckCircle2} isLoadingValue={isLoadingRiderCompletedToday} description="Deliveries made today."/>
+            <DashboardItem title="View Route Map" value={"Open"} icon={MapIcon} link="/rider/map" description="See your route."/>
+          </>
+        );
+      case 'ServiceManager':
+        return (
+          <>
+            <DashboardItem title="Total Active Prod. Tasks" value={smTotalActiveTasks} icon={ListChecks} link="/tasks" isLoadingValue={isLoadingSmTotalActiveTasks} description="All 'pending', 'in-progress', or 'needs_approval' tasks."/>
+            <DashboardItem title="Tasks Needing Action" value={smTasksNeedingAction} icon={AlertTriangle} link="/tasks?filter=action" isLoadingValue={isLoadingSmTasksNeedingAction} description="Tasks 'pending' or 'needs_approval'."/>
+            <DashboardItem title="Active Technicians" value={smActiveTechnicians} icon={UsersIcon} link="/admin/users?role=Technician" isLoadingValue={isLoadingSmActiveTechnicians} description="Count of enabled technicians."/>
             <Card className="md:col-span-2 lg:col-span-4">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><UsersRound className="h-5 w-5"/> Active Technicians</CardTitle>
@@ -553,22 +572,6 @@ export default function DashboardPage() {
                 )}
               </CardContent>
             </Card>
-          </>
-        );
-       case 'Rider':
-        return (
-          <>
-            <DashboardItem title="Active Deliveries" value={riderActiveDeliveriesCount} icon={Truck} link="/deliveries" isLoadingValue={isLoadingRiderActiveDeliveries} description="Your current deliveries."/>
-            <DashboardItem title="Completed Today" value={riderCompletedTodayCount} icon={CheckCircle2} isLoadingValue={isLoadingRiderCompletedToday} description="Deliveries made today."/>
-            <DashboardItem title="View Route Map" value={"Open"} icon={MapIcon} link="/rider/map" description="See your route."/>
-          </>
-        );
-      case 'ServiceManager':
-        return (
-          <>
-            <DashboardItem title="Total Active Prod. Tasks" value={smTotalActiveTasks} icon={ListChecks} link="/tasks" isLoadingValue={isLoadingSmTotalActiveTasks} description="All 'pending', 'in-progress', or 'needs_approval' tasks."/>
-            <DashboardItem title="Tasks Needing Action" value={smTasksNeedingAction} icon={AlertTriangle} link="/tasks?filter=action" isLoadingValue={isLoadingSmTasksNeedingAction} description="Tasks 'pending' or 'needs_approval'."/>
-            <DashboardItem title="Active Technicians" value={smActiveTechnicians} icon={UsersIcon} link="/admin/users?role=Technician" isLoadingValue={isLoadingSmActiveTechnicians} description="Count of enabled technicians."/>
           </>
         );
       default:
