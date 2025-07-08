@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -119,11 +118,11 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent className="p-6 md:p-8 space-y-3">
           {role === 'Customer' && (
-             <Link href="/orders" asChild>
-                <Button variant="outline" className="w-full justify-start">
+             <Button  variant="outline" className="w-full justify-start">
+                <Link href="/orders">
                   <ShoppingCart className="mr-2 h-4 w-4" /> My Orders
-                </Button>
-              </Link>
+                </Link>
+              </Button>
           )}
           <Button variant="outline" className="w-full justify-start">
             <ShieldCheck className="mr-2 h-4 w-4" /> Change Password
@@ -132,21 +131,21 @@ export default function ProfilePage() {
             <p className="text-sm font-medium">Dark Mode</p>
             <ThemeToggle />
           </div>
-           <Link href="/help" asChild>
-            <Button variant="outline" className="w-full justify-start">
+           <Button  variant="outline" className="w-full justify-start">
+            <Link href="/help">
               <HelpCircle className="mr-2 h-4 w-4" /> Help Center
-            </Button>
-          </Link>
-          <Link href="/support" asChild>
-              <Button variant="outline" className="w-full justify-start">
+            </Link>
+          </Button>
+          <Button  variant="outline" className="w-full justify-start">
+              <Link href="/support">
                 <ShieldQuestion className="mr-2 h-4 w-4" /> Contact Support
-              </Button>
-          </Link>
-          <Link href="/about" asChild>
-            <Button variant="outline" className="w-full justify-start">
+              </Link>
+          </Button>
+          <Button  variant="outline" className="w-full justify-start">
+            <Link href="/about">
               <Info className="mr-2 h-4 w-4" /> About Zellow
-            </Button>
-          </Link>
+            </Link>
+          </Button>
           <Button variant="destructive" className="w-full justify-start" onClick={logout} disabled={authLoading}>
             {authLoading && logout === undefined ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
             Logout
