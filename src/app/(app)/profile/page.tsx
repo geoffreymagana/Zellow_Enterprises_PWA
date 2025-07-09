@@ -101,7 +101,7 @@ export default function ProfilePage() {
                 )}
               />
               <div>
-                <Label htmlFor="email">Email Address (Cannot be changed)</Label>
+                <Label htmlFor="email">Email Address</Label>
                 <Input id="email" type="email" value={user.email || ""} disabled className="mt-1" />
               </div>
               <Button type="submit" className="w-full sm:w-auto" disabled={isUpdating || authLoading}>
@@ -118,13 +118,11 @@ export default function ProfilePage() {
           <CardTitle className="font-headline">Account & Support</CardTitle>
         </CardHeader>
         <CardContent className="p-6 md:p-8 space-y-3">
-          {role === 'Customer' && (
-            <Button asChild variant="outline" className="w-full justify-start">
-              <Link href="/orders">
-                <ShoppingCart className="mr-2 h-4 w-4" /> My Orders
-              </Link>
-            </Button>
-          )}
+          <Button asChild variant="outline" className="w-full justify-start">
+            <Link href="/orders">
+              <ShoppingCart className="mr-2 h-4 w-4" /> My Orders
+            </Link>
+          </Button>
           <Button variant="outline" className="w-full justify-start">
             <ShieldCheck className="mr-2 h-4 w-4" /> Change Password
           </Button>

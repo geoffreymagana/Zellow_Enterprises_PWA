@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase';
 import type { Order, DeliveryHistoryEntry, OrderStatus } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertTriangle, Package, ShoppingBag, Truck, CheckCircle, MapPin, Clock, Star, MessageSquare, Home } from 'lucide-react'; // Added Home
+import { Loader2, AlertTriangle, Package, ShoppingBag, Truck, CheckCircle, MapPin, Clock, Star, MessageSquare, Home, Download } from 'lucide-react'; // Added Home, Download
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
@@ -219,6 +219,7 @@ export default function TrackOrderPage() {
 
   const canRateOrder = !isGiftRecipientView && user && order.customerId === user.uid && order.status === 'delivered' && !order.rating;
   const hasBeenRated = !isGiftRecipientView && user && order.customerId === user.uid && !!order.rating;
+  const canDownloadReceipt = !isGiftRecipientView && order.status === 'delivered';
 
 
   if (isGiftRecipientView && order.status === 'delivered') {
@@ -376,7 +377,14 @@ export default function TrackOrderPage() {
             </Card>
           )}
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 text-center space-x-4">
+            {canDownloadReceipt && (
+                <Link href={`/orders/receipt/${order.id}`} passHref>
+                    <Button variant="default">
+                        <Download className="mr-2 h-4 w-4"/> Download Receipt
+                    </Button>
+                </Link>
+            )}
             <Link href={isGiftRecipientView ? "/" : "/products"} passHref>
               <Button variant="outline">
                   {isGiftRecipientView ? <Home className="mr-2 h-4 w-4"/> : <ShoppingBag className="mr-2 h-4 w-4"/> }
@@ -401,6 +409,3 @@ export default function TrackOrderPage() {
 
   return trackingContent;
 }
-    
-
-    
