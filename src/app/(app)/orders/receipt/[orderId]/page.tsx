@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -13,6 +13,8 @@ import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 import { Logo } from '@/components/common/Logo';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -34,6 +36,8 @@ export default function OrderReceiptPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const receiptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (authLoading) return; // Wait until auth state is resolved
@@ -75,6 +79,35 @@ export default function OrderReceiptPage() {
     fetchOrder();
 
   }, [orderId, user, authLoading, router]);
+  
+  const handleDownloadPdf = () => {
+    if (!receiptRef.current || !order) return;
+    setIsGeneratingPdf(true);
+
+    html2canvas(receiptRef.current, {
+      scale: 2, // Higher scale for better quality
+      useCORS: true,
+      backgroundColor: 'hsl(var(--background))',
+    }).then(canvas => {
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'pt',
+        format: 'a4'
+      });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const canvasWidth = canvas.width;
+      const ratio = canvasWidth / pdfWidth;
+      const finalHeight = canvas.height / ratio;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, finalHeight);
+      pdf.save(`Zellow-Receipt-${order.id.substring(0, 8)}.pdf`);
+      setIsGeneratingPdf(false);
+    }).catch(err => {
+        console.error("Error generating PDF:", err);
+        setIsGeneratingPdf(false);
+    });
+  };
 
   if (loading || authLoading) {
     return (
@@ -110,14 +143,14 @@ export default function OrderReceiptPage() {
 
   return (
     <div className="bg-muted/40 min-h-screen p-4 sm:p-8">
-        <div className="max-w-3xl mx-auto bg-background p-6 sm:p-8 rounded-lg shadow-lg">
+        <div ref={receiptRef} className="max-w-3xl mx-auto bg-background p-6 sm:p-8 rounded-lg shadow-lg">
             <header className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-4">
                 <div>
                     <Logo iconSize={28} textSize="text-2xl"/>
                     <p className="text-xs text-muted-foreground mt-1 max-w-xs">GTC Office Tower, 5th Floor, Westlands, Nairobi</p>
                 </div>
                 <div className="text-left sm:text-right w-full sm:w-auto pt-4 sm:pt-0">
-                    <h1 className="text-2xl font-bold font-headline text-primary">RECEIPT</h1>
+                    <h1 className="text-2xl font-bold font-headline text-primary uppercase tracking-wider">Receipt</h1>
                     <p className="text-sm">Order #{order.id.substring(0,8)}...</p>
                     <p className="text-sm text-muted-foreground">Date: {formatDate(order.createdAt)}</p>
                 </div>
@@ -193,15 +226,21 @@ export default function OrderReceiptPage() {
             </footer>
 
         </div>
-        <div className="max-w-3xl mx-auto mt-6 flex justify-between items-center print:hidden">
+        <div className="max-w-3xl mx-auto mt-6 flex flex-col sm:flex-row justify-between items-center gap-2 print:hidden">
             <Button variant="outline" onClick={() => router.back()}>
                 <ArrowLeft className="mr-2 h-4 w-4"/>
                 Back
             </Button>
-            <Button onClick={() => window.print()}>
-                <Printer className="mr-2 h-4 w-4"/>
-                Print Receipt
-            </Button>
+            <div className="flex gap-2">
+                <Button onClick={handleDownloadPdf} disabled={isGeneratingPdf}>
+                    {isGeneratingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
+                    Download PDF
+                </Button>
+                <Button onClick={() => window.print()}>
+                    <Printer className="mr-2 h-4 w-4"/>
+                    Print Receipt
+                </Button>
+            </div>
         </div>
     </div>
   );
