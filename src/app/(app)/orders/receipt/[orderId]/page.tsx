@@ -97,27 +97,25 @@ export default function OrderReceiptPage() {
       
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
+      
       const canvasWidth = canvas.width;
       const canvasHeight = canvas.height;
-      const ratio = canvasHeight / canvasWidth;
-      const imgHeight = pdfWidth * ratio;
+      
+      const canvasAspectRatio = canvasHeight / canvasWidth;
+      
+      let finalPdfWidth = pdfWidth;
+      let finalPdfHeight = pdfWidth * canvasAspectRatio;
 
-      let heightLeft = imgHeight;
-      let position = 0;
-      let pageCount = 1;
-
-      // Add the first page
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-      heightLeft -= pdfHeight;
-
-      // Add more pages if content is taller than one page
-      while (heightLeft > 0) {
-        position = -pdfHeight * pageCount;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-        heightLeft -= pdfHeight;
-        pageCount++;
+      // If the content is too tall for one page, scale it down to fit.
+      if (finalPdfHeight > pdfHeight) {
+        finalPdfHeight = pdfHeight;
+        finalPdfWidth = pdfHeight / canvasAspectRatio;
       }
+      
+      // Center the image on the page
+      const xOffset = (pdfWidth - finalPdfWidth) / 2;
+
+      pdf.addImage(imgData, 'PNG', xOffset, 0, finalPdfWidth, finalPdfHeight);
       
       pdf.save(`Zellow-Receipt-${order.id}.pdf`);
       setIsGeneratingPdf(false);
