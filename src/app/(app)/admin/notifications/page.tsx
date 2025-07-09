@@ -95,15 +95,12 @@ export default function AdminNotificationsPage() {
     setIsLoadingThreads(true);
 
     let threadsQuery;
-    if (role === 'Admin') {
-      threadsQuery = query(collection(db, 'feedbackThreads'), orderBy('updatedAt', 'desc'));
-    } else {
-      threadsQuery = query(
+    // Admin and other managers will only see threads targeted to their specific role.
+    threadsQuery = query(
         collection(db, 'feedbackThreads'),
         where('targetRole', '==', role),
         orderBy('updatedAt', 'desc')
-      );
-    }
+    );
     
     const unsubscribe = onSnapshot(threadsQuery, (snapshot) => {
       setSupportThreads(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as FeedbackThread)));
@@ -170,7 +167,7 @@ export default function AdminNotificationsPage() {
                           <Badge variant={getStatusVariant(thread.status)}>{thread.status}</Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mt-2 italic truncate">"{thread.lastMessageSnippet}"</p>
-                        <p className="text-xs text-right text-muted-foreground mt-2">Last update: {format(thread.updatedAt.toDate(), 'PP')}</p>
+                        <p className="text-xs text-right text-muted-foreground mt-2">Last update: {thread.updatedAt ? format(thread.updatedAt.toDate(), 'PP') : 'N/A'}</p>
                       </CardContent>
                     </Card>
                   </button>
