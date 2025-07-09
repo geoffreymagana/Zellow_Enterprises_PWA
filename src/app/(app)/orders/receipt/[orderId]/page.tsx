@@ -15,6 +15,7 @@ import { Logo } from '@/components/common/Logo';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { useToast } from '@/hooks/use-toast';
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -38,12 +39,12 @@ export default function OrderReceiptPage() {
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
-    if (authLoading) return; // Wait until auth state is resolved
+    if (authLoading) return;
 
     if (!user) {
-        // If user is not logged in after auth check, redirect.
         router.replace('/login');
         return;
     }
@@ -61,7 +62,6 @@ export default function OrderReceiptPage() {
 
       if (docSnapshot.exists()) {
         const orderData = { id: docSnapshot.id, ...docSnapshot.data() } as Order;
-        // Security check: only the customer who owns the order or an admin can view it.
         if (user && (orderData.customerId === user.uid || user.role === 'Admin')) {
           setOrder(orderData);
           setError(null);
@@ -80,23 +80,41 @@ export default function OrderReceiptPage() {
 
   }, [orderId, user, authLoading, router]);
   
-  const handlePrintPdf = () => {
+  const handlePrintPdf = async () => {
     if (!receiptRef.current || !order) return;
     setIsGeneratingPdf(true);
+    toast({ title: "Generating PDF...", description: "Please wait while your receipt is being prepared." });
 
     const receiptElement = receiptRef.current;
-    html2canvas(receiptElement, {
-      scale: 2, // Higher scale for better quality
-      useCORS: true,
-      // Capture full scrollable content
-      width: receiptElement.scrollWidth,
-      height: receiptElement.scrollHeight,
-    }).then(canvas => {
+    
+    const clone = receiptElement.cloneNode(true) as HTMLElement;
+    
+    clone.style.width = '800px';
+    clone.style.height = 'auto';
+    clone.style.position = 'absolute';
+    clone.style.left = '-9999px';
+    clone.style.top = '0';
+    clone.style.backgroundColor = 'white';
+
+    document.body.appendChild(clone);
+
+    try {
+      const canvas = await html2canvas(clone, {
+        scale: 2,
+        useCORS: true,
+        width: clone.offsetWidth,
+        height: clone.offsetHeight,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: clone.scrollWidth,
+        windowHeight: clone.scrollHeight,
+      });
+
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
-        unit: 'pt',
-        format: 'a4' // Standard A4 size
+        unit: 'mm',
+        format: 'a4',
       });
       
       const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -105,27 +123,25 @@ export default function OrderReceiptPage() {
       const canvasWidth = canvas.width;
       const canvasHeight = canvas.height;
 
-      // Calculate the aspect ratio to fit the image into the PDF page
       const ratio = Math.min(pdfWidth / canvasWidth, pdfHeight / canvasHeight);
-
-      // Calculate the final dimensions of the image in the PDF
       const finalImgWidth = canvasWidth * ratio;
       const finalImgHeight = canvasHeight * ratio;
 
-      // Calculate offsets to center the image on the PDF page
       const xOffset = (pdfWidth - finalImgWidth) / 2;
-      const yOffset = (pdfHeight - finalImgHeight) / 2;
+      const yOffset = (pdfHeight > finalImgHeight) ? (pdfHeight - finalImgHeight) / 2 : 0;
       
       pdf.addImage(imgData, 'PNG', xOffset, yOffset, finalImgWidth, finalImgHeight);
-      
       pdf.save(`Zellow-Receipt-${order.id}.pdf`);
-      setIsGeneratingPdf(false);
-    }).catch(err => {
+
+    } catch (err: any) {
         console.error("Error generating PDF:", err);
-        toast({ title: "PDF Generation Failed", description: "An error occurred while creating the receipt.", variant: "destructive"});
+        toast({ title: "PDF Generation Failed", description: "An error occurred while creating the receipt. Please try again.", variant: "destructive"});
+    } finally {
+        document.body.removeChild(clone);
         setIsGeneratingPdf(false);
-    });
+    }
   };
+
 
   if (loading || authLoading) {
     return (
