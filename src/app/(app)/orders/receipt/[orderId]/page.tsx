@@ -87,7 +87,6 @@ export default function OrderReceiptPage() {
     html2canvas(receiptRef.current, {
       scale: 2, // Higher scale for better quality
       useCORS: true,
-      backgroundColor: 'hsl(var(--background))',
     }).then(canvas => {
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
@@ -101,7 +100,7 @@ export default function OrderReceiptPage() {
       const finalHeight = canvas.height / ratio;
       
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, finalHeight);
-      pdf.save(`Zellow-Receipt-${order.id.substring(0, 8)}.pdf`);
+      pdf.save(`Zellow-Receipt-${order.id}.pdf`);
       setIsGeneratingPdf(false);
     }).catch(err => {
         console.error("Error generating PDF:", err);
@@ -151,7 +150,7 @@ export default function OrderReceiptPage() {
                 </div>
                 <div className="text-left sm:text-right w-full sm:w-auto pt-4 sm:pt-0">
                     <h1 className="text-2xl font-bold font-headline text-primary uppercase tracking-wider">Receipt</h1>
-                    <p className="text-sm">Order #{order.id.substring(0,8)}...</p>
+                    <p className="text-sm break-all">Order #{order.id}</p>
                     <p className="text-sm text-muted-foreground">Date: {formatDate(order.createdAt)}</p>
                 </div>
             </header>
@@ -226,11 +225,7 @@ export default function OrderReceiptPage() {
             </footer>
 
         </div>
-        <div className="max-w-3xl mx-auto mt-6 flex flex-col sm:flex-row justify-between items-center gap-2 print:hidden">
-            <Button variant="outline" onClick={() => router.back()}>
-                <ArrowLeft className="mr-2 h-4 w-4"/>
-                Back
-            </Button>
+        <div className="max-w-3xl mx-auto mt-6 flex flex-col sm:flex-row justify-end items-center gap-2 print:hidden">
             <div className="flex gap-2">
                 <Button onClick={handleDownloadPdf} disabled={isGeneratingPdf}>
                     {isGeneratingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
