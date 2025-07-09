@@ -84,15 +84,19 @@ export default function OrderReceiptPage() {
     if (!receiptRef.current || !order) return;
     setIsGeneratingPdf(true);
 
-    html2canvas(receiptRef.current, {
-      scale: 2,
+    const receiptElement = receiptRef.current;
+    html2canvas(receiptElement, {
+      scale: 2, // Higher scale for better quality
       useCORS: true,
+      // Capture full scrollable content
+      width: receiptElement.scrollWidth,
+      height: receiptElement.scrollHeight,
     }).then(canvas => {
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'pt',
-        format: 'a4'
+        format: 'a4' // Standard A4 size
       });
       
       const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -100,27 +104,25 @@ export default function OrderReceiptPage() {
       
       const canvasWidth = canvas.width;
       const canvasHeight = canvas.height;
-      
-      const canvasAspectRatio = canvasHeight / canvasWidth;
-      
-      let finalPdfWidth = pdfWidth;
-      let finalPdfHeight = pdfWidth * canvasAspectRatio;
 
-      // If the content is too tall for one page, scale it down to fit.
-      if (finalPdfHeight > pdfHeight) {
-        finalPdfHeight = pdfHeight;
-        finalPdfWidth = pdfHeight / canvasAspectRatio;
-      }
-      
-      // Center the image on the page
-      const xOffset = (pdfWidth - finalPdfWidth) / 2;
+      // Calculate the aspect ratio to fit the image into the PDF page
+      const ratio = Math.min(pdfWidth / canvasWidth, pdfHeight / canvasHeight);
 
-      pdf.addImage(imgData, 'PNG', xOffset, 0, finalPdfWidth, finalPdfHeight);
+      // Calculate the final dimensions of the image in the PDF
+      const finalImgWidth = canvasWidth * ratio;
+      const finalImgHeight = canvasHeight * ratio;
+
+      // Calculate offsets to center the image on the PDF page
+      const xOffset = (pdfWidth - finalImgWidth) / 2;
+      const yOffset = (pdfHeight - finalImgHeight) / 2;
+      
+      pdf.addImage(imgData, 'PNG', xOffset, yOffset, finalImgWidth, finalImgHeight);
       
       pdf.save(`Zellow-Receipt-${order.id}.pdf`);
       setIsGeneratingPdf(false);
     }).catch(err => {
         console.error("Error generating PDF:", err);
+        toast({ title: "PDF Generation Failed", description: "An error occurred while creating the receipt.", variant: "destructive"});
         setIsGeneratingPdf(false);
     });
   };
