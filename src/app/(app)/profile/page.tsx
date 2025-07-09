@@ -118,11 +118,13 @@ export default function ProfilePage() {
           <CardTitle className="font-headline">Account & Support</CardTitle>
         </CardHeader>
         <CardContent className="p-6 md:p-8 space-y-3">
-          <Button asChild variant="outline" className="w-full justify-start">
-            <Link href="/orders">
-              <ShoppingCart className="mr-2 h-4 w-4" /> My Orders
-            </Link>
-          </Button>
+          {role === 'Customer' && (
+            <Button asChild variant="outline" className="w-full justify-start">
+              <Link href="/orders">
+                <ShoppingCart className="mr-2 h-4 w-4" /> My Orders
+              </Link>
+            </Button>
+          )}
           <Button variant="outline" className="w-full justify-start">
             <ShieldCheck className="mr-2 h-4 w-4" /> Change Password
           </Button>
