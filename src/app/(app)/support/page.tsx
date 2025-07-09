@@ -12,7 +12,7 @@ export default function SupportPage() {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <Card className="shadow-lg">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-headline font-bold text-primary">Contact Information</CardTitle>
+          <CardTitle className="text-2xl font-headline font-bold text-primary">Contact Us</CardTitle>
           <CardDescription>Ways to get in touch with Zellow Enterprises.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 pt-6">
@@ -34,7 +34,7 @@ export default function SupportPage() {
           <div className="text-center pt-4">
               <p className="mb-3 text-muted-foreground">Have a specific question or want to track your messages?</p>
               <Button asChild>
-                <Link href="/feedback">Go to My Feedback & Support</Link>
+                <Link href="/feedback">Go to Feedback</Link>
               </Button>
           </div>
         </CardContent>

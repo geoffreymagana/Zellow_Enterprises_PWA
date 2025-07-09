@@ -29,6 +29,9 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { FeedbackThread } from '@/types';
 
 interface LayoutProps {
   children: ReactNode;
@@ -294,6 +297,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   const searchParams = useSearchParams();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchParams.get('q') || '');
+  const [unreadCount, setUnreadCount] = useState(0);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -303,6 +307,37 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!db || !user || !role) return;
+
+    let q;
+    if (role === 'Customer') {
+      q = query(collection(db, 'feedbackThreads'), 
+        where('senderId', '==', user.uid),
+        where('status', 'in', ['open', 'replied'])
+      );
+    } else {
+      q = query(collection(db, 'feedbackThreads'), 
+        where('targetRole', '==', role),
+        where('status', 'in', ['open', 'replied'])
+      );
+    }
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      let count = 0;
+      snapshot.forEach((doc) => {
+        const thread = doc.data() as FeedbackThread;
+        // Count as unread if the last replier is not the current user
+        if (thread.lastReplierRole !== role) {
+          count++;
+        }
+      });
+      setUnreadCount(count);
+    });
+
+    return () => unsubscribe();
+  }, [db, user, role]);
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newSearchTerm = event.target.value;
@@ -345,6 +380,16 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
           </div>
 
           <div className="flex items-center gap-2">
+            <Link href="/feedback" passHref>
+                <Button variant="ghost" size="icon" aria-label="Feedback Notifications" className="relative">
+                    <Bell className="h-5 w-5" />
+                    {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                            {unreadCount}
+                        </span>
+                    )}
+                </Button>
+            </Link>
             {role !== 'Customer' && <ThemeToggle />}
             {user && role === 'Customer' && (
               <Link href="/orders/cart">
@@ -454,4 +499,3 @@ export default function AppGroupLayout({ children }: LayoutProps) {
 
   return <NonAdminLayout>{children}</NonAdminLayout>;
 }
-

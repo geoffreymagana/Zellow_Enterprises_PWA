@@ -17,7 +17,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { FeedbackThread, UserRole } from "@/types";
-import { collection, addDoc, serverTimestamp, runTransaction, doc, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, runTransaction, doc, query, where, onSnapshot, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { FeedbackThreadModal } from '@/components/common/FeedbackThreadModal';
@@ -105,27 +105,50 @@ export default function FeedbackPage() {
     }
   };
 
-  const fetchHistory = useCallback(() => {
-    if (!db || !user) {
+  const fetchHistory = useCallback(async () => {
+    if (!db || !user || !role) {
       setIsLoadingHistory(false);
-      return () => {};
+      return;
     }
     setIsLoadingHistory(true);
-    const q = query(
-      collection(db, 'feedbackThreads'), 
-      where("senderId", "==", user.uid), 
-      orderBy("updatedAt", "desc")
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setHistory(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as FeedbackThread)));
-      setIsLoadingHistory(false);
-    }, (error) => {
-      console.error("Error fetching feedback history:", error);
-      toast({ title: "Error", description: "Could not load your feedback history.", variant: "destructive" });
-      setIsLoadingHistory(false);
-    });
-    return unsubscribe;
-  }, [db, user, toast]);
+    try {
+      const isManagerOrAdmin = role !== 'Customer';
+
+      const senderQuery = query(collection(db, 'feedbackThreads'), where("senderId", "==", user.uid));
+      const senderPromise = getDocs(senderQuery);
+
+      let recipientPromise = Promise.resolve(null);
+      if (isManagerOrAdmin) {
+        const recipientQuery = query(collection(db, 'feedbackThreads'), where("targetRole", "==", role));
+        recipientPromise = getDocs(recipientQuery);
+      }
+
+      const [senderSnapshot, recipientSnapshot] = await Promise.all([senderPromise, recipientPromise]);
+      
+      const threadsMap = new Map<string, FeedbackThread>();
+
+      senderSnapshot.forEach(doc => {
+        threadsMap.set(doc.id, { id: doc.id, ...doc.data() } as FeedbackThread);
+      });
+
+      if (recipientSnapshot) {
+        recipientSnapshot.forEach(doc => {
+          threadsMap.set(doc.id, { id: doc.id, ...doc.data() } as FeedbackThread);
+        });
+      }
+
+      const combinedThreads = Array.from(threadsMap.values());
+      combinedThreads.sort((a, b) => b.updatedAt.toDate() - a.updatedAt.toDate());
+
+      setHistory(combinedThreads);
+    } catch (error) {
+        console.error("Error fetching feedback history:", error);
+        toast({ title: "Error", description: "Could not load your feedback history.", variant: "destructive" });
+    } finally {
+        setIsLoadingHistory(false);
+    }
+  }, [db, user, role, toast]);
+
 
   useEffect(() => {
     if (loading) return;
@@ -133,8 +156,7 @@ export default function FeedbackPage() {
       router.replace('/login');
       return;
     }
-    const unsubscribe = fetchHistory();
-    return () => unsubscribe();
+    fetchHistory();
   }, [loading, user, router, fetchHistory]);
 
   return (
@@ -191,7 +213,7 @@ export default function FeedbackPage() {
               </CardHeader>
               <CardContent>
                 {isLoadingHistory ? <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin" /></div>
-                : history.length === 0 ? <p className="text-center text-muted-foreground py-6">You have not submitted any feedback yet.</p>
+                : history.length === 0 ? <p className="text-center text-muted-foreground py-6">You have no message history yet.</p>
                 : <div className="space-y-3">
                     {history.map(thread => (
                         <button key={thread.id} onClick={() => setSelectedThreadId(thread.id)} className="w-full text-left">

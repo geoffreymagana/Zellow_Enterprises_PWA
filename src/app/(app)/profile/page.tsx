@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
-import { UserCircle2, Edit3, ShieldCheck, LogOut, Loader2, HelpCircle, ShieldQuestion, Info, ShoppingCart, MessageSquare } from "lucide-react";
+import { UserCircle2, Edit3, ShieldCheck, LogOut, Loader2, HelpCircle, Mail, Info, ShoppingCart, MessageSquare } from "lucide-react";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -133,19 +133,16 @@ export default function ProfilePage() {
             <ThemeToggle />
           </div>
            <Button asChild variant="outline" className="w-full justify-start">
-            <Link href="/help">
-              <HelpCircle className="mr-2 h-4 w-4" /> Help Center
-            </Link>
+            <Link href="/help"><HelpCircle className="mr-2 h-4 w-4" /> Help Center</Link>
           </Button>
           <Button asChild variant="outline" className="w-full justify-start">
-              <Link href="/feedback">
-                <MessageSquare className="mr-2 h-4 w-4" /> My Feedback & Support
-              </Link>
+            <Link href="/support"><Mail className="mr-2 h-4 w-4" /> Contact Us</Link>
           </Button>
           <Button asChild variant="outline" className="w-full justify-start">
-            <Link href="/about">
-              <Info className="mr-2 h-4 w-4" /> About Zellow
-            </Link>
+            <Link href="/feedback"><MessageSquare className="mr-2 h-4 w-4" /> Feedback</Link>
+          </Button>
+          <Button asChild variant="outline" className="w-full justify-start">
+            <Link href="/about"><Info className="mr-2 h-4 w-4" /> About Zellow</Link>
           </Button>
           <Button variant="destructive" className="w-full justify-start" onClick={logout} disabled={authLoading}>
             {authLoading && logout === undefined ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
