@@ -51,24 +51,20 @@ export default function FeedbackPage() {
 
   const [sentThreads, setSentThreads] = useState<FeedbackThread[]>([]);
   const [receivedThreads, setReceivedThreads] = useState<FeedbackThread[]>([]);
-  const [broadcastThreads, setBroadcastThreads] = useState<FeedbackThread[]>([]); // For admin broadcasts
+  const [broadcastThreads, setBroadcastThreads] = useState<FeedbackThread[]>([]); 
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   
   const history = useMemo(() => {
     const allThreads = new Map<string, FeedbackThread>();
-    // Add all threads to a map to handle duplicates (e.g., admin sent a broadcast)
     [...sentThreads, ...receivedThreads, ...broadcastThreads].forEach(thread => {
-      if (thread?.updatedAt) { // Guard against threads without a timestamp yet
+      if (thread?.id) {
         allThreads.set(thread.id, thread);
       }
     });
     const combined = Array.from(allThreads.values());
-    // Sort by most recent update
     combined.sort((a, b) => (b.updatedAt?.toDate() ?? 0) - (a.updatedAt?.toDate() ?? 0));
     return combined;
   }, [sentThreads, receivedThreads, broadcastThreads]);
-
-  const isAdminOrManager = role === 'Admin' || (role && role.endsWith('Manager'));
 
   const form = useForm<FeedbackFormValues>({
     resolver: zodResolver(feedbackFormSchema),
@@ -83,11 +79,10 @@ export default function FeedbackPage() {
     setIsSubmitting(true);
     try {
       const threadCollection = collection(db, 'feedbackThreads');
-      const newThreadRef = doc(threadCollection); // Create a reference with a new ID
+      const newThreadRef = doc(threadCollection); 
       const messagesCollection = collection(newThreadRef, 'messages');
 
       await runTransaction(db, async (transaction) => {
-        // 1. Create the main thread document
         transaction.set(newThreadRef, {
           subject: values.subject,
           senderId: user.uid,
@@ -101,7 +96,6 @@ export default function FeedbackPage() {
           lastReplierRole: role,
         });
         
-        // 2. Create the first message in the subcollection
         transaction.set(doc(messagesCollection), {
           threadId: newThreadRef.id,
           senderId: user.uid,
@@ -124,57 +118,54 @@ export default function FeedbackPage() {
 
   useEffect(() => {
     if (loading || !user || !db || !role) {
-        if (!loading) setIsLoadingHistory(false);
-        return;
+      if (!loading) setIsLoadingHistory(false);
+      return;
     }
   
     setIsLoadingHistory(true);
     const unsubscribers: (() => void)[] = [];
   
-    // Listener for threads sent by the current user
+    // Listener 1: Threads SENT BY the current user (for everyone).
     const sentQuery = query(collection(db, 'feedbackThreads'), where("senderId", "==", user.uid), orderBy('updatedAt', 'desc'));
     const unsubSent = onSnapshot(sentQuery, (snapshot) => {
         setSentThreads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedbackThread)));
-        setIsLoadingHistory(false);
     }, (error) => {
         console.error("Error fetching sent threads:", error);
         toast({ title: "Error", description: "Could not load your sent messages.", variant: "destructive" });
-        setIsLoadingHistory(false);
     });
     unsubscribers.push(unsubSent);
   
-    // Listener for threads received by the current user (as a manager/admin)
-    if (role !== 'Customer') {
+    // Listener 2: Threads RECEIVED BY the current user's specific role (managers/admins).
+    if (role && role !== 'Customer') {
         const receivedQuery = query(collection(db, 'feedbackThreads'), where("targetRole", "==", role), orderBy('updatedAt', 'desc'));
         const unsubReceived = onSnapshot(receivedQuery, (snapshot) => {
             setReceivedThreads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedbackThread)));
-            setIsLoadingHistory(false);
         }, (error) => {
             console.error("Error fetching received threads:", error);
             toast({ title: "Error", description: "Could not load messages for your role.", variant: "destructive" });
-            setIsLoadingHistory(false);
         });
         unsubscribers.push(unsubReceived);
+    } else {
+        setReceivedThreads([]);
     }
       
-    // Listener for broadcast threads (for Admin role only)
-    if (role === 'Admin') {
+    // Listener 3: BROADCASTS visible to Customers and Admins.
+    if (role === 'Customer' || role === 'Admin') {
         const broadcastQuery = query(collection(db, 'feedbackThreads'), where("targetRole", "==", "BROADCAST_ALL"), orderBy('updatedAt', 'desc'));
         const unsubBroadcast = onSnapshot(broadcastQuery, (snapshot) => {
             setBroadcastThreads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedbackThread)));
-            setIsLoadingHistory(false);
         }, (error) => {
             console.error("Error fetching broadcast threads:", error);
             toast({ title: "Error", description: "Could not load broadcast messages.", variant: "destructive" });
-            setIsLoadingHistory(false);
         });
         unsubscribers.push(unsubBroadcast);
     } else {
-        // Ensure broadcast threads are cleared if user is not admin
         setBroadcastThreads([]);
     }
+
+    // Set loading to false once initial listeners are setup. They will manage their own state.
+    setIsLoadingHistory(false);
   
-    // This is the cleanup function that will be called when the component unmounts
     return () => {
         unsubscribers.forEach(unsub => unsub());
     };
@@ -212,7 +203,7 @@ export default function FeedbackPage() {
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select a department or recipient..." /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {isAdminOrManager && <SelectItem value="BROADCAST_ALL">All Customers</SelectItem>}
+                            {role === 'Admin' && <SelectItem value="BROADCAST_ALL">All Customers (Broadcast)</SelectItem>}
                             {contactableRoles.map(r => r && <SelectItem key={r} value={r}>{r.replace('Manager', ' Manager')}</SelectItem>)}
                           </SelectContent>
                         </Select><FormMessage />
@@ -251,7 +242,7 @@ export default function FeedbackPage() {
                                     <div className="flex justify-between items-start">
                                         <div className="flex-grow min-w-0">
                                             <p className="font-semibold text-primary truncate" title={thread.subject}>{thread.subject}</p>
-                                            <p className="text-xs text-muted-foreground truncate">To: {thread.targetRole.replace('Manager', ' Manager')}</p>
+                                            <p className="text-xs text-muted-foreground truncate">To: {thread.targetRole.replace('Manager', ' Manager').replace('BROADCAST_ALL', 'All Customers')}</p>
                                         </div>
                                         <Badge variant={getStatusVariant(thread.status)}>{thread.status}</Badge>
                                     </div>
