@@ -110,33 +110,37 @@ export default function OrderReceiptPage() {
 
   return (
     <div className="bg-muted/40 min-h-screen p-4 sm:p-8">
-        <div className="max-w-3xl mx-auto bg-background p-6 sm:p-10 rounded-lg shadow-lg">
-            <header className="flex justify-between items-start mb-8">
+        <div className="max-w-3xl mx-auto bg-background p-6 sm:p-8 rounded-lg shadow-lg">
+            <header className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-4">
                 <div>
-                    <Logo iconSize={32} textSize="text-3xl"/>
-                    <p className="text-xs text-muted-foreground mt-1">GTC Office Tower, 5th Floor, Westlands, Nairobi</p>
+                    <Logo iconSize={28} textSize="text-2xl"/>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-xs">GTC Office Tower, 5th Floor, Westlands, Nairobi</p>
                 </div>
-                <div className="text-right">
-                    <h1 className="text-3xl font-bold font-headline text-primary">RECEIPT</h1>
+                <div className="text-left sm:text-right w-full sm:w-auto pt-4 sm:pt-0">
+                    <h1 className="text-2xl font-bold font-headline text-primary">RECEIPT</h1>
                     <p className="text-sm">Order #{order.id.substring(0,8)}...</p>
                     <p className="text-sm text-muted-foreground">Date: {formatDate(order.createdAt)}</p>
                 </div>
             </header>
             
-            <section className="grid grid-cols-2 gap-8 mb-8">
+            <section className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 mb-8">
                 <div>
-                    <h2 className="font-semibold text-muted-foreground mb-1">BILLED TO:</h2>
-                    <p className="font-medium">{order.shippingAddress.fullName}</p>
-                    <p className="text-sm">{order.shippingAddress.addressLine1}</p>
-                    <p className="text-sm">{order.shippingAddress.city}, {order.shippingAddress.county}</p>
-                    <p className="text-sm">{order.customerEmail}</p>
-                    <p className="text-sm">{order.shippingAddress.phone}</p>
+                    <h2 className="font-semibold text-muted-foreground mb-1 text-xs uppercase tracking-wider">Billed To</h2>
+                    <div className="text-sm space-y-0.5">
+                        <p className="font-medium">{order.shippingAddress.fullName}</p>
+                        <p>{order.shippingAddress.addressLine1}</p>
+                        <p>{order.shippingAddress.city}, {order.shippingAddress.county}</p>
+                        <p>{order.customerEmail}</p>
+                        <p>{order.shippingAddress.phone}</p>
+                    </div>
                 </div>
-                <div className="text-right">
-                    <h2 className="font-semibold text-muted-foreground mb-1">PAYMENT DETAILS:</h2>
-                    <p className="text-sm">Method: <span className="capitalize">{order.paymentMethod?.replace(/_/g, " ")}</span></p>
-                    <p className="text-sm">Status: <span className="font-semibold text-green-600 capitalize">{order.paymentStatus}</span></p>
-                    {order.transactionId && <p className="text-xs">Ref: {order.transactionId}</p>}
+                <div className="sm:text-right">
+                    <h2 className="font-semibold text-muted-foreground mb-1 text-xs uppercase tracking-wider">Payment Details</h2>
+                     <div className="text-sm space-y-0.5">
+                        <p>Method: <span className="capitalize font-medium">{order.paymentMethod?.replace(/_/g, " ")}</span></p>
+                        <p>Status: <span className="font-medium text-green-600 capitalize">{order.paymentStatus}</span></p>
+                        {order.transactionId && <p className="text-xs">Ref: {order.transactionId}</p>}
+                    </div>
                 </div>
             </section>
             
@@ -144,8 +148,8 @@ export default function OrderReceiptPage() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[60%]">Item Description</TableHead>
-                            <TableHead className="text-center">Quantity</TableHead>
+                            <TableHead>Item</TableHead>
+                            <TableHead className="text-center">Qty</TableHead>
                             <TableHead className="text-right">Unit Price</TableHead>
                             <TableHead className="text-right">Total</TableHead>
                         </TableRow>
