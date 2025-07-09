@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -6,12 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
-import { UserCircle2, Edit3, ShieldCheck, LogOut, Loader2, HelpCircle, ShieldQuestion, Info, ShoppingCart } from "lucide-react";
+import { UserCircle2, Edit3, ShieldCheck, LogOut, Loader2, HelpCircle, ShieldQuestion, Info, ShoppingCart, MessageSquare } from "lucide-react";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
@@ -118,11 +119,11 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent className="p-6 md:p-8 space-y-3">
           {role === 'Customer' && (
-             <Button asChild variant="outline" className="w-full justify-start">
-                <Link href="/orders">
-                  <ShoppingCart className="mr-2 h-4 w-4" /> My Orders
-                </Link>
-              </Button>
+            <Button asChild variant="outline" className="w-full justify-start">
+              <Link href="/orders">
+                <ShoppingCart className="mr-2 h-4 w-4" /> My Orders
+              </Link>
+            </Button>
           )}
           <Button variant="outline" className="w-full justify-start">
             <ShieldCheck className="mr-2 h-4 w-4" /> Change Password
@@ -137,8 +138,8 @@ export default function ProfilePage() {
             </Link>
           </Button>
           <Button asChild variant="outline" className="w-full justify-start">
-              <Link href="/support">
-                <ShieldQuestion className="mr-2 h-4 w-4" /> Contact Support
+              <Link href="/feedback">
+                <MessageSquare className="mr-2 h-4 w-4" /> My Feedback & Support
               </Link>
           </Button>
           <Button asChild variant="outline" className="w-full justify-start">

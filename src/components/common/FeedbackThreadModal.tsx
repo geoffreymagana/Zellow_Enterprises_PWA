@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, doc, addDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, addDoc, runTransaction, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { Loader2, Send } from 'lucide-react';
 import type { FeedbackMessage, FeedbackThread, User, UserRole } from '@/types';
 import { format, isSameDay } from 'date-fns';
@@ -113,6 +113,7 @@ export function FeedbackThreadModal({ isOpen, onOpenChange, threadId, currentUse
   };
 
   const handleCloseThread = async () => {
+    if (!db || !threadId) return;
     setIsReplying(true);
     try {
         const threadRef = doc(db, 'feedbackThreads', threadId);
@@ -120,7 +121,8 @@ export function FeedbackThreadModal({ isOpen, onOpenChange, threadId, currentUse
         toast({ title: "Thread Closed", description: "This conversation has been marked as closed."});
         onOpenChange(false);
     } catch (e: any) {
-        toast({ title: "Error", description: "Could not close the thread.", variant: "destructive" });
+        console.error("Error closing thread:", e);
+        toast({ title: "Error", description: `Could not close thread: ${e.message}`, variant: "destructive" });
     } finally {
         setIsReplying(false);
     }
