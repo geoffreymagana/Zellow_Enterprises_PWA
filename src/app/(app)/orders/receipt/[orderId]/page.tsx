@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase';
 import type { Order } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertTriangle, Printer, Download, ArrowLeft } from 'lucide-react';
+import { Loader2, AlertTriangle, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 import { Logo } from '@/components/common/Logo';
@@ -80,12 +80,12 @@ export default function OrderReceiptPage() {
 
   }, [orderId, user, authLoading, router]);
   
-  const handleDownloadPdf = () => {
+  const handlePrintPdf = () => {
     if (!receiptRef.current || !order) return;
     setIsGeneratingPdf(true);
 
     html2canvas(receiptRef.current, {
-      scale: 2, // Higher scale for better quality
+      scale: 2,
       useCORS: true,
     }).then(canvas => {
       const imgData = canvas.toDataURL('image/png');
@@ -94,12 +94,31 @@ export default function OrderReceiptPage() {
         unit: 'pt',
         format: 'a4'
       });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const canvasWidth = canvas.width;
-      const ratio = canvasWidth / pdfWidth;
-      const finalHeight = canvas.height / ratio;
       
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, finalHeight);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      const ratio = canvasHeight / canvasWidth;
+      const imgHeight = pdfWidth * ratio;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+      let pageCount = 1;
+
+      // Add the first page
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+      heightLeft -= pdfHeight;
+
+      // Add more pages if content is taller than one page
+      while (heightLeft > 0) {
+        position = -pdfHeight * pageCount;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+        heightLeft -= pdfHeight;
+        pageCount++;
+      }
+      
       pdf.save(`Zellow-Receipt-${order.id}.pdf`);
       setIsGeneratingPdf(false);
     }).catch(err => {
@@ -145,11 +164,11 @@ export default function OrderReceiptPage() {
         <div ref={receiptRef} className="max-w-3xl mx-auto bg-background p-6 sm:p-8 rounded-lg shadow-lg">
             <header className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-4">
                 <div>
-                    <Logo iconSize={28} textSize="text-2xl"/>
+                    <Logo iconSize={24} textSize="text-xl"/>
                     <p className="text-xs text-muted-foreground mt-1 max-w-xs">GTC Office Tower, 5th Floor, Westlands, Nairobi</p>
                 </div>
                 <div className="text-left sm:text-right w-full sm:w-auto pt-4 sm:pt-0">
-                    <h1 className="text-2xl font-bold font-headline text-primary uppercase tracking-wider">Receipt</h1>
+                    <h1 className="text-xl font-bold font-headline text-primary uppercase tracking-wider">Receipt</h1>
                     <p className="text-sm break-all">Order #{order.id}</p>
                     <p className="text-sm text-muted-foreground">Date: {formatDate(order.createdAt)}</p>
                 </div>
@@ -180,7 +199,7 @@ export default function OrderReceiptPage() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Item</TableHead>
+                            <TableHead className="text-left">Item</TableHead>
                             <TableHead className="text-center">Qty</TableHead>
                             <TableHead className="text-right">Unit Price</TableHead>
                             <TableHead className="text-right">Total</TableHead>
@@ -226,16 +245,10 @@ export default function OrderReceiptPage() {
 
         </div>
         <div className="max-w-3xl mx-auto mt-6 flex flex-col sm:flex-row justify-end items-center gap-2 print:hidden">
-            <div className="flex gap-2">
-                <Button onClick={handleDownloadPdf} disabled={isGeneratingPdf}>
-                    {isGeneratingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
-                    Download PDF
-                </Button>
-                <Button onClick={() => window.print()}>
-                    <Printer className="mr-2 h-4 w-4"/>
-                    Print Receipt
-                </Button>
-            </div>
+            <Button onClick={handlePrintPdf} disabled={isGeneratingPdf}>
+                {isGeneratingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Printer className="mr-2 h-4 w-4"/>}
+                Print Receipt
+            </Button>
         </div>
     </div>
   );
