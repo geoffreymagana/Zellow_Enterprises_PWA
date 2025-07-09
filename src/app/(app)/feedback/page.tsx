@@ -14,10 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { FeedbackThread, UserRole } from "@/types";
-import { collection, addDoc, serverTimestamp, runTransaction, doc, query, where, onSnapshot, orderBy, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, runTransaction, doc, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { FeedbackThreadModal } from '@/components/common/FeedbackThreadModal';
@@ -47,9 +47,26 @@ export default function FeedbackPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [history, setHistory] = useState<FeedbackThread[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+
+  const [sentThreads, setSentThreads] = useState<FeedbackThread[]>([]);
+  const [receivedThreads, setReceivedThreads] = useState<FeedbackThread[]>([]);
+  const [broadcastThreads, setBroadcastThreads] = useState<FeedbackThread[]>([]); // For admin broadcasts
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  
+  const history = useMemo(() => {
+    const allThreads = new Map<string, FeedbackThread>();
+    // Add all threads to a map to handle duplicates (e.g., admin sent a broadcast)
+    [...sentThreads, ...receivedThreads, ...broadcastThreads].forEach(thread => {
+      if (thread?.updatedAt) { // Guard against threads without a timestamp yet
+        allThreads.set(thread.id, thread);
+      }
+    });
+    const combined = Array.from(allThreads.values());
+    // Sort by most recent update
+    combined.sort((a, b) => (b.updatedAt?.toDate() ?? 0) - (a.updatedAt?.toDate() ?? 0));
+    return combined;
+  }, [sentThreads, receivedThreads, broadcastThreads]);
 
   const isAdminOrManager = role === 'Admin' || (role && role.endsWith('Manager'));
 
@@ -105,59 +122,71 @@ export default function FeedbackPage() {
     }
   };
 
-  const fetchHistory = useCallback(async () => {
-    if (!db || !user || !role) {
-      setIsLoadingHistory(false);
-      return;
+  useEffect(() => {
+    if (loading || !user || !db || !role) {
+        if (!loading) setIsLoadingHistory(false);
+        return;
     }
+  
     setIsLoadingHistory(true);
-    try {
-      const isManagerOrAdmin = role !== 'Customer';
-
-      const senderQuery = query(collection(db, 'feedbackThreads'), where("senderId", "==", user.uid));
-      const senderPromise = getDocs(senderQuery);
-
-      let recipientPromise = Promise.resolve(null);
-      if (isManagerOrAdmin) {
-        const recipientQuery = query(collection(db, 'feedbackThreads'), where("targetRole", "==", role));
-        recipientPromise = getDocs(recipientQuery);
-      }
-
-      const [senderSnapshot, recipientSnapshot] = await Promise.all([senderPromise, recipientPromise]);
-      
-      const threadsMap = new Map<string, FeedbackThread>();
-
-      senderSnapshot.forEach(doc => {
-        threadsMap.set(doc.id, { id: doc.id, ...doc.data() } as FeedbackThread);
-      });
-
-      if (recipientSnapshot) {
-        recipientSnapshot.forEach(doc => {
-          threadsMap.set(doc.id, { id: doc.id, ...doc.data() } as FeedbackThread);
-        });
-      }
-
-      const combinedThreads = Array.from(threadsMap.values());
-      combinedThreads.sort((a, b) => b.updatedAt.toDate() - a.updatedAt.toDate());
-
-      setHistory(combinedThreads);
-    } catch (error) {
-        console.error("Error fetching feedback history:", error);
-        toast({ title: "Error", description: "Could not load your feedback history.", variant: "destructive" });
-    } finally {
+    const unsubscribers: (() => void)[] = [];
+  
+    // Listener for threads sent by the current user
+    const sentQuery = query(collection(db, 'feedbackThreads'), where("senderId", "==", user.uid), orderBy('updatedAt', 'desc'));
+    const unsubSent = onSnapshot(sentQuery, (snapshot) => {
+        setSentThreads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedbackThread)));
         setIsLoadingHistory(false);
+    }, (error) => {
+        console.error("Error fetching sent threads:", error);
+        toast({ title: "Error", description: "Could not load your sent messages.", variant: "destructive" });
+        setIsLoadingHistory(false);
+    });
+    unsubscribers.push(unsubSent);
+  
+    // Listener for threads received by the current user (as a manager/admin)
+    if (role !== 'Customer') {
+        const receivedQuery = query(collection(db, 'feedbackThreads'), where("targetRole", "==", role), orderBy('updatedAt', 'desc'));
+        const unsubReceived = onSnapshot(receivedQuery, (snapshot) => {
+            setReceivedThreads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedbackThread)));
+            setIsLoadingHistory(false);
+        }, (error) => {
+            console.error("Error fetching received threads:", error);
+            toast({ title: "Error", description: "Could not load messages for your role.", variant: "destructive" });
+            setIsLoadingHistory(false);
+        });
+        unsubscribers.push(unsubReceived);
     }
-  }, [db, user, role, toast]);
+      
+    // Listener for broadcast threads (for Admin role only)
+    if (role === 'Admin') {
+        const broadcastQuery = query(collection(db, 'feedbackThreads'), where("targetRole", "==", "BROADCAST_ALL"), orderBy('updatedAt', 'desc'));
+        const unsubBroadcast = onSnapshot(broadcastQuery, (snapshot) => {
+            setBroadcastThreads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedbackThread)));
+            setIsLoadingHistory(false);
+        }, (error) => {
+            console.error("Error fetching broadcast threads:", error);
+            toast({ title: "Error", description: "Could not load broadcast messages.", variant: "destructive" });
+            setIsLoadingHistory(false);
+        });
+        unsubscribers.push(unsubBroadcast);
+    } else {
+        // Ensure broadcast threads are cleared if user is not admin
+        setBroadcastThreads([]);
+    }
+  
+    // This is the cleanup function that will be called when the component unmounts
+    return () => {
+        unsubscribers.forEach(unsub => unsub());
+    };
+  }, [loading, user, db, role, toast]);
 
 
   useEffect(() => {
     if (loading) return;
     if (!user) {
       router.replace('/login');
-      return;
     }
-    fetchHistory();
-  }, [loading, user, router, fetchHistory]);
+  }, [loading, user, router]);
 
   return (
     <>
@@ -220,14 +249,14 @@ export default function FeedbackPage() {
                             <Card className="hover:shadow-md hover:border-primary/50 transition-all">
                                 <CardContent className="p-4">
                                     <div className="flex justify-between items-start">
-                                        <div className="flex-grow">
-                                            <p className="font-semibold text-primary">{thread.subject}</p>
-                                            <p className="text-xs text-muted-foreground truncate">To: {thread.targetRole}</p>
+                                        <div className="flex-grow min-w-0">
+                                            <p className="font-semibold text-primary truncate" title={thread.subject}>{thread.subject}</p>
+                                            <p className="text-xs text-muted-foreground truncate">To: {thread.targetRole.replace('Manager', ' Manager')}</p>
                                         </div>
                                         <Badge variant={getStatusVariant(thread.status)}>{thread.status}</Badge>
                                     </div>
                                     <p className="text-sm text-muted-foreground mt-2 italic truncate">"{thread.lastMessageSnippet}"</p>
-                                    <p className="text-xs text-right text-muted-foreground mt-2">Last update: {format(thread.updatedAt.toDate(), 'PP')}</p>
+                                    <p className="text-xs text-right text-muted-foreground mt-2">Last update: {thread.updatedAt ? format(thread.updatedAt.toDate(), 'PP') : 'N/A'}</p>
                                 </CardContent>
                             </Card>
                         </button>
