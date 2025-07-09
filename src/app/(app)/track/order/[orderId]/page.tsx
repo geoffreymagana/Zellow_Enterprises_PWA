@@ -264,7 +264,7 @@ export default function TrackOrderPage() {
             Order Tracking
           </CardTitle>
           <CardDescription>
-            Order ID: <span className="font-semibold text-primary">{order.id.substring(0, 12)}...</span>
+            Order ID: <span className="font-semibold text-primary">{order.id}</span>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -377,11 +377,11 @@ export default function TrackOrderPage() {
             </Card>
           )}
 
-          <div className="mt-6 text-center space-x-4">
+          <div className="mt-6 flex flex-row items-center justify-center gap-4">
             {canDownloadReceipt && (
                 <Link href={`/orders/receipt/${order.id}`} passHref>
                     <Button variant="default">
-                        <Download className="mr-2 h-4 w-4"/> Download Receipt
+                        <Download className="mr-2 h-4 w-4"/> Receipt
                     </Button>
                 </Link>
             )}
