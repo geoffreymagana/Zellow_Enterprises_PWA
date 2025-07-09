@@ -1,6 +1,7 @@
 
 
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -158,7 +159,6 @@ export interface Order {
   isGift?: boolean;
   giftDetails?: GiftDetails | null;
   rating?: OrderRating | null;
-  // giftTrackingToken?: string; // Removed this line
 }
 
 export interface CartItem {
@@ -336,4 +336,29 @@ export interface Invoice {
   };
   financeManagerId?: string;
   financeManagerName?: string;
+}
+
+// Feedback System
+export interface FeedbackThread {
+  id: string;
+  subject: string;
+  senderId: string;
+  senderName: string;
+  senderEmail: string;
+  targetRole: UserRole;
+  status: 'open' | 'replied' | 'closed';
+  lastMessageSnippet: string;
+  createdAt: any; // Firestore Timestamp
+  updatedAt: any; // Firestore Timestamp
+  lastReplierRole?: UserRole;
+}
+
+export interface FeedbackMessage {
+  id: string;
+  threadId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: UserRole;
+  message: string;
+  createdAt: any; // Firestore Timestamp
 }
