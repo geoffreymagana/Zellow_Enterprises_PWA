@@ -77,7 +77,7 @@ export function FeedbackThreadModal({ isOpen, onOpenChange, threadId, currentUse
   }, [isOpen, threadId, toast]);
 
   const handleReply = async () => {
-    if (!replyMessage.trim() || !threadId) return;
+    if (!replyMessage.trim() || !threadId || !currentUserRole) return;
     setIsReplying(true);
     
     const threadRef = doc(db, 'feedbackThreads', threadId);
@@ -129,6 +129,7 @@ export function FeedbackThreadModal({ isOpen, onOpenChange, threadId, currentUse
   }
 
   let lastDate: Date | null = null;
+  const canCloseThread = thread && thread.status !== 'closed' && (thread.targetRole !== 'Customer Broadcast' || currentUserRole === 'Admin');
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -136,7 +137,7 @@ export function FeedbackThreadModal({ isOpen, onOpenChange, threadId, currentUse
         <DialogHeader>
           <DialogTitle className="truncate pr-8">{thread?.subject || "Conversation"}</DialogTitle>
           <DialogDescription>
-            From: {thread?.senderName || "..."} | To: {thread?.targetRole}
+            From: {thread?.senderName || "..."} | To: {typeof thread?.targetRole === 'string' ? thread.targetRole.replace('Manager', ' Manager').replace('Customer Broadcast', 'All Customers') : 'N/A'}
           </DialogDescription>
         </DialogHeader>
         
@@ -150,6 +151,8 @@ export function FeedbackThreadModal({ isOpen, onOpenChange, threadId, currentUse
                 if (messageDate) {
                   lastDate = messageDate;
                 }
+                const senderRoleDisplay = msg.senderRole ? `(${msg.senderRole.replace('Manager', ' Mngr.')})` : '';
+
                 return (
                   <div key={msg.id || index}>
                      {showDateSeparator && (
@@ -163,9 +166,9 @@ export function FeedbackThreadModal({ isOpen, onOpenChange, threadId, currentUse
                         "p-3 rounded-lg max-w-sm md:max-w-md", 
                         isCurrentUser ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
                       )}>
-                        <p className="text-xs font-semibold mb-1">{isCurrentUser ? "You" : msg.senderName}</p>
+                        <p className="text-xs font-semibold mb-1">{isCurrentUser ? "You" : `${msg.senderName} ${senderRoleDisplay}`}</p>
                         <p className="text-sm whitespace-pre-line break-words">{msg.message}</p>
-                        <p className="text-xs text-right mt-2 opacity-70">{format(msg.createdAt?.toDate(), 'p')}</p>
+                        <p className="text-xs text-right mt-2 opacity-70">{messageDate ? format(messageDate, 'p') : ''}</p>
                       </div>
                     </div>
                   </div>
@@ -189,7 +192,9 @@ export function FeedbackThreadModal({ isOpen, onOpenChange, threadId, currentUse
                   {isReplying ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />}
                   Send Reply
                 </Button>
-                <Button onClick={handleCloseThread} variant="outline" size="sm" disabled={isReplying}>Close Thread</Button>
+                {canCloseThread && (
+                  <Button onClick={handleCloseThread} variant="outline" size="sm" disabled={isReplying}>Close Thread</Button>
+                )}
               </div>
             </div>
           </div>

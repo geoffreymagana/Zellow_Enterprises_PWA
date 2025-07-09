@@ -72,7 +72,7 @@ export default function FeedbackPage() {
   });
 
   const onSubmit = async (values: FeedbackFormValues) => {
-    if (!user || !db) {
+    if (!user || !db || !role) {
       toast({ title: "Error", description: "You must be logged in to send feedback.", variant: "destructive" });
       return;
     }
@@ -149,9 +149,9 @@ export default function FeedbackPage() {
         setReceivedThreads([]);
     }
       
-    // Listener 3: BROADCASTS visible to Customers and Admins.
-    if (role === 'Customer' || role === 'Admin') {
-        const broadcastQuery = query(collection(db, 'feedbackThreads'), where("targetRole", "==", "BROADCAST_ALL"), orderBy('updatedAt', 'desc'));
+    // Listener 3: BROADCASTS visible to Customers.
+    if (role === 'Customer') {
+        const broadcastQuery = query(collection(db, 'feedbackThreads'), where("targetRole", "==", "Customer Broadcast"), orderBy('updatedAt', 'desc'));
         const unsubBroadcast = onSnapshot(broadcastQuery, (snapshot) => {
             setBroadcastThreads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedbackThread)));
         }, (error) => {
@@ -203,7 +203,7 @@ export default function FeedbackPage() {
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select a department or recipient..." /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {role === 'Admin' && <SelectItem value="BROADCAST_ALL">All Customers (Broadcast)</SelectItem>}
+                            {role === 'Admin' && <SelectItem value="Customer Broadcast">All Customers (Broadcast)</SelectItem>}
                             {contactableRoles.map(r => r && <SelectItem key={r} value={r}>{r.replace('Manager', ' Manager')}</SelectItem>)}
                           </SelectContent>
                         </Select><FormMessage />
@@ -242,7 +242,7 @@ export default function FeedbackPage() {
                                     <div className="flex justify-between items-start">
                                         <div className="flex-grow min-w-0">
                                             <p className="font-semibold text-primary truncate" title={thread.subject}>{thread.subject}</p>
-                                            <p className="text-xs text-muted-foreground truncate">To: {thread.targetRole.replace('Manager', ' Manager').replace('BROADCAST_ALL', 'All Customers')}</p>
+                                            <p className="text-xs text-muted-foreground truncate">To: {typeof thread.targetRole === 'string' ? thread.targetRole.replace('Manager', ' Manager').replace('Customer Broadcast', 'All Customers') : 'N/A'}</p>
                                         </div>
                                         <Badge variant={getStatusVariant(thread.status)}>{thread.status}</Badge>
                                     </div>

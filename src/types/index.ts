@@ -2,6 +2,7 @@
 
 
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -345,7 +346,7 @@ export interface FeedbackThread {
   senderId: string;
   senderName: string;
   senderEmail: string;
-  targetRole: UserRole;
+  targetRole: UserRole | 'Customer Broadcast';
   status: 'open' | 'replied' | 'closed';
   lastMessageSnippet: string;
   createdAt: any; // Firestore Timestamp
