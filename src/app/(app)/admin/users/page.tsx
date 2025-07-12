@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PlusCircle, Edit, Trash2, Eye, EyeOff, UserCheck, UserX, Search, CheckCircle, XCircle, AlertTriangle, UserCog } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Eye, EyeOff, UserCheck, UserX, Search, CheckCircle, XCircle, AlertTriangle, UserCog, Filter } from 'lucide-react';
 import type { User, UserRole, UserStatus } from '@/types';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,6 +25,11 @@ import { createUserWithEmailAndPassword, updateProfile as updateAuthProfile } fr
 import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp, orderBy } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { formatDistanceToNow } from 'date-fns';
+
+const allRoles: UserRole[] = [
+  'Admin', 'Customer', 'Technician', 'Rider', 'Supplier', 
+  'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'
+];
 
 const employeeRoles: Exclude<UserRole, 'Admin' | 'Customer' | null>[] = [
   'Technician', 'Rider', 'Supplier', 
@@ -62,6 +67,9 @@ export default function AdminUsersPage() {
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [showDefaultPassword, setShowDefaultPassword] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
 
   const createUserForm = useForm<CreateUserFormValues>({
     resolver: zodResolver(createUserFormSchema),
@@ -103,16 +111,23 @@ export default function AdminUsersPage() {
   }, [adminUser, adminRole, authLoading, router, fetchUsers]);
   
   const filteredUsers = useMemo(() => {
-    if (!searchTerm) return users;
-    const lowerSearchTerm = searchTerm.toLowerCase();
-    return users.filter(user =>
-      (user.displayName?.toLowerCase() || "").includes(lowerSearchTerm) ||
-      (user.email?.toLowerCase() || "").includes(lowerSearchTerm) ||
-      (user.firstName?.toLowerCase() || "").includes(lowerSearchTerm) ||
-      (user.lastName?.toLowerCase() || "").includes(lowerSearchTerm) ||
-      (user.role?.toLowerCase() || "").includes(lowerSearchTerm)
-    );
-  }, [users, searchTerm]);
+    return users.filter(user => {
+        const searchLower = searchTerm.toLowerCase();
+        const searchMatch = !searchTerm ||
+            (user.displayName?.toLowerCase().includes(searchLower)) ||
+            (user.email?.toLowerCase().includes(searchLower)) ||
+            (user.firstName?.toLowerCase().includes(searchLower)) ||
+            (user.lastName?.toLowerCase().includes(searchLower));
+
+        const roleMatch = roleFilter === 'all' || user.role === roleFilter;
+
+        const statusMatch = statusFilter === 'all' ||
+            (statusFilter === 'active' && !user.disabled) ||
+            (statusFilter === 'inactive' && user.disabled);
+        
+        return searchMatch && roleMatch && statusMatch;
+    });
+  }, [users, searchTerm, roleFilter, statusFilter]);
 
   const checkEmailExists = async (email: string): Promise<boolean> => {
     if (!db) return true; 
@@ -212,6 +227,12 @@ export default function AdminUsersPage() {
       setIsSubmitting(false);
     }
   };
+  
+  const clearFilters = () => {
+    setSearchTerm("");
+    setRoleFilter("all");
+    setStatusFilter("all");
+  };
 
   const formatDisplayName = (user: User) => {
     const name = user.displayName || `${user.firstName || ''} ${user.lastName || ''}`.trim();
@@ -253,16 +274,42 @@ export default function AdminUsersPage() {
       
       <Card>
         <CardHeader className="p-4 border-b">
-           <div className="relative w-full max-w-md">
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search users (Name, Email, Role)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 h-9" />
-          </div>
+           <div className="flex flex-col sm:flex-row gap-2 items-center">
+              <div className="relative w-full sm:flex-1">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input placeholder="Search users (Name, Email)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 h-9" />
+              </div>
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-full sm:w-[160px] h-9 text-xs sm:text-sm">
+                    <SelectValue placeholder="Filter by role" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    {allRoles.map(r => r && <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                </SelectContent>
+              </Select>
+               <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-[140px] h-9 text-xs sm:text-sm">
+                    <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+              {(searchTerm || roleFilter !== 'all' || statusFilter !== 'all') && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9">
+                    <Filter className="mr-2 h-3 w-3" /> Clear
+                </Button>
+              )}
+           </div>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading && filteredUsers.length === 0 ? (
             <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
           ) : filteredUsers.length === 0 ? (
-            <p className="p-6 text-center text-muted-foreground">{users.length === 0 ? "No users found." : "No users match your search criteria."}</p>
+            <p className="p-6 text-center text-muted-foreground">{users.length === 0 ? "No users found." : "No users match your filters."}</p>
           ) : (
             <Table>
               <TableHeader>
@@ -276,7 +323,7 @@ export default function AdminUsersPage() {
                     <TableCell>{user.role || '-'}</TableCell>
                     <TableCell>
                       <Badge variant={getAccountStatusBadgeVariant(user.disabled)} className="capitalize">
-                        {user.disabled ? `Inactive for ${user.disabledAt ? formatDistanceToNow(user.disabledAt.toDate(), { addSuffix: true }) : ''}` : 'Active'}
+                        {user.disabled ? `Inactive ${user.disabledAt ? 'since ' + formatDistanceToNow(user.disabledAt.toDate(), { addSuffix: true }) : ''}`.trim() : 'Active'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right space-x-1">
@@ -324,5 +371,3 @@ export default function AdminUsersPage() {
     </div>
   );
 }
-
-    
