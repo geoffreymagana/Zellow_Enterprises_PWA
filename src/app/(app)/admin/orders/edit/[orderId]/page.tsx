@@ -1,6 +1,7 @@
 
 "use client";
 
+import React from 'react'; // Added this line to fix the error
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
@@ -272,7 +273,7 @@ export default function AdminOrderDetailPage() {
     setCurrentItemForTask(item);
     taskForm.reset({
       taskType: "",
-      description: `Production task for: ${item.name}`,
+      description: `Work on: ${item.name}`,
       assigneeId: ""
     });
     setIsTaskDialogOpen(true);
@@ -452,7 +453,7 @@ export default function AdminOrderDetailPage() {
                                       <div className="col-span-2 flex items-center gap-2">
                                           {details.isImage && details.imageUrl ? (
                                             <button onClick={() => setImageToView(details.imageUrl!)} className="relative w-12 h-12 bg-muted rounded border overflow-hidden hover:opacity-80 transition-opacity">
-                                                <Image src={details.imageUrl} alt={details.label} layout="fill" objectFit="cover"/>
+                                                <Image src={details.imageUrl} alt={details.label} layout="fill" objectFit="cover" data-ai-hint="product image" />
                                             </button>
                                           ) : details.isColor && details.colorHex ? (
                                             <span style={{ backgroundColor: details.colorHex }} className="inline-block w-4 h-4 rounded-full border border-muted-foreground mr-1"></span>
@@ -582,7 +583,7 @@ export default function AdminOrderDetailPage() {
                         <span className="font-semibold text-foreground/90">{details.label}:</span>
                          {details.isImage && details.imageUrl ? (
                             <button type="button" onClick={() => setImageToView(details.imageUrl!)} className="relative w-16 h-16 bg-muted rounded border overflow-hidden hover:opacity-80 transition-opacity">
-                                <Image src={details.imageUrl} alt={details.label} layout="fill" objectFit="cover"/>
+                                <Image src={details.imageUrl} alt={details.label} layout="fill" objectFit="cover" data-ai-hint="customization image"/>
                             </button>
                          ) : (
                             <div className="flex items-center gap-1 text-muted-foreground break-all">
