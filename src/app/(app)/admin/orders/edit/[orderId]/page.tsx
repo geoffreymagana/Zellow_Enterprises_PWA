@@ -269,7 +269,7 @@ export default function AdminOrderDetailPage() {
   const openTaskDialog = (item: OrderItemType) => {
     setCurrentItemForTask(item);
     taskForm.reset({
-      taskType: item.customizations?.engraving_text ? "Engraving" : (item.customizations?.printing_details ? "Printing" : ""),
+      taskType: "",
       description: `Work on: ${item.name}. Customizations: ${JSON.stringify(item.customizations)}`,
       assigneeId: ""
     });
@@ -536,7 +536,7 @@ export default function AdminOrderDetailPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create Task for: {currentItemForTask?.name}</DialogTitle>
-            <DialogDescription>Fill in the details for the new production task.</DialogDescription>
+            <DialogDescription>Fill in the details for the new production task. This can only be done by a Service Manager or Admin.</DialogDescription>
           </DialogHeader>
           <form onSubmit={taskForm.handleSubmit(handleTaskSubmit)} className="space-y-4 py-2">
             <div>

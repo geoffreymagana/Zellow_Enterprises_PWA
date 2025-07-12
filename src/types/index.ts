@@ -5,6 +5,7 @@
 
 
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -205,7 +206,7 @@ export interface Task {
   id: string;
   orderId?: string;
   itemName?: string;
-  taskType: string;
+  taskType: "Engraving" | "Printing" | "Assembly" | "Quality Check" | "Packaging" | string;
   description: string;
   assigneeId?: string;
   assigneeName?: string;
