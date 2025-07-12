@@ -24,7 +24,7 @@ import {
   LayoutDashboard, Users, Package, ShoppingCart, Layers, DollarSign,
   Truck, Settings as SettingsIcon, UserCircle, LogOutIcon, Menu, Bell,
   FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIconLucide, ListChecks,
-  Aperture, Coins, Warehouse, PackageSearch, BarChart2, FileText, Wrench
+  Aperture, Coins, Warehouse, PackageSearch, BarChart2, FileText, Wrench, PackagePlus
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
@@ -53,7 +53,8 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/products', label: 'Products', icon: Package, roles: ['Admin'] },
     { href: '/inventory', label: 'Inventory Mgt', icon: Warehouse, roles: ['Admin', 'InventoryManager'] },
     { href: '/inventory/receivership', label: 'Receive Stock', icon: PackageSearch, roles: ['Admin', 'InventoryManager'] },
-    { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, roles: ['Admin'] }, 
+    { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, roles: ['Admin', 'ServiceManager'] }, 
+    { href: '/admin/bulk-orders', label: 'Bulk Orders', icon: PackagePlus, roles: ['Admin', 'FinanceManager'] },
     { href: '/tasks', label: 'Production Tasks', icon: Wrench, roles: ['Admin', 'ServiceManager'] },
     { href: '/admin/customizations', label: 'Customizations', icon: Layers, roles: ['Admin'] },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'] },
