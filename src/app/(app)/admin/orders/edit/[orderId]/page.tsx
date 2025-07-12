@@ -10,7 +10,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft, Save, AlertTriangle, Package, User, Settings2, Truck, CreditCard, GiftIcon, PlusCircle, Edit, Users, Image as ImageIconPlaceholder, Palette } from 'lucide-react';
@@ -75,6 +74,8 @@ interface ResolvedOptionDetails {
   value: string;
   isColor?: boolean;
   colorHex?: string;
+  isImage?: boolean;
+  imageUrl?: string;
 }
 
 function OrderTaskItem({ task }: { task: Task }) {
@@ -122,6 +123,7 @@ export default function AdminOrderDetailPage() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [currentItemForTask, setCurrentItemForTask] = useState<OrderItemType | null>(null);
+  const [imageToView, setImageToView] = useState<string | null>(null);
   
   const [resolvedOrderItemOptionsMap, setResolvedOrderItemOptionsMap] = useState<Map<string, ProductCustomizationOption[]>>(new Map());
   const [isLoadingItemOptions, setIsLoadingItemOptions] = useState(false);
@@ -270,7 +272,7 @@ export default function AdminOrderDetailPage() {
     setCurrentItemForTask(item);
     taskForm.reset({
       taskType: "",
-      description: `Production task for: ${item.name}`, // Simplified description
+      description: `Production task for: ${item.name}`,
       assigneeId: ""
     });
     setIsTaskDialogOpen(true);
@@ -292,7 +294,7 @@ export default function AdminOrderDetailPage() {
       assigneeId: data.assigneeId,
       assigneeName: selectedTechnician.displayName || selectedTechnician.email || 'N/A',
       status: 'pending',
-      customizations: currentItemForTask.customizations || null, // Store structured data
+      customizations: currentItemForTask.customizations || null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -328,8 +330,9 @@ export default function AdminOrderDetailPage() {
     if (!optionDef) return { label: optionId, value: String(selectedValue) };
 
     let displayValue = String(selectedValue);
-    let isColor = false;
+    let isColor = false, isImage = false;
     let colorHex: string | undefined = undefined;
+    let imageUrl: string | undefined = undefined;
 
     switch (optionDef.type) {
       case 'dropdown':
@@ -342,7 +345,9 @@ export default function AdminOrderDetailPage() {
         colorHex = colorChoice?.value;
         break;
       case 'image_upload':
-        displayValue = "Image provided";
+        isImage = true;
+        imageUrl = typeof selectedValue === 'string' ? selectedValue : undefined;
+        displayValue = imageUrl ? "Image Provided" : "No Image";
         break;
       case 'checkbox':
         displayValue = selectedValue ? (optionDef.checkboxLabel || 'Selected') : 'Not selected';
@@ -350,7 +355,7 @@ export default function AdminOrderDetailPage() {
       default: // text
         displayValue = String(selectedValue);
     }
-    return { label: optionDef.label, value: displayValue, isColor, colorHex };
+    return { label: optionDef.label, value: displayValue, isColor, colorHex, isImage, imageUrl };
   };
 
 
@@ -420,16 +425,24 @@ export default function AdminOrderDetailPage() {
                         <TableCell>
                           <div className="font-medium">{item.name}</div>
                           {item.customizations && Object.keys(item.customizations).length > 0 && (
-                            <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                            <div className="text-xs text-muted-foreground space-y-2 mt-2">
                               {Object.entries(item.customizations).map(([optionId, selectedValue]) => {
                                 const details = getDisplayableCustomizationValueAdmin(optionId, selectedValue, itemOptionDefinitions);
                                 return (
-                                  <div key={optionId} className="flex items-center gap-1">
-                                    <span className="font-semibold">{details.label}:</span>
-                                    {details.isColor && details.colorHex && (
-                                        <span style={{ backgroundColor: details.colorHex }} className="inline-block w-3 h-3 rounded-full border border-muted-foreground mr-1"></span>
+                                  <div key={optionId} className="flex flex-col items-start gap-0.5">
+                                    <span className="font-semibold text-foreground/90">{details.label}:</span>
+                                    {details.isImage && details.imageUrl ? (
+                                        <button onClick={() => setImageToView(details.imageUrl!)} className="relative w-16 h-16 bg-muted rounded border overflow-hidden hover:opacity-80 transition-opacity">
+                                            <Image src={details.imageUrl} alt={details.label} layout="fill" objectFit="cover"/>
+                                        </button>
+                                    ) : (
+                                        <div className="flex items-center gap-1">
+                                            {details.isColor && details.colorHex && (
+                                                <span style={{ backgroundColor: details.colorHex }} className="inline-block w-3 h-3 rounded-full border border-muted-foreground mr-1"></span>
+                                            )}
+                                            <span className="break-all">{details.value}</span>
+                                        </div>
                                     )}
-                                    <span>{details.value}</span>
                                   </div>
                                 );
                               })}
@@ -556,14 +569,25 @@ export default function AdminOrderDetailPage() {
              {currentItemForTask?.customizations && (
               <div>
                 <Label>Customization Details</Label>
-                <Card className="p-3 bg-muted/50 max-h-40 overflow-y-auto text-xs">
+                <Card className="p-3 bg-muted/50 max-h-40 overflow-y-auto text-xs space-y-2">
                   {Object.entries(currentItemForTask.customizations).map(([optionId, selectedValue]) => {
                      const itemOptionDefinitions = resolvedOrderItemOptionsMap.get(`${currentItemForTask.productId}_${order?.items.findIndex(i => i.name === currentItemForTask.name)}`);
                      const details = getDisplayableCustomizationValueAdmin(optionId, selectedValue, itemOptionDefinitions);
                      return (
-                      <div key={optionId} className="flex gap-2 border-b last:border-0 py-1">
-                        <strong className="shrink-0">{details.label}:</strong> 
-                         <span className="text-muted-foreground break-all">{details.value}</span>
+                      <div key={optionId} className="flex flex-col items-start gap-0.5 border-b last:border-b-0 pb-1.5">
+                        <span className="font-semibold text-foreground/90">{details.label}:</span>
+                         {details.isImage && details.imageUrl ? (
+                            <button type="button" onClick={() => setImageToView(details.imageUrl!)} className="relative w-16 h-16 bg-muted rounded border overflow-hidden hover:opacity-80 transition-opacity">
+                                <Image src={details.imageUrl} alt={details.label} layout="fill" objectFit="cover"/>
+                            </button>
+                         ) : (
+                            <div className="flex items-center gap-1 text-muted-foreground break-all">
+                                {details.isColor && details.colorHex && (
+                                    <span style={{ backgroundColor: details.colorHex }} className="inline-block w-3 h-3 rounded-full border border-muted-foreground mr-1"></span>
+                                )}
+                                <span>{details.value}</span>
+                            </div>
+                         )}
                       </div>
                      );
                   })}
@@ -598,6 +622,14 @@ export default function AdminOrderDetailPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={!!imageToView} onOpenChange={(open) => { if (!open) setImageToView(null) }}>
+        <DialogContent className="max-w-xl">
+            <div className="relative w-full aspect-square">
+                {imageToView && <Image src={imageToView} alt="Customization Image Preview" layout="fill" objectFit="contain" />}
+            </div>
         </DialogContent>
       </Dialog>
     </div>
