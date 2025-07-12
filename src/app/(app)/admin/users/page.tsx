@@ -7,7 +7,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Badge, BadgeProps } from "@/components/ui/badge";
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 
 import { createUserWithEmailAndPassword, updateProfile as updateAuthProfile } from 'firebase/auth';
 import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
@@ -262,15 +263,17 @@ export default function AdminUsersPage() {
               <DialogTitle>Create New Employee</DialogTitle>
               <DialogDescription>Email will be auto-generated. Default password: <Button variant="ghost" size="sm" onClick={() => setShowDefaultPassword(!showDefaultPassword)} className="ml-1 p-1 h-auto align-middle">{showDefaultPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button>{showDefaultPassword && <span className="text-xs font-mono"> (12345678)</span>}</DialogDescription>
             </DialogHeader>
-            <form onSubmit={createUserForm.handleSubmit(handleCreateUser)} className="space-y-4 py-4">
-              <FormField control={createUserForm.control} name="firstName" render={({ field }) => (<FormItem><Label>First Name</Label><Input {...field} /><FormMessage /></FormItem>)} />
-              <FormField control={createUserForm.control} name="lastName" render={({ field }) => (<FormItem><Label>Last Name</Label><Input {...field} /><FormMessage /></FormItem>)} />
-              <FormField control={createUserForm.control} name="role" render={({ field }) => (<FormItem><Label>Role</Label><Select onValueChange={field.onChange} defaultValue={field.value}><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger><SelectContent>{employeeRoles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-              <DialogFooter>
-                <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-                <Button type="submit" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create</Button>
-              </DialogFooter>
-            </form>
+            <Form {...createUserForm}>
+              <form onSubmit={createUserForm.handleSubmit(handleCreateUser)} className="space-y-4 py-4">
+                <FormField control={createUserForm.control} name="firstName" render={({ field }) => (<FormItem><Label>First Name</Label><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={createUserForm.control} name="lastName" render={({ field }) => (<FormItem><Label>Last Name</Label><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={createUserForm.control} name="role" render={({ field }) => (<FormItem><Label>Role</Label><Select onValueChange={field.onChange} defaultValue={field.value}><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger><SelectContent>{employeeRoles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                <DialogFooter>
+                  <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+                  <Button type="submit" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create</Button>
+                </DialogFooter>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
       </div>
@@ -334,15 +337,18 @@ export default function AdminUsersPage() {
       <Dialog open={isEditUserOpen} onOpenChange={(isOpen) => { setIsEditUserOpen(isOpen); if (!isOpen) setUserToEdit(null);}}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader><DialogTitle>Edit User</DialogTitle><DialogDescription>Change details for {userToEdit?.displayName || userToEdit?.email || '-'}.</DialogDescription></DialogHeader>
-          {userToEdit && (<form onSubmit={editUserForm.handleSubmit(handleEditUser)} className="space-y-4 py-4">
-              <div><Label>User</Label><Input disabled value={formatDisplayName(userToEdit)} /></div>
-              <FormField control={editUserForm.control} name="role" render={({ field }) => (<FormItem><Label>Role</Label><Select onValueChange={field.onChange} defaultValue={field.value as string | undefined}><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger><SelectContent>{([...employeeRoles, 'Admin', 'Customer'] as UserRole[]).filter(r => r !== null).map(r => <SelectItem key={r} value={r!}>{r}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-              <FormField control={editUserForm.control} name="disabled" render={({ field }) => (<div className="flex items-center space-x-2 pt-2"><input type="checkbox" id="edit-disabled" checked={field.value || false} onChange={(e) => field.onChange(e.target.checked)} className="peer h-4 w-4 shrink-0 rounded-sm border border-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground" /><Label htmlFor="edit-disabled" className="font-normal">Account Disabled</Label></div>)} />
-              <DialogFooter>
-                <DialogClose asChild><Button type="button" variant="outline" onClick={() => { setIsEditUserOpen(false); setUserToEdit(null); }}>Cancel</Button></DialogClose>
-                <Button type="submit" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Changes</Button>
-              </DialogFooter>
-          </form>)}
+          {userToEdit && (
+            <Form {...editUserForm}>
+              <form onSubmit={editUserForm.handleSubmit(handleEditUser)} className="space-y-4 py-4">
+                  <FormField control={editUserForm.control} name="role" render={({ field }) => (<FormItem><Label>Role</Label><Select onValueChange={field.onChange} defaultValue={field.value as string | undefined}><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger><SelectContent>{([...employeeRoles, 'Admin', 'Customer'] as UserRole[]).filter(r => r !== null).map(r => <SelectItem key={r} value={r!}>{r}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                  <FormField control={editUserForm.control} name="disabled" render={({ field }) => (<div className="flex items-center space-x-2 pt-2"><FormControl><Checkbox id="edit-disabled" checked={field.value || false} onCheckedChange={(e) => field.onChange(e)} /></FormControl><Label htmlFor="edit-disabled" className="font-normal">Account Disabled</Label></div>)} />
+                  <DialogFooter>
+                    <DialogClose asChild><Button type="button" variant="outline" onClick={() => { setIsEditUserOpen(false); setUserToEdit(null); }}>Cancel</Button></DialogClose>
+                    <Button type="submit" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Changes</Button>
+                  </DialogFooter>
+              </form>
+            </Form>
+          )}
         </DialogContent>
       </Dialog>
       
