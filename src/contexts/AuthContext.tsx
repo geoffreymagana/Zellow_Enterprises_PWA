@@ -12,7 +12,7 @@ import {
   updateProfile 
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase'; 
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore'; // Added setDoc, serverTimestamp
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, addDoc, writeBatch } from 'firebase/firestore'; // Added more imports
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
@@ -175,7 +175,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const firstName = nameParts[0];
       const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
       
-      await setDoc(doc(db, 'users', firebaseUser.uid), {
+      const batch = writeBatch(db);
+
+      // 1. Create user document
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      batch.set(userDocRef, {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
         displayName: fullName,
@@ -185,10 +189,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         county,
         town,
         role: 'Customer',
-        status: 'pending', // New user status
+        status: 'pending',
         createdAt: serverTimestamp(),
         disabled: false,
       });
+
+      // 2. Create approval request document
+      const approvalRequestRef = doc(collection(db, 'approvalRequests'));
+      batch.set(approvalRequestRef, {
+        type: 'user_registration',
+        status: 'pending',
+        requestedBy: firebaseUser.uid,
+        requestedByName: fullName,
+        requestedByEmail: email,
+        requestedAt: serverTimestamp(),
+        details: {
+          userId: firebaseUser.uid,
+          userName: fullName,
+          userEmail: email
+        }
+      });
+      
+      await batch.commit();
       
       toast({ title: "Registration Submitted", description: `Thank you, ${fullName}! Your account is pending admin approval.` });
 

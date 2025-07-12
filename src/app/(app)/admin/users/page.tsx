@@ -12,19 +12,19 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PlusCircle, Edit, Trash2, Eye, EyeOff, UserCheck, UserX, Search, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Eye, EyeOff, UserCheck, UserX, Search, CheckCircle, XCircle, AlertTriangle, UserCog } from 'lucide-react';
 import type { User, UserRole, UserStatus } from '@/types';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
-
+import { Switch } from "@/components/ui/switch";
 import { createUserWithEmailAndPassword, updateProfile as updateAuthProfile } from 'firebase/auth';
 import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { formatDistanceToNow } from 'date-fns';
 
 const employeeRoles: Exclude<UserRole, 'Admin' | 'Customer' | null>[] = [
   'Technician', 'Rider', 'Supplier', 
@@ -44,13 +44,8 @@ const editUserFormSchema = z.object({
 });
 type EditUserFormValues = z.infer<typeof editUserFormSchema>;
 
-const getStatusBadgeVariant = (status?: UserStatus): BadgeProps['variant'] => {
-    switch (status) {
-      case 'approved': return 'statusGreen';
-      case 'pending': return 'statusYellow';
-      case 'rejected': return 'statusRed';
-      default: return 'outline';
-    }
+const getAccountStatusBadgeVariant = (disabled?: boolean): BadgeProps['variant'] => {
+    return disabled ? 'destructive' : 'statusGreen';
 };
 
 export default function AdminUsersPage() {
@@ -64,10 +59,6 @@ export default function AdminUsersPage() {
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<User | null>(null);
-  const [userToAction, setUserToAction] = useState<User | null>(null);
-  const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [showDefaultPassword, setShowDefaultPassword] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -90,9 +81,9 @@ export default function AdminUsersPage() {
     setIsLoading(true);
     try {
       const usersCollection = collection(db, 'users');
-      const usersSnapshot = await getDocs(usersCollection);
+      const usersSnapshot = await getDocs(query(usersCollection, orderBy('createdAt', 'desc')));
       const usersList = usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
-      setUsers(usersList.sort((a,b) => (a.createdAt?.toDate?.() || 0) - (b.createdAt?.toDate?.() || 0)));
+      setUsers(usersList);
     } catch (error) {
       console.error("Failed to fetch users:", error);
       toast({ title: "Error", description: "Failed to fetch users.", variant: "destructive" });
@@ -156,7 +147,7 @@ export default function AdminUsersPage() {
       await setDoc(doc(db, 'users', newUser.uid), {
         uid: newUser.uid, email, firstName, lastName, displayName, role,
         createdAt: serverTimestamp(),
-        status: 'approved', // Staff created by admin are auto-approved
+        status: 'approved',
         disabled: false, 
       });
       toast({ title: "User Created", description: `${displayName} (${email}) created and approved. Default password: ${defaultPassword}`, duration: 7000 });
@@ -178,43 +169,25 @@ export default function AdminUsersPage() {
     if (!db || !userToEdit) return;
     setIsSubmitting(true);
     try {
-      await updateDoc(doc(db, 'users', userToEdit.uid), { 
+      const wasDisabled = userToEdit.disabled;
+      const willBeDisabled = values.disabled;
+      
+      const updateData: any = { 
         role: values.role,
         disabled: values.disabled,
-      });
+      };
+
+      if (!wasDisabled && willBeDisabled) {
+        updateData.disabledAt = serverTimestamp();
+      } else if (wasDisabled && !willBeDisabled) {
+        updateData.disabledAt = null;
+      }
+
+      await updateDoc(doc(db, 'users', userToEdit.uid), updateData);
       toast({ title: "User Updated", description: `${userToEdit.displayName || userToEdit.email}'s details updated.` });
       setIsEditUserOpen(false); setUserToEdit(null); fetchUsers();
     } catch (error: any) {
       toast({ title: "Update Failed", description: error.message || "Could not update user.", variant: "destructive" });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleOpenActionModal = (user: User, type: 'approve' | 'reject') => {
-    setUserToAction(user);
-    setActionType(type);
-    setIsActionModalOpen(true);
-    setRejectionReason("");
-  };
-
-  const handleConfirmAction = async () => {
-    if (!db || !userToAction || !actionType) return;
-    if (actionType === 'reject' && !rejectionReason.trim()) {
-      toast({ title: "Reason Required", description: "Please provide a reason for rejection.", variant: "destructive" });
-      return;
-    }
-    setIsSubmitting(true);
-    const newStatus: UserStatus = actionType === 'approve' ? 'approved' : 'rejected';
-    try {
-      await updateDoc(doc(db, 'users', userToAction.uid), {
-        status: newStatus,
-        rejectionReason: actionType === 'reject' ? rejectionReason : null,
-      });
-      toast({ title: `User ${newStatus}`, description: `User ${userToAction.displayName || userToAction.email} has been ${newStatus}.` });
-      setIsActionModalOpen(false); setUserToAction(null); fetchUsers();
-    } catch (e: any) {
-      toast({ title: "Action Failed", description: `Could not ${actionType} user.`, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -293,37 +266,31 @@ export default function AdminUsersPage() {
           ) : (
             <Table>
               <TableHeader>
-                <TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow>
+                <TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Account Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow>
               </TableHeader>
               <TableBody>
                 {filteredUsers.map((user) => (
-                  <TableRow key={user.uid} className={user.disabled ? "opacity-60" : ""}>
+                  <TableRow key={user.uid} className={user.disabled ? "bg-muted/50 opacity-70" : ""}>
                     <TableCell className={`font-medium ${user.disabled ? 'line-through' : ''}`}>{formatDisplayName(user)}</TableCell>
                     <TableCell>{user.email || '-'}</TableCell>
                     <TableCell>{user.role || '-'}</TableCell>
-                    <TableCell><Badge variant={getStatusBadgeVariant(user.status)} className="capitalize">{user.status || 'N/A'}</Badge></TableCell>
+                    <TableCell>
+                      <Badge variant={getAccountStatusBadgeVariant(user.disabled)} className="capitalize">
+                        {user.disabled ? `Inactive for ${user.disabledAt ? formatDistanceToNow(user.disabledAt.toDate(), { addSuffix: true }) : ''}` : 'Active'}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right space-x-1">
-                      {user.status === 'pending' && (
-                        <>
-                          <Button variant="ghost" size="icon" title="Approve" onClick={() => handleOpenActionModal(user, 'approve')}><CheckCircle className="h-4 w-4 text-green-600" /></Button>
-                          <Button variant="ghost" size="icon" title="Reject" onClick={() => handleOpenActionModal(user, 'reject')}><XCircle className="h-4 w-4 text-red-600" /></Button>
-                        </>
-                      )}
-                      {user.status !== 'pending' && (
-                        <>
-                          <Button variant="ghost" size="icon" onClick={() => openEditModal(user)} title="Edit Role & Status"><Edit className="h-4 w-4" /></Button>
-                          <AlertDialog open={userToDelete?.uid === user.uid} onOpenChange={(isOpen) => { if (!isOpen) setUserToDelete(null);}}>
-                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" onClick={() => openDeleteDialog(user)} disabled={user.uid === adminUser?.uid || isSubmitting} title="Delete User"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader><AlertDialogTitle>Delete User?</AlertDialogTitle><AlertDialogDescription>This will delete the user's Firestore record. Their auth account will remain. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={handleDeleteUser} disabled={isSubmitting} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </>
-                      )}
+                      <Button variant="ghost" size="icon" onClick={() => openEditModal(user)} title="Edit Role & Status"><UserCog className="h-4 w-4" /></Button>
+                      <AlertDialog open={userToDelete?.uid === user.uid} onOpenChange={(isOpen) => { if (!isOpen) setUserToDelete(null);}}>
+                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" onClick={() => openDeleteDialog(user)} disabled={user.uid === adminUser?.uid || isSubmitting} title="Delete User"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader><AlertDialogTitle>Delete User?</AlertDialogTitle><AlertDialogDescription>This will delete the user's Firestore record. Their auth account must be deleted separately from the Firebase Console. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDeleteUser} disabled={isSubmitting} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -341,7 +308,10 @@ export default function AdminUsersPage() {
             <Form {...editUserForm}>
               <form onSubmit={editUserForm.handleSubmit(handleEditUser)} className="space-y-4 py-4">
                   <FormField control={editUserForm.control} name="role" render={({ field }) => (<FormItem><Label>Role</Label><Select onValueChange={field.onChange} defaultValue={field.value as string | undefined}><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger><SelectContent>{([...employeeRoles, 'Admin', 'Customer'] as UserRole[]).filter(r => r !== null).map(r => <SelectItem key={r} value={r!}>{r}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                  <FormField control={editUserForm.control} name="disabled" render={({ field }) => (<div className="flex items-center space-x-2 pt-2"><FormControl><Input type="checkbox" id="edit-disabled" checked={field.value || false} onChange={(e) => field.onChange(e.target.checked)} className="h-4 w-4"/></FormControl><Label htmlFor="edit-disabled" className="font-normal">Account Disabled</Label></div>)} />
+                  <FormField control={editUserForm.control} name="disabled" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <div className="space-y-0.5"><FormLabel>Account Disabled</FormLabel><p className="text-xs text-muted-foreground">Disabling the account will prevent the user from logging in.</p></div>
+                      <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                  </FormItem>)} />
                   <DialogFooter>
                     <DialogClose asChild><Button type="button" variant="outline" onClick={() => { setIsEditUserOpen(false); setUserToEdit(null); }}>Cancel</Button></DialogClose>
                     <Button type="submit" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Changes</Button>
@@ -349,22 +319,6 @@ export default function AdminUsersPage() {
               </form>
             </Form>
           )}
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={isActionModalOpen} onOpenChange={setIsActionModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader><DialogTitle className="capitalize">{actionType} User</DialogTitle><DialogDescription>You are about to {actionType} the user: {userToAction?.displayName}</DialogDescription></DialogHeader>
-          {actionType === 'reject' && (
-            <div className="py-2 space-y-2">
-              <Label htmlFor="rejection-reason">Reason for Rejection</Label>
-              <Textarea id="rejection-reason" value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Provide a brief reason for rejection..." />
-            </div>
-          )}
-          <DialogFooter>
-            <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-            <Button type="button" onClick={handleConfirmAction} disabled={isSubmitting} variant={actionType === 'reject' ? 'destructive' : 'default'}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Confirm {actionType}</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -4,6 +4,7 @@
 
 
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -29,11 +30,30 @@ export interface User {
   status?: UserStatus;
   rejectionReason?: string;
   disabled?: boolean;
-  createdAt?: any; // Firestore Timestamp or Date
+  disabledAt?: any; // Firestore Timestamp
+  createdAt?: any; // Firestore Timestamp
   currentLocation?: { lat: number; lng: number; timestamp: any } | null; // Firestore Timestamp or Date for timestamp
   currentRouteId?: string | null;
   assignedOrdersCount?: number;
 }
+
+export type ApprovalRequestType = 'user_registration' | 'other_request_type';
+export type ApprovalRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface ApprovalRequest {
+  id: string;
+  type: ApprovalRequestType;
+  status: ApprovalRequestStatus;
+  requestedBy: string; // User ID
+  requestedByName: string;
+  requestedByEmail: string;
+  requestedAt: any; // Firestore Timestamp
+  details: Record<string, any>; // e.g., { userId: '...', userName: '...' }
+  resolvedBy?: string; // Admin User ID
+  resolvedAt?: any; // Firestore Timestamp
+  resolutionNotes?: string;
+}
+
 
 export interface CustomizationChoiceOption {
   value: string;
@@ -165,6 +185,7 @@ export interface Order {
   isGift?: boolean;
   giftDetails?: GiftDetails | null;
   rating?: OrderRating | null;
+  customerNotes?: string | null; // Added from tasks page
 }
 
 export interface CartItem {
