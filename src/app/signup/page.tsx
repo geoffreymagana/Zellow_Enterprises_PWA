@@ -63,9 +63,7 @@ export default function SignUpPage() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      // If user is already logged in, redirect to dashboard.
-      // This covers cases where they might navigate back to signup page.
-      router.replace('/products'); // Or /dashboard if that's preferred landing after login
+      router.replace('/dashboard');
     }
   }, [user, authLoading, router]);
 
@@ -91,10 +89,13 @@ export default function SignUpPage() {
   };
 
 
-  if (authLoading) { // Only show loader if auth is still loading and no user yet.
+  if (authLoading) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
-  // If user becomes available (e.g., after signup or if already logged in), useEffect will redirect.
+  
+  if (!authLoading && user) {
+    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
@@ -107,12 +108,8 @@ export default function SignUpPage() {
         county: values.county,
         town: values.town,
       });
-      // onAuthStateChanged in AuthContext will handle setting the user and role,
-      // then the useEffect above will redirect.
-      // Or, we can explicitly redirect here after a short delay if onAuthStateChanged is too slow.
-      router.replace('/products'); // Redirect to customer homepage
+      router.replace('/auth/pending');
     } catch (error) {
-      // Error toast is handled by the signup function in AuthContext
       console.error("Signup page caught error:", error);
     } finally {
       setIsLoading(false);
@@ -240,7 +237,7 @@ export default function SignUpPage() {
                         <p className="text-xs text-muted-foreground mt-1 text-right">
                           {passwordStrength < 40 && "Weak"}
                           {passwordStrength >= 40 && passwordStrength < 70 && "Okay"}
-                          {passwordStrength >= 70 && passwordStrength < 100 && "Good"}
+                          {passwordStrength >= 70 && passwordStrength < 100 && "Strong"}
                           {passwordStrength === 100 && "Strong"}
                         </p>
                       </div>

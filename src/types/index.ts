@@ -3,6 +3,7 @@
 
 
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -14,6 +15,8 @@ export type UserRole =
   | 'InventoryManager'
   | 'DispatchManager'
   | null;
+  
+export type UserStatus = 'pending' | 'approved' | 'rejected';
 
 export interface User {
   uid: string;
@@ -23,6 +26,8 @@ export interface User {
   lastName?: string | null;
   photoURL?: string | null;
   role: UserRole;
+  status?: UserStatus;
+  rejectionReason?: string;
   disabled?: boolean;
   createdAt?: any; // Firestore Timestamp or Date
   currentLocation?: { lat: number; lng: number; timestamp: any } | null; // Firestore Timestamp or Date for timestamp

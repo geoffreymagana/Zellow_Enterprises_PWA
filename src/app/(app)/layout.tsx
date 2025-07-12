@@ -461,22 +461,24 @@ export default function AppGroupLayout({ children }: LayoutProps) {
   const router = useRouter(); 
 
   useEffect(() => {
+    const isAuthPage = ['/login', '/signup', '/auth/pending'].some(p => pathname.startsWith(p));
     if (!loading) {
-      if (!user && !['/login', '/signup', '/track/order/[orderId]'].some(p => pathname.startsWith(p.replace('[orderId]', '')))) {
+      if (!user && !isAuthPage) {
         router.replace('/login');
       }
-      if (user && pathname === '/') {
+      if (user && isAuthPage) {
           router.replace('/dashboard');
       }
     }
   }, [user, loading, pathname, router]);
 
-
-  if (loading || (!user && !['/login', '/signup', '/track/order/[orderId]'].some(p => pathname.startsWith(p.replace('[orderId]', '')))) || (user && pathname === '/')) {
+  const isAuthPage = ['/login', '/signup', '/auth/pending'].some(p => pathname.startsWith(p));
+  
+  if (loading || (!user && !isAuthPage) || (user && isAuthPage)) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
   
-  if (!user && (pathname === '/login' || pathname === '/signup')) {
+  if (!user && isAuthPage) {
     return <>{children}</>;
   }
 
@@ -489,9 +491,7 @@ export default function AppGroupLayout({ children }: LayoutProps) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /> Awaiting authentication...</div>;
   }
 
-
   const isAdminPanelRole = role && ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager'].includes(role);
-
 
   if (isAdminPanelRole) {
     return <SidebarProvider><AdminLayout>{children}</AdminLayout></SidebarProvider>;

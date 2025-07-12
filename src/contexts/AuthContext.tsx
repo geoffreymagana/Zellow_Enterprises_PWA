@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { User, UserRole } from '@/types';
+import type { User, UserRole, UserStatus } from '@/types';
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { 
@@ -13,7 +13,7 @@ import {
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase'; 
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore'; // Added setDoc, serverTimestamp
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
 interface SignupData {
@@ -42,6 +42,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -64,19 +65,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDoc = await getDoc(userDocRef);
         
         if (userDoc.exists()) {
-          const userData = userDoc.data();
+          const userData = userDoc.data() as User;
+          
           if (userData?.disabled === true) {
             await firebaseSignOut(auth); 
-            setUser(null);
-            setRole(null);
-            setLoading(false);
-            toast({
-              title: "Account Disabled",
-              description: "Your account has been disabled. Please contact support.",
-              variant: "destructive",
-              duration: 7000,
-            });
+            setUser(null); setRole(null); setLoading(false);
+            toast({ title: "Account Disabled", description: "Your account has been disabled. Please contact support.", variant: "destructive", duration: 7000 });
             router.replace('/login'); 
+            return;
+          }
+
+          if (userData?.status === 'pending') {
+            setUser(null); setRole(null); setLoading(false);
+            router.replace('/auth/pending');
+            return;
+          }
+
+          if (userData?.status === 'rejected') {
+            await firebaseSignOut(auth);
+            setUser(null); setRole(null); setLoading(false);
+            const reason = userData.rejectionReason || "No reason provided.";
+            toast({ title: "Account Rejected", description: `Your account registration was rejected. Reason: ${reason}`, variant: "destructive", duration: 10000 });
+            router.replace('/login');
             return;
           }
 
@@ -87,6 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
             role: userRole,
+            status: userData?.status || 'approved',
             disabled: userData?.disabled || false,
             firstName: userData?.firstName || null,
             lastName: userData?.lastName || null,
@@ -95,11 +106,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(appUser);
           setRole(userRole);
         } else {
-          if (auth.currentUser && auth.currentUser.uid === firebaseUser.uid) {
-             setUser(null); 
-             setRole(null);
-          }
-          console.warn(`User document for ${firebaseUser.uid} not found or role is missing. Current auth state might be affected.`);
+          // This case might happen if a user is created in Auth but not in Firestore.
+          // For this app's logic, we should probably sign them out.
+           await firebaseSignOut(auth);
+           setUser(null); 
+           setRole(null);
+           console.warn(`User document for ${firebaseUser.uid} not found. User has been signed out.`);
         }
       } else { 
         setUser(null);
@@ -119,7 +131,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, pass);
+      const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+      // onAuthStateChanged will handle the rest of the logic (fetching user doc, role, status checks, etc.)
+      const redirectUrl = searchParams.get('redirect') || '/dashboard';
+      router.replace(redirectUrl);
       toast({ title: "Login Successful", description: "Welcome back!"});
     } catch (error: any) {
       console.error("Login failed:", error);
@@ -154,10 +169,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
 
-      // Update Firebase Auth profile
       await updateProfile(firebaseUser, { displayName: fullName });
 
-      // Create Firestore user document
       const nameParts = fullName.split(' ');
       const firstName = nameParts[0];
       const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
@@ -172,12 +185,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         county,
         town,
         role: 'Customer',
+        status: 'pending', // New user status
         createdAt: serverTimestamp(),
         disabled: false,
       });
       
-      // User state will be updated by onAuthStateChanged listener
-      toast({ title: "Signup Successful", description: `Welcome, ${fullName}! Your account has been created.` });
+      toast({ title: "Registration Submitted", description: `Thank you, ${fullName}! Your account is pending admin approval.` });
 
     } catch (error: any) {
       console.error("Signup failed:", error);
@@ -196,7 +209,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           errorMessage = error.message || "Failed to create account. Please try again.";
       }
       toast({ title: "Signup Failed", description: errorMessage, variant: "destructive" });
-      throw error; // Re-throw to be caught by the calling component
+      throw error; 
     }
   };
 
@@ -244,4 +257,3 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
-
