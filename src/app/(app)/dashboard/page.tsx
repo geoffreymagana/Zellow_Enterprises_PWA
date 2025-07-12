@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useAuth } from '@/hooks/useAuth';
@@ -13,6 +12,9 @@ import { collection, getDocs, query, where, onSnapshot, Unsubscribe, Timestamp, 
 import { db } from '@/lib/firebase';
 import type { User as AppUser, Order, OrderStatus, Product, StockRequest, Invoice, InvoiceStatus, Task } from '@/types';
 import { useRouter } from 'next/navigation'; 
+import { CustomizationOrdersList } from '@/components/dashboard/CustomizationOrdersList';
+import { BulkOrdersList } from '@/components/dashboard/BulkOrdersList';
+
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -580,7 +582,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <h1 className="text-3xl font-headline font-semibold">{getRoleSpecificGreeting()}</h1>
       <p className="text-muted-foreground">
         Hello, {user.displayName || user.email}! Your role is: <span className="font-semibold text-primary">{role || 'Not Assigned'}</span>.
@@ -636,7 +638,7 @@ export default function DashboardPage() {
           <PackageSearch className="h-4 w-4 mr-2 text-purple-500" />
           <AlertTitle className="text-purple-600 dark:text-purple-400">Supplier Portal Dashboard</AlertTitle>
           <AlertDescription className="text-purple-600/90 dark:text-purple-400/90">
-            View stock requests, manage your fulfillments, and submit invoices. Your key metrics are updated here.
+            View stock requests, manage your fulfillments, and submit invoices. Your key metrics are displayed here.
           </AlertDescription>
         </Alert>
       )}
@@ -672,15 +674,22 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {getRoleSpecificItems()}
       </div>
+      
+      {role === 'ServiceManager' && (
+        <div className="space-y-8 mt-8">
+            <CustomizationOrdersList />
+            <BulkOrdersList />
+        </div>
+      )}
 
 
-      {(role !== 'Admin' && role !== 'Supplier') && ( 
+      {(role !== 'Admin' && role !== 'Supplier' && role !== 'ServiceManager') && ( 
         <Card>
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            {(role === 'Technician' || role === 'ServiceManager') && <Link href="/tasks"><Button>View Tasks</Button></Link>}
+            {(role === 'Technician') && <Link href="/tasks"><Button>View Tasks</Button></Link>}
             {(role === 'Rider') && <Link href="/deliveries"><Button>Manage Deliveries</Button></Link>}
              {role === 'DispatchManager' && <Link href="/admin/dispatch"><Button><Component className="mr-2 h-4 w-4" />Open Dispatch Center</Button></Link>}
              {role === 'FinanceManager' && (<>
@@ -704,3 +713,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
