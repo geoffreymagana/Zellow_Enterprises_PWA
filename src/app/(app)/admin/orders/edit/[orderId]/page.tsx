@@ -270,7 +270,7 @@ export default function AdminOrderDetailPage() {
     setCurrentItemForTask(item);
     taskForm.reset({
       taskType: "",
-      description: `Work on: ${item.name}. Customizations: ${JSON.stringify(item.customizations)}`,
+      description: `Production task for: ${item.name}`, // Simplified description
       assigneeId: ""
     });
     setIsTaskDialogOpen(true);
@@ -292,6 +292,7 @@ export default function AdminOrderDetailPage() {
       assigneeId: data.assigneeId,
       assigneeName: selectedTechnician.displayName || selectedTechnician.email || 'N/A',
       status: 'pending',
+      customizations: currentItemForTask.customizations || null, // Store structured data
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -341,7 +342,7 @@ export default function AdminOrderDetailPage() {
         colorHex = colorChoice?.value;
         break;
       case 'image_upload':
-        displayValue = selectedValue ? "Uploaded Image" : "No image";
+        displayValue = "Image provided";
         break;
       case 'checkbox':
         displayValue = selectedValue ? (optionDef.checkboxLabel || 'Selected') : 'Not selected';
@@ -532,7 +533,7 @@ export default function AdminOrderDetailPage() {
         </div>
       </div>
 
-      <Dialog open={isTaskDialogOpen} onOpenChange={(open) => { setIsTaskDialogOpen(open); if (!open) setCurrentItemForTask(null);}}>
+      <Dialog open={isTaskDialogOpen} onOpenChange={(open) => { if (!open) setCurrentItemForTask(null); setIsTaskDialogOpen(open);}}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create Task for: {currentItemForTask?.name}</DialogTitle>
@@ -552,9 +553,26 @@ export default function AdminOrderDetailPage() {
               />
               {taskForm.formState.errors.taskType && <p className="text-xs text-destructive mt-1">{taskForm.formState.errors.taskType.message}</p>}
             </div>
+             {currentItemForTask?.customizations && (
+              <div>
+                <Label>Customization Details</Label>
+                <Card className="p-3 bg-muted/50 max-h-40 overflow-y-auto text-xs">
+                  {Object.entries(currentItemForTask.customizations).map(([optionId, selectedValue]) => {
+                     const itemOptionDefinitions = resolvedOrderItemOptionsMap.get(`${currentItemForTask.productId}_${order?.items.findIndex(i => i.name === currentItemForTask.name)}`);
+                     const details = getDisplayableCustomizationValueAdmin(optionId, selectedValue, itemOptionDefinitions);
+                     return (
+                      <div key={optionId} className="flex gap-2 border-b last:border-0 py-1">
+                        <strong className="shrink-0">{details.label}:</strong> 
+                         <span className="text-muted-foreground break-all">{details.value}</span>
+                      </div>
+                     );
+                  })}
+                </Card>
+              </div>
+            )}
             <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea id="description" {...taskForm.register("description")} rows={4} />
+              <Label htmlFor="description">Task Description / Instructions</Label>
+              <Input id="description" {...taskForm.register("description")} />
               {taskForm.formState.errors.description && <p className="text-xs text-destructive mt-1">{taskForm.formState.errors.description.message}</p>}
             </div>
             <div>

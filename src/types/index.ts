@@ -7,6 +7,7 @@
 
 
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -213,6 +214,7 @@ export interface Task {
   assigneeId?: string;
   assigneeName?: string;
   status: 'pending' | 'in-progress' | 'completed' | 'needs_approval' | 'blocked' | 'rejected';
+  customizations?: Record<string, any> | null; // Added field
   proofOfWorkUrl?: string | null;
   serviceManagerNotes?: string | null;
   relatedDocId?: string;
