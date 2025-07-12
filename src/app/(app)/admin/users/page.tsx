@@ -22,7 +22,7 @@ import { Badge, BadgeProps } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
 import { createUserWithEmailAndPassword, updateProfile as updateAuthProfile } from 'firebase/auth';
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp, orderBy } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -324,3 +324,5 @@ export default function AdminUsersPage() {
     </div>
   );
 }
+
+    
