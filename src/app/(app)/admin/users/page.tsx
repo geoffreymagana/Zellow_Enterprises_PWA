@@ -88,9 +88,14 @@ export default function AdminUsersPage() {
     }
     setIsLoading(true);
     try {
+      // Fetch all users without ordering by 'createdAt' to ensure all users are retrieved
       const usersCollection = collection(db, 'users');
-      const usersSnapshot = await getDocs(query(usersCollection, orderBy('createdAt', 'desc')));
+      const usersSnapshot = await getDocs(query(usersCollection));
       const usersList = usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
+      
+      // Sort on the client side to handle documents that might be missing the createdAt field
+      usersList.sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
+      
       setUsers(usersList);
     } catch (error) {
       console.error("Failed to fetch users:", error);
