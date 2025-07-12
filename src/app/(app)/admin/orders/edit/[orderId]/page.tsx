@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft, Save, AlertTriangle, Package, User, Settings2, Truck, CreditCard, GiftIcon, PlusCircle, Edit, Users, Image as ImageIconPlaceholder, Palette } from 'lucide-react';
-import type { Order, OrderStatus, Task, User as AppUser, DeliveryHistoryEntry, OrderItem as OrderItemType, PaymentStatus, Product, CustomizationGroupDefinition, ProductCustomizationOption } from '@/types';
+import type { Order, OrderStatus, Task, User as AppUser, DeliveryHistoryEntry, OrderItem as OrderItemType, PaymentStatus, Product, CustomizationGroupDefinition, ProductCustomizationOption, UserRole } from '@/types';
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
@@ -25,6 +25,8 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from 'date-fns';
+
+const technicianRoles: UserRole[] = ['Engraving', 'Printing', 'Assembly', 'Quality Check', 'Packaging'];
 
 const taskFormSchema = z.object({
   taskType: z.string().min(1, "Task type is required"),
@@ -171,7 +173,7 @@ export default function AdminOrderDetailPage() {
   const fetchTechnicians = useCallback(async () => {
     if (!db) return;
     try {
-      const techQuery = query(collection(db, 'users'), where("role", "==", "Technician"), where("disabled", "!=", true));
+      const techQuery = query(collection(db, 'users'), where("role", "in", technicianRoles), where("disabled", "!=", true));
       const techSnapshot = await getDocs(techQuery);
       const fetchedTechs: AppUser[] = [];
       techSnapshot.forEach(docUser => fetchedTechs.push({ uid: docUser.id, ...docUser.data() } as AppUser));

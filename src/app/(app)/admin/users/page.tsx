@@ -22,29 +22,26 @@ import { Badge, BadgeProps } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormMessage, FormLabel } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
 import { createUserWithEmailAndPassword, updateProfile as updateAuthProfile } from 'firebase/auth';
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { formatDistanceToNow } from 'date-fns';
 
-const allRoles: UserRole[] = [
-  'Admin', 'Customer', 'Technician', 'Rider', 'Supplier', 
-  'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'
-];
+const technicianRoles: UserRole[] = ['Engraving', 'Printing', 'Assembly', 'Quality Check', 'Packaging'];
+const otherEmployeeRoles: UserRole[] = ['Rider', 'Supplier', 'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'];
 
-const employeeRoles: Exclude<UserRole, 'Admin' | 'Customer' | null>[] = [
-  'Technician', 'Rider', 'Supplier', 
-  'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'
-];
+const allEmployeeRoles: UserRole[] = [...technicianRoles, ...otherEmployeeRoles];
+const allManageableRoles: UserRole[] = [...allEmployeeRoles, 'Admin', 'Customer'];
+
 
 const createUserFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  role: z.enum(employeeRoles, { required_error: "Role is required" }),
+  role: z.enum(allEmployeeRoles as [string, ...string[]], { required_error: "Role is required" }),
 });
 type CreateUserFormValues = z.infer<typeof createUserFormSchema>;
 
 const editUserFormSchema = z.object({
-  role: z.enum([...employeeRoles, 'Admin', 'Customer'] as [string, ...string[]], { required_error: "Role is required" }), 
+  role: z.enum(allManageableRoles as [string, ...string[]], { required_error: "Role is required" }), 
   disabled: z.boolean().optional(),
 });
 type EditUserFormValues = z.infer<typeof editUserFormSchema>;
@@ -88,12 +85,10 @@ export default function AdminUsersPage() {
     }
     setIsLoading(true);
     try {
-      // Fetch all users without ordering by 'createdAt' to ensure all users are retrieved
       const usersCollection = collection(db, 'users');
       const usersSnapshot = await getDocs(query(usersCollection));
       const usersList = usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
       
-      // Sort on the client side to handle documents that might be missing the createdAt field
       usersList.sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
       
       setUsers(usersList);
@@ -266,7 +261,7 @@ export default function AdminUsersPage() {
               <form onSubmit={createUserForm.handleSubmit(handleCreateUser)} className="space-y-4 py-4">
                 <FormField control={createUserForm.control} name="firstName" render={({ field }) => (<FormItem><Label>First Name</Label><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={createUserForm.control} name="lastName" render={({ field }) => (<FormItem><Label>Last Name</Label><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={createUserForm.control} name="role" render={({ field }) => (<FormItem><Label>Role</Label><Select onValueChange={field.onChange} defaultValue={field.value}><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger><SelectContent>{employeeRoles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                <FormField control={createUserForm.control} name="role" render={({ field }) => (<FormItem><Label>Role</Label><Select onValueChange={field.onChange} defaultValue={field.value}><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger><SelectContent>{allEmployeeRoles.map(r => <SelectItem key={r} value={r!}>{r}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
                 <DialogFooter>
                   <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
                   <Button type="submit" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create</Button>
@@ -290,7 +285,7 @@ export default function AdminUsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                     <SelectItem value="all">All Roles</SelectItem>
-                    {allRoles.map(r => r && <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                    {allManageableRoles.map(r => r && <SelectItem key={r} value={r}>{r}</SelectItem>)}
                 </SelectContent>
               </Select>
                <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -359,7 +354,7 @@ export default function AdminUsersPage() {
           {userToEdit && (
             <Form {...editUserForm}>
               <form onSubmit={editUserForm.handleSubmit(handleEditUser)} className="space-y-4 py-4">
-                  <FormField control={editUserForm.control} name="role" render={({ field }) => (<FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value as string | undefined}><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger><SelectContent>{([...employeeRoles, 'Admin', 'Customer'] as UserRole[]).filter(r => r !== null).map(r => <SelectItem key={r} value={r!}>{r}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                  <FormField control={editUserForm.control} name="role" render={({ field }) => (<FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value as string | undefined}><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger><SelectContent>{allManageableRoles.filter(r => r !== null).map(r => <SelectItem key={r} value={r!}>{r}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
                   <FormField control={editUserForm.control} name="disabled" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                       <div className="space-y-0.5"><FormLabel>Account Disabled</FormLabel><p className="text-xs text-muted-foreground">Disabling the account will prevent the user from logging in.</p></div>
                       <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>

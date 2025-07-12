@@ -8,10 +8,15 @@
 
 
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
-  | 'Technician'
+  | 'Engraving'
+  | 'Printing'
+  | 'Assembly'
+  | 'Quality Check'
+  | 'Packaging'
   | 'Rider'
   | 'Supplier'
   | 'FinanceManager'
