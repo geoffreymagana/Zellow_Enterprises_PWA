@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Edit, Filter, PackageOpen } from 'lucide-react';
+import { Loader2, Search, Edit, Filter, PackageOpen, Layers } from 'lucide-react';
 import type { Order, OrderStatus } from '@/types';
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import Link from 'next/link';
@@ -63,15 +63,31 @@ export default function AdminOrdersPage() {
     try {
       let q = query(collection(db, 'orders'), orderBy("createdAt", "desc"));
       
-      if (statusFilter && statusFilter !== ALL_STATUSES_SENTINEL) {
+      // Admin and other roles see all orders based on status filter
+      if (role !== 'ServiceManager' && statusFilter && statusFilter !== ALL_STATUSES_SENTINEL) {
         q = query(collection(db, 'orders'), where("status", "==", statusFilter), orderBy("createdAt", "desc"));
       }
       
       const querySnapshot = await getDocs(q);
-      const fetchedOrders: Order[] = [];
+      let fetchedOrders: Order[] = [];
       querySnapshot.forEach((docSnapshot) => {
         fetchedOrders.push({ id: docSnapshot.id, ...docSnapshot.data() } as Order);
       });
+
+      // For Service Manager, filter further to show only orders with customizations or bulk orders.
+      if (role === 'ServiceManager') {
+        fetchedOrders = fetchedOrders.filter(order => {
+          const hasCustomizations = order.items.some(item => item.customizations && Object.keys(item.customizations).length > 0);
+          const isBulkOrder = (order as any).isBulkOrder === true; // Assuming a flag for bulk orders
+          return hasCustomizations || isBulkOrder;
+        });
+        
+        // Apply status filter after the role-specific filtering
+        if (statusFilter && statusFilter !== ALL_STATUSES_SENTINEL) {
+            fetchedOrders = fetchedOrders.filter(order => order.status === statusFilter);
+        }
+      }
+
       setOrders(fetchedOrders);
     } catch (error) {
       console.error("Failed to fetch orders:", error);
@@ -79,7 +95,7 @@ export default function AdminOrdersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, statusFilter]); 
+  }, [toast, statusFilter, role]); 
 
   useEffect(() => {
     if (!authLoading) {
@@ -118,8 +134,12 @@ export default function AdminOrdersPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-headline font-semibold">Order Management</h1>
-          <p className="text-muted-foreground">View, process, and track all customer orders.</p>
+          <h1 className="text-3xl font-headline font-semibold">
+            {role === 'ServiceManager' ? 'Customization & Bulk Orders' : 'Order Management'}
+          </h1>
+          <p className="text-muted-foreground">
+            {role === 'ServiceManager' ? 'View orders requiring production tasks.' : 'View, process, and track all customer orders.'}
+          </p>
         </div>
       </div>
 
@@ -167,7 +187,7 @@ export default function AdminOrdersPage() {
             <div className="p-10 text-center">
               <PackageOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">
-                {orders.length === 0 ? "No orders found yet." : "No orders match your current search/filter criteria."}
+                {orders.length === 0 ? "No orders found for your view." : "No orders match your current search/filter criteria."}
               </p>
             </div>
           ) : (
@@ -177,6 +197,7 @@ export default function AdminOrdersPage() {
                   <TableHead>Order ID</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -191,6 +212,13 @@ export default function AdminOrdersPage() {
                       <div className="text-xs text-muted-foreground">{order.customerEmail || "N/A"}</div>
                     </TableCell>
                     <TableCell>{formatDate(order.createdAt)}</TableCell>
+                    <TableCell>
+                        {order.items.some(item => item.customizations && Object.keys(item.customizations).length > 0) && (
+                            <Badge variant="outline" className="text-xs">
+                                <Layers className="mr-1 h-3 w-3"/> Custom
+                            </Badge>
+                        )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={getOrderStatusBadgeVariant(order.status)} className="capitalize">
                         {order.status.replace(/_/g, " ")}
@@ -215,4 +243,3 @@ export default function AdminOrdersPage() {
     </div>
   );
 }
-

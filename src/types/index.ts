@@ -6,6 +6,7 @@
 
 
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -186,7 +187,8 @@ export interface Order {
   isGift?: boolean;
   giftDetails?: GiftDetails | null;
   rating?: OrderRating | null;
-  customerNotes?: string | null; // Added from tasks page
+  customerNotes?: string | null; 
+  isBulkOrder?: boolean;
 }
 
 export interface CartItem {

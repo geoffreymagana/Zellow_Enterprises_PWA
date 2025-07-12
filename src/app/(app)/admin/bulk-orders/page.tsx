@@ -13,7 +13,7 @@ export default function AdminBulkOrdersPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!authLoading && (!user || !['Admin', 'FinanceManager'].includes(role || ''))) {
+    if (!authLoading && (!user || !['Admin', 'FinanceManager', 'ServiceManager'].includes(role || ''))) {
       router.replace('/dashboard');
     }
   }, [user, role, authLoading, router]);
