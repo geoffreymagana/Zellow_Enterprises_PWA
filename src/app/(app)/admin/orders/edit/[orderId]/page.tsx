@@ -627,6 +627,10 @@ export default function AdminOrderDetailPage() {
       
       <Dialog open={!!imageToView} onOpenChange={(open) => { if (!open) setImageToView(null) }}>
         <DialogContent className="max-w-xl">
+            <DialogHeader>
+                <DialogTitle>Customization Image Preview</DialogTitle>
+                <DialogDescription>A larger view of the user-provided image.</DialogDescription>
+            </DialogHeader>
             <div className="relative w-full aspect-square">
                 {imageToView && <Image src={imageToView} alt="Customization Image Preview" layout="fill" objectFit="contain" />}
             </div>
