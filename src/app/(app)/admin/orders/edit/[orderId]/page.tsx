@@ -413,56 +413,60 @@ export default function AdminOrderDetailPage() {
 
           <Card>
             <CardHeader><CardTitle className="font-headline text-lg flex items-center"><Package className="mr-2 h-5 w-5"/>Order Items</CardTitle></CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               <Table>
-                <TableHeader><TableRow><TableHead>Item</TableHead><TableHead>Qty</TableHead><TableHead className="text-right">Unit Price</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Item</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {order.items.map((item, index) => {
                     const itemKey = `${item.productId}_${index}`;
                     const itemOptionDefinitions = resolvedOrderItemOptionsMap.get(itemKey);
                     return (
-                      <TableRow key={itemKey}>
-                        <TableCell>
-                          <div className="font-medium">{item.name}</div>
-                          {item.customizations && Object.keys(item.customizations).length > 0 && (
-                            <div className="text-xs text-muted-foreground space-y-2 mt-2">
-                              {Object.entries(item.customizations).map(([optionId, selectedValue]) => {
-                                const details = getDisplayableCustomizationValueAdmin(optionId, selectedValue, itemOptionDefinitions);
-                                return (
-                                  <div key={optionId} className="flex flex-col items-start gap-0.5">
-                                    <span className="font-semibold text-foreground/90">{details.label}:</span>
-                                    {details.isImage && details.imageUrl ? (
-                                        <button onClick={() => setImageToView(details.imageUrl!)} className="relative w-16 h-16 bg-muted rounded border overflow-hidden hover:opacity-80 transition-opacity">
-                                            <Image src={details.imageUrl} alt={details.label} layout="fill" objectFit="cover"/>
-                                        </button>
-                                    ) : (
-                                        <div className="flex items-center gap-1">
-                                            {details.isColor && details.colorHex && (
-                                                <span style={{ backgroundColor: details.colorHex }} className="inline-block w-3 h-3 rounded-full border border-muted-foreground mr-1"></span>
-                                            )}
-                                            <span className="break-all">{details.value}</span>
-                                        </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>{item.quantity}</TableCell>
-                        <TableCell className="text-right">{formatPrice(item.price / item.quantity)}</TableCell>
-                        <TableCell className="text-right">{formatPrice(item.price)}</TableCell>
-                        <TableCell className="text-right">
-                          {item.customizations && Object.keys(item.customizations).length > 0 && !itemHasExistingTask(item.name) && (role === 'Admin' || role === 'ServiceManager') && (
-                            <Button variant="outline" size="sm" onClick={() => openTaskDialog(item)}>
-                              <Settings2 className="mr-1 h-3 w-3"/> Create Task
-                            </Button>
-                          )}
-                          {itemHasExistingTask(item.name) && (
-                              <Badge variant="outline" className="text-xs">ASSIGNED</Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
+                      <React.Fragment key={itemKey}>
+                        <TableRow>
+                          <TableCell>
+                            <div className="font-medium">{item.name}</div>
+                            <div className="text-xs text-muted-foreground">Qty: {item.quantity} @ {formatPrice(item.price / item.quantity)}</div>
+                          </TableCell>
+                          <TableCell className="text-right font-medium">{formatPrice(item.price)}</TableCell>
+                          <TableCell className="text-right">
+                            {item.customizations && Object.keys(item.customizations).length > 0 && !itemHasExistingTask(item.name) && (role === 'Admin' || role === 'ServiceManager') && (
+                              <Button variant="outline" size="sm" onClick={() => openTaskDialog(item)}>
+                                <Settings2 className="mr-1 h-3 w-3"/> Create Task
+                              </Button>
+                            )}
+                            {itemHasExistingTask(item.name) && (
+                                <Badge variant="outline" className="text-xs">ASSIGNED</Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                        {item.customizations && Object.keys(item.customizations).length > 0 && (
+                          <TableRow>
+                            <TableCell colSpan={3} className="p-0">
+                              <div className="bg-muted/50 p-3 text-xs space-y-2">
+                                <h4 className="font-semibold text-foreground/80">Customizations:</h4>
+                                {Object.entries(item.customizations).map(([optionId, selectedValue]) => {
+                                  const details = getDisplayableCustomizationValueAdmin(optionId, selectedValue, itemOptionDefinitions);
+                                  return (
+                                    <div key={optionId} className="grid grid-cols-3 gap-2 border-b pb-1 last:border-b-0">
+                                      <div className="col-span-1 font-medium">{details.label}:</div>
+                                      <div className="col-span-2 flex items-center gap-2">
+                                          {details.isImage && details.imageUrl ? (
+                                            <button onClick={() => setImageToView(details.imageUrl!)} className="relative w-12 h-12 bg-muted rounded border overflow-hidden hover:opacity-80 transition-opacity">
+                                                <Image src={details.imageUrl} alt={details.label} layout="fill" objectFit="cover"/>
+                                            </button>
+                                          ) : details.isColor && details.colorHex ? (
+                                            <span style={{ backgroundColor: details.colorHex }} className="inline-block w-4 h-4 rounded-full border border-muted-foreground mr-1"></span>
+                                          ) : null}
+                                          <span className="break-all">{details.value}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </TableBody>
