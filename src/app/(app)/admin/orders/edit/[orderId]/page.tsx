@@ -459,7 +459,7 @@ export default function AdminOrderDetailPage() {
                             </Button>
                           )}
                           {itemHasExistingTask(item.name) && (
-                              <Badge variant="outline" className="text-xs">Task Exists</Badge>
+                              <Badge variant="outline" className="text-xs">ASSIGNED</Badge>
                           )}
                         </TableCell>
                       </TableRow>
