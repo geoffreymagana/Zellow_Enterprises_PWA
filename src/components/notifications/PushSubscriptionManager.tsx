@@ -1,4 +1,3 @@
-
 // src/components/notifications/PushSubscriptionManager.tsx
 "use client";
 
@@ -8,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, BellOff, BellRing } from 'lucide-react';
+import type { User } from '@/types'; // Import User type
 
 async function urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -47,9 +47,9 @@ export function PushSubscriptionManager() {
         });
     }, []);
 
-    const subscribe = useCallback(async () => {
-        if (!VAPID_PUBLIC_KEY || !user) {
-            toast({ title: "Error", description: "Push notification key is not configured or user not logged in.", variant: "destructive" });
+    const subscribe = useCallback(async (currentUser: User) => {
+        if (!VAPID_PUBLIC_KEY) {
+            toast({ title: "Error", description: "Push notification key is not configured.", variant: "destructive" });
             return;
         }
 
@@ -61,7 +61,8 @@ export function PushSubscriptionManager() {
                 applicationServerKey: applicationServerKey
             });
 
-            const token = await user.getIdToken();
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) throw new Error("Could not get auth token.");
 
             await fetch('/api/push/subscribe', {
                 method: 'POST',
@@ -80,13 +81,14 @@ export function PushSubscriptionManager() {
                 toast({ title: "Subscription Failed", description: "Could not subscribe to notifications. Please try again.", variant: "destructive" });
             }
         }
-    }, [VAPID_PUBLIC_KEY, toast, user]);
+    }, [VAPID_PUBLIC_KEY, toast]);
 
-    const unsubscribe = useCallback(async () => {
-        if (!subscription || !user) return;
+    const unsubscribe = useCallback(async (currentSubscription: PushSubscription) => {
         try {
-            await subscription.unsubscribe();
-            const token = await user.getIdToken();
+            await currentSubscription.unsubscribe();
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) throw new Error("Could not get auth token.");
+            
             await fetch('/api/push/unsubscribe', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -100,16 +102,16 @@ export function PushSubscriptionManager() {
             console.error("Failed to unsubscribe:", error);
             toast({ title: "Unsubscribe Failed", variant: "destructive" });
         }
-    }, [subscription, toast, user]);
+    }, [toast]);
 
     const handleToggleSubscription = async () => {
-        if (isChanging) return;
+        if (isChanging || !user) return;
         setIsChanging(true);
 
-        if (isSubscribed) {
-            await unsubscribe();
+        if (isSubscribed && subscription) {
+            await unsubscribe(subscription);
         } else {
-            await subscribe();
+            await subscribe(user);
         }
         setIsChanging(false);
     };
@@ -136,11 +138,12 @@ export function PushSubscriptionManager() {
                     Receive push notifications for key order updates.
                 </p>
             </div>
-            <Switch
+             <Switch
                 id="push-switch"
                 checked={isSubscribed}
                 onCheckedChange={handleToggleSubscription}
-                disabled={isChanging}
+                disabled={isChanging || !user}
+                aria-label="Toggle push notifications"
             />
         </div>
     );
