@@ -1,172 +1,123 @@
+document.addEventListener('DOMContentLoaded', function() {
+    const loader = document.getElementById('loader');
+    const content = document.getElementById('content');
+    const errorContainer = document.getElementById('error-container');
+    const errorMessage = document.getElementById('error-message');
 
-// Ensure you have configured Firebase in your project and included the SDKs in index.html
-// For v9 modular SDK, the initialization would look like:
-// import { initializeApp } from "firebase/app";
-// import { getFirestore, doc, onSnapshot, query, collection, where, limit } from "firebase/firestore";
+    const db = firebase.firestore();
 
-// ** IMPORTANT: Replace with your actual Firebase project configuration **
-const firebaseConfig = {
-  apiKey: "AIzaSyDzUlYdqqdkTxcHJHChsX6zM-U_7N92xec",
-  authDomain: "zellowlive.firebaseapp.com",
-  projectId: "zellowlive",
-  storageBucket: "zellowlive.firebasestorage.app",
-  messagingSenderId: "943761891650",
-  appId: "1:943761891650:web:e8c12f77ea9d5edf0b68db",
-};
+    const getOrderIdFromUrl = () => {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('token');
+    };
 
-let app;
-let db;
+    const orderId = getOrderIdFromUrl();
 
-try {
-  app = firebase.initializeApp(firebaseConfig);
-  db = firebase.firestore(app);
-  console.log("Firebase initialized for gift tracking.");
-} catch (error) {
-  console.error("Error initializing Firebase for gift tracking:", error);
-  const statusDiv = document.getElementById('status');
-  const detailsDiv = document.getElementById('gift-details');
-  if (statusDiv) statusDiv.textContent = 'Error initializing. Cannot load details.';
-  if (detailsDiv) detailsDiv.innerHTML = '<p>Could not connect to the tracking service. Please try again later.</p>';
-}
-
-function formatDate(timestamp) {
-  if (!timestamp) return 'N/A';
-  let date;
-  if (timestamp.toDate && typeof timestamp.toDate === 'function') {
-    date = timestamp.toDate(); // Firestore Timestamp
-  } else if (timestamp instanceof Date) {
-    date = timestamp; // JavaScript Date object
-  } else {
-    try {
-      date = new Date(timestamp); // Try parsing if it's a string or number
-    } catch (e) {
-      console.warn("Could not parse date:", timestamp, e);
-      return "Invalid Date";
-    }
-  }
-
-  if (isNaN(date.getTime())) {
-    console.warn("Formatted date is invalid:", date);
-    return "Invalid Date";
-  }
-
-  // Example format: "January 1, 2023, 10:30 AM"
-  // You can customize this using options for toLocaleString
-  return date.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true
-  });
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  if (!db) {
-    console.log("Firestore (db) not initialized. Exiting script.");
-    return;
-  }
-
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('token'); // This token is the orderId
-
-  const statusDiv = document.getElementById('status');
-  const recipientNameDiv = document.getElementById('recipient-name');
-  const expectedDeliveryDiv = document.getElementById('expected-delivery');
-  const messageDiv = document.getElementById('message-from-sender');
-  const detailsDiv = document.getElementById('gift-details');
-  const loadingDiv = document.getElementById('loading-message');
-
-  if (!token) {
-    if (loadingDiv) loadingDiv.style.display = 'none';
-    if (detailsDiv) detailsDiv.innerHTML = '<p class="error">No tracking token provided in the URL.</p>';
-    return;
-  }
-
-  const orderRef = db.collection('orders').doc(token);
-
-  orderRef.onSnapshot((doc) => {
-    if (loadingDiv) loadingDiv.style.display = 'none'; // Hide loading once we get a response
-
-    if (doc.exists) {
-      const orderData = doc.data();
-      console.log("Fetched Order Data:", orderData);
-
-      if (orderData.isGift !== true) {
-        if (detailsDiv) detailsDiv.innerHTML = '<p>This order is not marked as a trackable gift.</p>';
+    if (!orderId) {
+        showError("No gift ID provided in the link.");
         return;
-      }
-      
-      // Check if recipient can view order details
-      if (orderData.giftDetails && orderData.giftDetails.recipientCanViewAndTrack === false) {
-        if (statusDiv) statusDiv.textContent = orderData.status ? orderData.status.replace(/_/g, ' ') : 'Status Unavailable';
-        if (recipientNameDiv) recipientNameDiv.textContent = orderData.giftDetails.recipientName || 'Valued Recipient';
-        if (expectedDeliveryDiv && orderData.estimatedDeliveryTime) {
-            expectedDeliveryDiv.textContent = formatDate(orderData.estimatedDeliveryTime);
-        } else if (expectedDeliveryDiv) {
-            expectedDeliveryDiv.textContent = 'To be confirmed';
-        }
-        if (messageDiv && orderData.giftDetails.giftMessage) {
-            messageDiv.textContent = orderData.giftDetails.giftMessage;
-        } else if (messageDiv) {
-            messageDiv.textContent = 'A special gift is on its way!';
-        }
-        if (detailsDiv) {
-            // Show minimal info if tracking is restricted
-            detailsDiv.style.display = 'block';
-            const minimalInfoHTML = `
-                <p><strong>Status:</strong> <span id="status-val">${orderData.status ? orderData.status.replace(/_/g, ' ') : 'Status Unavailable'}</span></p>
-                <p>Hello ${orderData.giftDetails.recipientName || 'Valued Recipient'}, your gift from ${orderData.senderName || 'a friend'} is being prepared!</p>
-                ${orderData.giftDetails.giftMessage ? `<p class="message"><strong>Message:</strong> ${orderData.giftDetails.giftMessage}</p>` : ''}
-                <p class="note">Detailed tracking is not available for this gift as per sender's preference.</p>
-            `;
-            detailsDiv.innerHTML = minimalInfoHTML;
-        }
-        return;
-      }
-
-
-      if (detailsDiv) detailsDiv.style.display = 'block'; // Show details section
-
-      if (statusDiv) statusDiv.textContent = orderData.status ? orderData.status.replace(/_/g, ' ') : 'Status Unavailable';
-
-      if (recipientNameDiv) {
-        recipientNameDiv.textContent = orderData.giftDetails?.recipientName || 'Valued Recipient';
-      } else {
-        console.warn("recipientNameDiv not found");
-      }
-
-      if (expectedDeliveryDiv) {
-        if (orderData.status === 'delivered' && orderData.actualDeliveryTime) {
-            expectedDeliveryDiv.innerHTML = `Delivered on: <strong>${formatDate(orderData.actualDeliveryTime)}</strong>`;
-        } else if (orderData.estimatedDeliveryTime) {
-            expectedDeliveryDiv.textContent = formatDate(orderData.estimatedDeliveryTime);
-        } else {
-            expectedDeliveryDiv.textContent = 'To be confirmed';
-        }
-      } else {
-        console.warn("expectedDeliveryDiv not found");
-      }
-
-      if (messageDiv) {
-        if (orderData.giftDetails?.giftMessage) {
-          messageDiv.textContent = orderData.giftDetails.giftMessage;
-        } else {
-          messageDiv.textContent = 'A special gift is on its way!';
-        }
-      } else {
-        console.warn("messageDiv not found");
-      }
-
-    } else {
-      console.log("No such document for order ID:", token);
-      if (detailsDiv) detailsDiv.innerHTML = '<p class="error">Invalid tracking link or gift details not found.</p>';
     }
-  }, (error) => {
-    console.error("Error getting order details: ", error);
-    if (loadingDiv) loadingDiv.style.display = 'none';
-    if (detailsDiv) detailsDiv.innerHTML = '<p class="error">Could not load gift tracking information. Please try again later.</p>';
-  });
-});
+
+    const orderRef = db.collection('orders').doc(orderId);
+
+    const unsubscribe = orderRef.onSnapshot(doc => {
+        if (doc.exists) {
+            const orderData = doc.data();
+            if (orderData.isGift) {
+                renderOrderDetails(orderData);
+                hideError();
+            } else {
+                showError("This order is not marked as a gift.");
+            }
+        } else {
+            showError("Gift details could not be found. Please check the link or contact the sender.");
+        }
+        hideLoader();
+    }, err => {
+        console.error("Error fetching gift details:", err);
+        showError("There was a problem retrieving your gift details. Please try again later.");
+        hideLoader();
+    });
+
+    function renderOrderDetails(order) {
+        const { senderName, status, deliveryHistory, giftDetails, items } = order;
+        const showPrices = giftDetails?.showPricesToRecipient === true;
+
+        let itemsHtml = items.map(item => `
+            <div class="item">
+                <img src="${item.imageUrl || 'https://placehold.co/100x100.png'}" alt="${item.name}" class="item-image">
+                <div class="item-info">
+                    <p class="item-name">${item.name} (x${item.quantity})</p>
+                    ${showPrices ? `<p class="item-price">${formatPrice(item.price * item.quantity)}</p>` : ''}
+                </div>
+            </div>
+        `).join('');
+
+        let historyHtml = deliveryHistory ? deliveryHistory.slice().reverse().map(entry => `
+            <li class="timeline-item">
+                <div class="timeline-marker ${status === entry.status ? 'active' : ''}"></div>
+                <div class="timeline-content">
+                    <p class="status">${entry.status.replace(/_/g, ' ')}</p>
+                    <p class="timestamp">${formatDate(entry.timestamp)}</p>
+                    ${entry.notes ? `<p class="notes">${entry.notes}</p>` : ''}
+                </div>
+            </li>
+        `).join('') : '';
+
+        content.innerHTML = `
+            <div class="card sender-info">
+                <h2>A Gift For You!</h2>
+                <p>From: <strong>${senderName || 'A friend'}</strong></p>
+                ${giftDetails?.giftMessage ? `<p class="message">"${giftDetails.giftMessage}"</p>` : ''}
+            </div>
+
+            <div class="card status-overview">
+                <h3>Current Status: <span class="status-badge ${status}">${status.replace(/_/g, ' ')}</span></h3>
+            </div>
+
+            <div class="card timeline">
+                <h3>Your Gift's Journey</h3>
+                <ul>${historyHtml}</ul>
+            </div>
+            
+            ${showPrices ? `
+            <div class="card items-summary">
+                <h3>Items in this Gift</h3>
+                ${itemsHtml}
+            </div>
+            ` : ''}
+        `;
+    }
+
+    function showError(message) {
+        errorMessage.textContent = message;
+        errorContainer.classList.remove('hidden');
+        content.classList.add('hidden');
+        hideLoader();
+    }
     
+    function hideError() {
+        errorContainer.classList.add('hidden');
+        content.classList.remove('hidden');
+    }
+
+    function hideLoader() {
+        loader.classList.add('hidden');
+    }
+
+    function formatDate(timestamp) {
+        if (!timestamp || !timestamp.toDate) return 'Just now';
+        return timestamp.toDate().toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+    }
+
+    function formatPrice(price) {
+        return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
+    }
+});

@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, BellOff, BellRing } from 'lucide-react';
 import type { User } from '@/types'; // Import User type
+import { auth } from '@/lib/firebase';
 
 async function urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -52,6 +53,10 @@ export function PushSubscriptionManager() {
             toast({ title: "Error", description: "Push notification key is not configured.", variant: "destructive" });
             return;
         }
+        if (!auth) {
+            toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive" });
+            return;
+        }
 
         const sw = await navigator.serviceWorker.ready;
         try {
@@ -84,6 +89,10 @@ export function PushSubscriptionManager() {
     }, [VAPID_PUBLIC_KEY, toast]);
 
     const unsubscribe = useCallback(async (currentSubscription: PushSubscription) => {
+        if (!auth) {
+            toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive" });
+            return;
+        }
         try {
             await currentSubscription.unsubscribe();
             const token = await auth.currentUser?.getIdToken();

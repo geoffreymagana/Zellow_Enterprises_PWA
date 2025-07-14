@@ -98,13 +98,22 @@ These instructions will get you a copy of the project up and running on your loc
     ```
     *   **Note:** For `FIREBASE_PRIVATE_KEY`, you must wrap the key in double quotes and ensure the `\n` characters are preserved. Copy the entire `private_key` value from your service account JSON file.
 
-5.  **Run the development server:**
+5.  **Configure Public Gift Tracking Page:**
+    The public gift tracking page (`/public/gift-tracking-site/index.html`) requires your Firebase configuration to be added directly to the file. 
+    
+    *   Open `/public/gift-tracking-site/index.html`.
+    *   Find the `firebaseConfig` object within the `<script>` tag.
+    *   Replace the placeholder values (`"YOUR_API_KEY"`, `"YOUR_PROJECT_ID"`, etc.) with your actual Firebase project configuration values from your `.env.local` file.
+    
+    **IMPORTANT:** This page is publicly accessible and should only use client-safe Firebase keys. Do not expose any server-side keys here. For production deployments, it's recommended to automate this replacement using a build script or your CI/CD pipeline's environment variables to avoid committing keys to version control.
+
+6.  **Run the development server:**
     ```bash
     npm run dev
     ```
     The application should now be running on `http://localhost:9002`.
 
-6.  **Run the Genkit development server (for AI flows):**
+7.  **Run the Genkit development server (for AI flows):**
     In a separate terminal:
     ```bash
     npm run genkit:dev
@@ -119,6 +128,7 @@ This Next.js application is optimized for deployment on Vercel.
 3.  **Configure Environment Variables:**
     *   In your Vercel project settings (Project > Settings > Environment Variables), add all the variables listed in the `.env.local` example above.
     *   **Crucially for `NEXT_PUBLIC_SITE_URL`**: Change its value to your Vercel production URL (e.g., `https://your-project-name.vercel.app`).
+    *   **For the Public Gift Tracking Page**: You will need a build-step process to inject your public Firebase variables into the `public/gift-tracking-site/index.html` file. This can be done with a script using `sed` or `replace-in-file` that runs before your `next build` command.
 4.  **Deploy:** Vercel will automatically detect Next.js settings and deploy your application. Subsequent pushes to your main branch will trigger redeployments.
 
 ## Key Functionalities
