@@ -1,3 +1,4 @@
+
 // src/components/notifications/PushSubscriptionManager.tsx
 "use client";
 
@@ -7,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, BellOff, BellRing } from 'lucide-react';
-import type { User } from '@/types'; // Import User type
+import type { User } from '@/types';
 import { auth } from '@/lib/firebase';
 
 async function urlBase64ToUint8Array(base64String: string) {
@@ -32,6 +33,7 @@ export function PushSubscriptionManager() {
     const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
     useEffect(() => {
+        // This effect runs only once on mount to check initial subscription status.
         if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !window.PushManager) {
             setIsLoading(false);
             return;
@@ -46,81 +48,75 @@ export function PushSubscriptionManager() {
                 setIsLoading(false);
             });
         });
-    }, []);
-
-    const subscribe = useCallback(async (currentUser: User) => {
-        if (!VAPID_PUBLIC_KEY) {
-            toast({ title: "Error", description: "Push notification key is not configured.", variant: "destructive" });
-            return;
-        }
-        if (!auth) {
-            toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive" });
-            return;
-        }
-
-        const sw = await navigator.serviceWorker.ready;
-        try {
-            const applicationServerKey = await urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
-            const sub = await sw.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: applicationServerKey
-            });
-
-            const token = await auth.currentUser?.getIdToken();
-            if (!token) throw new Error("Could not get auth token.");
-
-            await fetch('/api/push/subscribe', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ subscription: sub, token }),
-            });
-
-            setSubscription(sub);
-            setIsSubscribed(true);
-            toast({ title: "Subscribed!", description: "You will now receive push notifications." });
-        } catch (error: any) {
-            console.error("Failed to subscribe:", error);
-            if (Notification.permission === 'denied') {
-                toast({ title: "Permission Denied", description: "Please enable push notifications in your browser settings.", variant: "destructive" });
-            } else {
-                toast({ title: "Subscription Failed", description: "Could not subscribe to notifications. Please try again.", variant: "destructive" });
-            }
-        }
-    }, [VAPID_PUBLIC_KEY, toast]);
-
-    const unsubscribe = useCallback(async (currentSubscription: PushSubscription) => {
-        if (!auth) {
-            toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive" });
-            return;
-        }
-        try {
-            await currentSubscription.unsubscribe();
-            const token = await auth.currentUser?.getIdToken();
-            if (!token) throw new Error("Could not get auth token.");
-            
-            await fetch('/api/push/unsubscribe', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token }),
-            });
-
-            setIsSubscribed(false);
-            setSubscription(null);
-            toast({ title: "Unsubscribed", description: "You will no longer receive push notifications." });
-        } catch (error) {
-            console.error("Failed to unsubscribe:", error);
-            toast({ title: "Unsubscribe Failed", variant: "destructive" });
-        }
-    }, [toast]);
+    }, []); // Empty dependency array ensures this runs only once.
 
     const handleToggleSubscription = async () => {
         if (isChanging || !user) return;
         setIsChanging(true);
 
-        if (isSubscribed && subscription) {
-            await unsubscribe(subscription);
+        const currentSubscription = await navigator.serviceWorker.ready.then(reg => reg.pushManager.getSubscription());
+
+        if (currentSubscription) {
+            // Unsubscribe logic
+            try {
+                await currentSubscription.unsubscribe();
+                const token = await auth.currentUser?.getIdToken();
+                if (!token) throw new Error("Could not get auth token.");
+                
+                await fetch('/api/push/unsubscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token }),
+                });
+
+                setIsSubscribed(false);
+                setSubscription(null);
+                toast({ title: "Unsubscribed", description: "You will no longer receive push notifications." });
+            } catch (error) {
+                console.error("Failed to unsubscribe:", error);
+                toast({ title: "Unsubscribe Failed", variant: "destructive" });
+            }
         } else {
-            await subscribe(user);
+            // Subscribe logic
+            if (!VAPID_PUBLIC_KEY) {
+                toast({ title: "Error", description: "Push notification key is not configured.", variant: "destructive" });
+                setIsChanging(false);
+                return;
+            }
+            if (!auth.currentUser) {
+                toast({ title: "Error", description: "Authentication service not ready.", variant: "destructive" });
+                setIsChanging(false);
+                return;
+            }
+            
+            try {
+                const sw = await navigator.serviceWorker.ready;
+                const applicationServerKey = await urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+                const sub = await sw.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: applicationServerKey
+                });
+
+                const token = await auth.currentUser.getIdToken();
+                if (!token) throw new Error("Could not get auth token.");
+
+                await fetch('/api/push/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subscription: sub, token }),
+                });
+
+                setSubscription(sub);
+                setIsSubscribed(true);
+                toast({ title: "Subscribed!", description: "You will now receive push notifications." });
+            } catch (error: any) {
+                console.error("Failed to subscribe:", error);
+                if (Notification.permission === 'denied') {
+                    toast({ title: "Permission Denied", description: "Please enable push notifications in your browser settings.", variant: "destructive" });
+                } else {
+                    toast({ title: "Subscription Failed", description: "Could not subscribe to notifications. Please try again.", variant: "destructive" });
+                }
+            }
         }
         setIsChanging(false);
     };
