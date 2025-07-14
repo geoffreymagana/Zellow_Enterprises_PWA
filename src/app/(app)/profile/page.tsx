@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
-import { UserCircle2, Edit3, ShieldCheck, LogOut, Loader2, HelpCircle, Mail, Info, ShoppingCart, MessageSquare } from "lucide-react";
+import { UserCircle2, Edit3, ShieldCheck, LogOut, Loader2, HelpCircle, Mail, Info, ShoppingCart, MessageSquare, Bell } from "lucide-react";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,6 +15,8 @@ import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { PushSubscriptionManager } from "@/components/notifications/PushSubscriptionManager";
+import { Separator } from "@/components/ui/separator";
 
 const profileFormSchema = z.object({
   displayName: z.string().min(1, { message: "Display name cannot be empty." }).max(50, { message: "Display name cannot exceed 50 characters." }),
@@ -118,6 +120,13 @@ export default function ProfilePage() {
           <CardTitle className="font-headline">Account & Support</CardTitle>
         </CardHeader>
         <CardContent className="p-6 md:p-8 space-y-3">
+          <div className="space-y-2">
+            <h3 className="text-md font-semibold flex items-center gap-2"><Bell />Notifications</h3>
+            <PushSubscriptionManager />
+          </div>
+
+          <Separator className="my-4 !mt-6" />
+
           {role === 'Customer' && (
             <Button asChild variant="outline" className="w-full justify-start">
               <Link href="/orders">

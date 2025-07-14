@@ -4,18 +4,12 @@ import withPWAInit from "@ducanh2912/next-pwa";
 
 const withPWA = withPWAInit({
   dest: "public",
-  disable: process.env.NODE_ENV === "development", // Disable PWA in development for faster builds and no service worker conflicts
-  register: true, // Auto register service worker
-  skipWaiting: true, // Skip waiting for service worker to activate
-  // cacheOnFrontEndNav: true, // Optional: Aggressively cache assets on frontend navigation
-  // reloadOnOnline: true, // Optional: Auto-reload PWA when online again
-  fallbacks: { // Add fallbacks configuration
-    document: '/offline', // Custom offline page for document requests (page navigations)
-    // image: '/static/images/fallback.png', // Optional: A fallback image
-    // font: '/static/fonts/fallback.woff2', // Optional: A fallback font
-    // data: '/static/data/fallback.json', // Optional: Fallback for data/API requests
-    // audio: ...,
-    // video: ...,
+  disable: process.env.NODE_ENV === "development",
+  register: true,
+  skipWaiting: true,
+  sw: 'sw.js', // Ensure it points to our custom service worker
+  fallbacks: {
+    document: '/offline', 
   },
 });
 

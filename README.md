@@ -15,7 +15,7 @@ ZellowLive is a comprehensive web application designed to streamline the process
 *   **UI:** ShadCN UI Components, Tailwind CSS
 *   **Backend & Database:** Firebase (Firestore, Authentication, Storage for user-uploaded images)
 *   **Generative AI:** Genkit (for features like gift notifications via email)
-*   **PWA:** Enabled for Customer and Staff portals for an app-like experience.
+*   **PWA:** Enabled for Customer and Staff portals for an app-like experience with Push Notifications.
 
 ## Getting Started
 
@@ -41,57 +41,70 @@ These instructions will get you a copy of the project up and running on your loc
     # yarn install
     ```
 
-3.  **Set up Firebase:**
+3.  **Generate VAPID Keys for Push Notifications:**
+    Run the following command in your terminal to generate the necessary keys for sending web push notifications.
+    ```bash
+    npm run generate-vapid-keys
+    ```
+    This will output a Public Key and a Private Key. You will need to add these to your environment variables.
+
+4.  **Set up Firebase & Environment Variables:**
     *   Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com/).
     *   Enable Firestore, Firebase Authentication (Email/Password), and Firebase Storage.
-    *   Obtain your Firebase project configuration (API key, authDomain, etc.).
-    *   Create a `.env.local` file in the root of your project and add your Firebase configuration keys. Example:
-        ```env
-        # Firebase Client-Side Configuration
-        NEXT_PUBLIC_FIREBASE_API_KEY=YOUR_API_KEY
-        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=YOUR_AUTH_DOMAIN
-        NEXT_PUBLIC_FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
-        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=YOUR_STORAGE_BUCKET
-        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=YOUR_MESSAGING_SENDER_ID
-        NEXT_PUBLIC_FIREBASE_APP_ID=YOUR_APP_ID
-        NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=YOUR_MEASUREMENT_ID # Optional, for Analytics
+    *   **Generate a private key for the Admin SDK:** In your Firebase project settings, go to "Service accounts", select "Node.js", and click "Generate new private key". This will download a JSON file.
+    *   Create a `.env.local` file in the root of your project and add your configuration.
 
-        # Genkit (AI Features) - Server-Side
-        GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+    **Example `.env.local`:**
+    ```env
+    # Firebase Client-Side Configuration
+    NEXT_PUBLIC_FIREBASE_API_KEY=YOUR_API_KEY
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=YOUR_AUTH_DOMAIN
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=YOUR_STORAGE_BUCKET
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=YOUR_MESSAGING_SENDER_ID
+    NEXT_PUBLIC_FIREBASE_APP_ID=YOUR_APP_ID
+    NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=YOUR_MEASUREMENT_ID # Optional
 
-        # Email Notifications (SMTP) - Server-Side
-        SMTP_HOST=smtp.gmail.com
-        SMTP_PORT=587
-        SMTP_SECURE=false # For STARTTLS on port 587
-        SMTP_USER=your-gmail-username@gmail.com
-        SMTP_PASS=your-gmail-app-password # Use an App Password for Gmail
-        SMTP_FROM_EMAIL=noreply@yourdomain.com # Gmail might override this
-        SMTP_FROM_NAME="Zellow Notifications"
+    # Firebase Admin SDK (Server-Side) - from your downloaded JSON file
+    FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
+    FIREBASE_CLIENT_EMAIL=your-firebase-service-account-email@...
+    FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_PRIVATE_KEY_HERE\n-----END PRIVATE KEY-----\n"
 
-        # Mapbox Token (Client-Side)
-        NEXT_PUBLIC_MAPBOX_TOKEN=YOUR_MAPBOX_ACCESS_TOKEN
-        
-        # Cloudinary (if used for image uploads during customization)
-        NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=YOUR_CLOUDINARY_CLOUD_NAME
-        NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=YOUR_CLOUDINARY_UPLOAD_PRESET
+    # Push Notifications (VAPID Keys) - from the 'generate-vapid-keys' command
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY=YOUR_GENERATED_PUBLIC_KEY
+    VAPID_PRIVATE_KEY=YOUR_GENERATED_PRIVATE_KEY
 
-        # Site URL - Crucial for links in emails/notifications
-        # For local development:
-        NEXT_PUBLIC_SITE_URL=http://localhost:9002
-        # For Vercel/Production deployment, update this to your actual deployed URL on Vercel, e.g.:
-        # NEXT_PUBLIC_SITE_URL=https://your-zellowlive-project.vercel.app 
-        ```
-    *   **Note:** For `SMTP_PASS` with Gmail, you'll need to generate an "App Password" if you have 2-Step Verification enabled on your Google account.
+    # Genkit (AI Features) - Server-Side
+    GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 
-4.  **Run the development server:**
+    # Email Notifications (SMTP) - Server-Side
+    SMTP_HOST=smtp.gmail.com
+    SMTP_PORT=587
+    SMTP_SECURE=false
+    SMTP_USER=your-gmail-username@gmail.com
+    SMTP_PASS=your-gmail-app-password
+    SMTP_FROM_EMAIL=noreply@yourdomain.com
+    SMTP_FROM_NAME="Zellow Notifications"
+
+    # Mapbox Token (Client-Side)
+    NEXT_PUBLIC_MAPBOX_TOKEN=YOUR_MAPBOX_ACCESS_TOKEN
+    
+    # Cloudinary (Client-Side)
+    NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=YOUR_CLOUDINARY_CLOUD_NAME
+    NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=YOUR_CLOUDINARY_UPLOAD_PRESET
+
+    # Site URL - Crucial for links in emails/notifications
+    NEXT_PUBLIC_SITE_URL=http://localhost:9002
+    ```
+    *   **Note:** For `FIREBASE_PRIVATE_KEY`, you must wrap the key in double quotes and ensure the `\n` characters are preserved. Copy the entire `private_key` value from your service account JSON file.
+
+5.  **Run the development server:**
     ```bash
     npm run dev
-    # or
-    # yarn dev
     ```
-    The application should now be running on `http://localhost:9002` (or your configured port).
+    The application should now be running on `http://localhost:9002`.
 
-5.  **Run the Genkit development server (for AI flows):**
+6.  **Run the Genkit development server (for AI flows):**
     In a separate terminal:
     ```bash
     npm run genkit:dev
@@ -107,7 +120,6 @@ This Next.js application is optimized for deployment on Vercel.
     *   In your Vercel project settings (Project > Settings > Environment Variables), add all the variables listed in the `.env.local` example above.
     *   **Crucially for `NEXT_PUBLIC_SITE_URL`**: Change its value to your Vercel production URL (e.g., `https://your-project-name.vercel.app`).
 4.  **Deploy:** Vercel will automatically detect Next.js settings and deploy your application. Subsequent pushes to your main branch will trigger redeployments.
-5.  The `apphosting.yaml` file is for Firebase App Hosting and is not used by Vercel.
 
 ## Key Functionalities
 
@@ -116,6 +128,7 @@ This Next.js application is optimized for deployment on Vercel.
 *   **Customization:** Personalize items with text, images, color choices, etc.
 *   **Secure Checkout:** Multi-step checkout process including shipping details, gift options, and payment.
 *   **Order Tracking:** Real-time updates on order status and delivery.
+*   **Push Notifications:** Customers can opt-in to receive push notifications for important order status changes.
 *   **Gift Options:** Send orders as gifts, with options to notify the recipient and hide prices.
 
 ### Admin & Staff Operations
@@ -131,27 +144,19 @@ This Next.js application is optimized for deployment on Vercel.
 ## Application Structure Overview
 
 *   **`src/app/(app)/`**: Contains the main application routes and pages accessible after login.
-    *   **`admin/`**: Admin-specific dashboards and management pages.
-    *   **`checkout/`**: Customer checkout flow.
-    *   **`products/`**: Product listing and detail pages.
-    *   **`orders/`**: Customer order history and cart.
-    *   **`dashboard/`**: Role-based dashboards for staff.
-    *   ...and other role-specific pages like `deliveries/`, `tasks/`, `inventory/`, `finance/`, `supplier/`.
+*   **`src/app/api/`**: API routes for server-side logic like push notification subscriptions.
 *   **`src/app/login/`**: Login page.
-*   **`src/components/`**: Reusable UI components (auth, common, navigation, ui, charts).
-*   **`src/contexts/`**: React Context providers (AuthContext, CartContext).
+*   **`src/components/`**: Reusable UI components.
+*   **`src/contexts/`**: React Context providers.
 *   **`src/hooks/`**: Custom React hooks.
 *   **`src/lib/`**: Utility functions and Firebase initialization.
 *   **`src/ai/`**: Genkit flows and configuration.
-*   **`public/`**: Static assets like icons and manifest.json.
+*   **`public/`**: Static assets like icons, manifest.json, and the service worker (sw.js).
 
 ## Future Considerations (Potential Enhancements)
 
+*   Trigger push notifications automatically from the backend when an order status changes (e.g., using Firebase Functions).
 *   More sophisticated email templates.
 *   Advanced reporting and analytics.
-*   Direct image uploads to Firebase Storage instead of URL pasting for product images (or better Cloudinary integration for product image management by admin).
 *   Integration with actual payment gateways (e.g., Stripe, PayPal, or local Kenyan gateways).
-*   Push notifications for real-time updates.
 *   Enhanced PWA features (offline caching strategies, background sync).
-
-    
