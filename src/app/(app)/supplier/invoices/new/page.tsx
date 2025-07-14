@@ -17,7 +17,7 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from "zod";
 import { addDays, format } from 'date-fns';
-import { ArrowLeft, Send, CalendarIcon, PlusCircle, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Send, CalendarIcon, PlusCircle, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import type { Invoice, InvoiceItem, StockRequest } from '@/types';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, runTransaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -30,7 +30,7 @@ const formatKsh = (amount: number) => {
 const invoiceItemSchema = z.object({
   description: z.string().min(1, "Item description is required."),
   quantity: z.coerce.number().min(1, "Quantity must be at least 1."),
-  unitPrice: z.coerce.number().min(0, "Unit price must be 0 or greater."),
+  unitPrice: z.coerce.number().min(0.01, "Unit price must be greater than 0."),
 });
 
 const invoiceFormSchema = z.object({
@@ -38,7 +38,7 @@ const invoiceFormSchema = z.object({
   dueDate: z.date({ required_error: "Due date is required."}),
   items: z.array(invoiceItemSchema).min(1, "At least one item is required."),
   notes: z.string().optional(),
-  taxRate: z.coerce.number().min(0).max(100).optional().default(0), // Percentage
+  taxRate: z.coerce.number().min(0).max(100).optional().default(0),
 });
 
 type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
@@ -52,19 +52,19 @@ export default function NewInvoicePage() {
   const stockRequestId = searchParams.get('stockRequestId');
   const productName = searchParams.get('productName');
   const fulfilledQty = searchParams.get('fulfilledQty');
-  const supplierNotesDialog = searchParams.get('supplierNotesDialog');
+  const supplierPrice = searchParams.get('supplierPrice'); // Price awarded
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [invoiceNumber, setInvoiceNumber] = useState(`INV-${Date.now().toString().slice(-6)}`);
+  const [invoiceNumber] = useState(`INV-${Date.now().toString().slice(-6)}`);
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: {
       invoiceDate: new Date(),
       dueDate: addDays(new Date(), 30),
-      items: [{ description: productName || "", quantity: Number(fulfilledQty) || 1, unitPrice: 0 }],
-      notes: supplierNotesDialog || "",
-      taxRate: 5, // Default 5% tax
+      items: [{ description: productName || "", quantity: Number(fulfilledQty) || 1, unitPrice: Number(supplierPrice) || 0 }],
+      notes: "",
+      taxRate: 5,
     },
   });
 
@@ -85,10 +85,19 @@ export default function NewInvoicePage() {
     if (!user || role !== 'Supplier') {
       router.replace('/dashboard');
     }
-  }, [user, role, authLoading, router]);
+    // Prevent creating invoice if essential data is missing from URL
+    if (stockRequestId && (!productName || !fulfilledQty || !supplierPrice || Number(supplierPrice) <= 0)) {
+        toast({
+            title: "Invalid Request",
+            description: "Cannot create invoice without an awarded price from a stock request. Please fulfill from an awarded request.",
+            variant: "destructive",
+            duration: 7000,
+        });
+        router.push('/supplier/stock-requests');
+    }
+  }, [user, role, authLoading, router, stockRequestId, productName, fulfilledQty, supplierPrice, toast]);
   
   useEffect(() => {
-     // Update due date if invoice date changes
     const subscription = form.watch((value, { name }) => {
       if (name === "invoiceDate" && value.invoiceDate) {
         form.setValue("dueDate", addDays(value.invoiceDate, 30));
@@ -99,7 +108,10 @@ export default function NewInvoicePage() {
 
 
   const onSubmit = async (values: InvoiceFormValues) => {
-    if (!user || !db) return;
+    if (!user || !db || (stockRequestId && Number(supplierPrice) <= 0)) {
+        toast({ title: "Validation Error", description: "Supplier price must be set before creating an invoice.", variant: "destructive"});
+        return;
+    }
     setIsSubmitting(true);
 
     const invoiceItems: InvoiceItem[] = values.items.map(item => ({
@@ -113,7 +125,7 @@ export default function NewInvoicePage() {
       invoiceNumber,
       supplierId: user.uid,
       supplierName: user.displayName || user.email || "Unknown Supplier",
-      clientName: "Zellow Enterprises", // Hardcoded client
+      clientName: "Zellow Enterprises",
       invoiceDate: values.invoiceDate,
       dueDate: values.dueDate,
       items: invoiceItems,
@@ -127,39 +139,49 @@ export default function NewInvoicePage() {
     };
 
     try {
-      await runTransaction(db, async (transaction) => {
-        const invoiceRef = await addDoc(collection(db, 'invoices'), {
-          ...newInvoiceData,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
+        const invoiceCollectionRef = collection(db, 'invoices');
+        const invoiceRef = doc(invoiceCollectionRef); // Create a reference with a new ID
 
         if (stockRequestId) {
-          const stockRequestRef = doc(db, 'stockRequests', stockRequestId);
-          transaction.update(stockRequestRef, {
-            status: 'awaiting_receipt',
-            fulfilledQuantity: Number(fulfilledQty) || 0, // Quantity already confirmed by supplier
-            supplierNotes: values.notes, // Use notes from invoice
-            supplierId: user.uid,
-            supplierName: user.displayName || user.email,
-            supplierActionTimestamp: serverTimestamp(),
-            invoiceId: invoiceRef.id,
-            updatedAt: serverTimestamp(),
-          });
+            // If linked to a stock request, perform as a transaction
+            await runTransaction(db, async (transaction) => {
+                const stockRequestRef = doc(db, 'stockRequests', stockRequestId);
+                // First, set the invoice document
+                transaction.set(invoiceRef, {
+                    ...newInvoiceData,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                });
+                // Then, update the stock request
+                transaction.update(stockRequestRef, {
+                    status: 'fulfilled',
+                    fulfilledQuantity: Number(fulfilledQty) || 0,
+                    supplierNotes: values.notes,
+                    supplierActionTimestamp: serverTimestamp(),
+                    invoiceId: invoiceRef.id, // Link invoice to request
+                    updatedAt: serverTimestamp(),
+                });
+            });
+        } else {
+            // If not linked, just add the invoice
+            await addDoc(invoiceCollectionRef, {
+                ...newInvoiceData,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            });
         }
-      });
 
       toast({ title: "Invoice Sent", description: `Invoice ${invoiceNumber} sent for approval.` });
-      router.push('/supplier/stock-requests');
+      router.push('/supplier/stock-requests'); // Redirect after success
     } catch (e: any) {
-      console.error("Error creating invoice or updating stock request:", e);
+      console.error("Error creating invoice:", e);
       toast({ title: "Error", description: "Could not create invoice.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (authLoading) {
+  if (authLoading || (stockRequestId && !supplierPrice)) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
@@ -175,7 +197,7 @@ export default function NewInvoicePage() {
               <CardTitle className="text-lg font-headline text-center">New Invoice</CardTitle>
               <CardDescription className="text-center text-xs">#{invoiceNumber}</CardDescription>
             </div>
-            <div className="w-8"></div> {/* Spacer for balance */}
+            <div className="w-8"></div>
           </div>
         </CardHeader>
         <CardContent className="p-4 space-y-4">
@@ -255,15 +277,12 @@ export default function NewInvoicePage() {
               </div>
 
               <FormField control={form.control} name="notes" render={({ field }) => (
-                <FormItem><FormLabel>Notes (Optional)</FormLabel><FormControl><Textarea {...field} placeholder="Any additional notes for Zellow..." rows={2} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Notes (Optional)</FormLabel><FormControl><Textarea {...field} placeholder="e.g., Bank details, payment terms." rows={2} /></FormControl><FormMessage /></FormItem>
               )} />
               
               <div className="space-y-2 pt-4">
                 <Button type="submit" className="w-full bg-foreground hover:bg-foreground/90 text-background" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />} Send Invoice Now
-                </Button>
-                <Button type="button" variant="outline" className="w-full" onClick={() => onSubmit(form.getValues())} disabled={isSubmitting}> {/* Placeholder for now */}
-                  Schedule Delivery
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />} Send Invoice
                 </Button>
               </div>
             </form>
@@ -273,4 +292,3 @@ export default function NewInvoicePage() {
     </div>
   );
 }
-

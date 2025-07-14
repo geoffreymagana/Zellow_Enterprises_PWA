@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle, RefreshCw, FilePlus2 } from 'lucide-react'; // Changed Truck to FilePlus2
-import type { StockRequest, StockRequestStatus } from '@/types';
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { Loader2, CheckCircle, RefreshCw, FilePlus2, Gavel, FileQuestion, Hourglass, Check } from 'lucide-react';
+import type { StockRequest, StockRequestStatus, Bid } from '@/types';
+import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -19,16 +19,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-
 const getStockRequestStatusVariant = (status: StockRequestStatus): BadgeProps['variant'] => {
   switch (status) {
-    case 'pending_finance_approval': return 'statusYellow';
-    case 'pending_supplier_fulfillment': return 'statusAmber';
-    case 'awaiting_receipt': return 'statusBlue';
-    case 'received': return 'statusGreen';
+    case 'pending_bids': return 'statusYellow';
+    case 'pending_award': return 'statusAmber';
+    case 'awarded': return 'statusIndigo';
+    case 'awaiting_fulfillment': return 'statusLightBlue';
     case 'fulfilled': return 'statusGreen';
     case 'rejected_finance':
-    case 'rejected_supplier':
     case 'cancelled': 
       return 'statusRed';
     default: return 'outline';
@@ -44,10 +42,10 @@ export default function SupplierStockRequestsPage() {
   const [isLoading, setIsLoading] = useState(true);
   
   const [actionableRequest, setActionableRequest] = useState<StockRequest | null>(null);
-  const [isPrepareInvoiceModalOpen, setIsPrepareInvoiceModalOpen] = useState(false);
-  const [fulfilledQuantity, setFulfilledQuantity] = useState<number | string>("");
-  const [supplierNotes, setSupplierNotes] = useState("");
-  const [isSubmittingPreparation, setIsSubmittingPreparation] = useState(false);
+  const [isBidModalOpen, setIsBidModalOpen] = useState(false);
+  const [pricePerUnit, setPricePerUnit] = useState<number | string>("");
+  const [bidNotes, setBidNotes] = useState("");
+  const [isSubmittingBid, setIsSubmittingBid] = useState(false);
 
   const fetchRequests = useCallback(() => {
     if (!db || !user || role !== 'Supplier') {
@@ -55,15 +53,24 @@ export default function SupplierStockRequestsPage() {
       return () => {};
     }
     setIsLoading(true);
+    // Suppliers see requests open for bidding, AND requests they have been awarded
     const q = query(
         collection(db, 'stockRequests'), 
-        where("status", "==", "pending_supplier_fulfillment"),
-        // where("supplierId", "==", user.uid), // If we assign suppliers directly to requests later
+        where("status", "in", ["pending_bids", "awaiting_fulfillment"]),
         orderBy("createdAt", "desc")
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StockRequest)));
+      let fetchedRequests = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StockRequest));
+      // For 'awaiting_fulfillment', filter to only show if it was awarded to the current supplier
+      fetchedRequests = fetchedRequests.filter(req => {
+        if (req.status === 'awaiting_fulfillment') {
+          return req.supplierId === user.uid;
+        }
+        return true; // Keep all 'pending_bids' requests
+      });
+
+      setRequests(fetchedRequests);
       setIsLoading(false);
     }, (error) => {
       console.error("Error fetching stock requests for supplier:", error);
@@ -83,48 +90,75 @@ export default function SupplierStockRequestsPage() {
     return () => unsubscribe();
   }, [authLoading, user, role, router, fetchRequests]);
 
-  const handleOpenPrepareInvoiceModal = (request: StockRequest) => {
+  const handleOpenBidModal = (request: StockRequest) => {
     setActionableRequest(request);
-    setFulfilledQuantity(request.requestedQuantity); 
-    setSupplierNotes(request.supplierNotes || ""); // Pre-fill if any notes were there
-    setIsPrepareInvoiceModalOpen(true);
+    setPricePerUnit(""); 
+    setBidNotes("");
+    setIsBidModalOpen(true);
   };
-
-  const handleConfirmPreparationAndNavigateToInvoice = async () => {
-    if (!actionableRequest || fulfilledQuantity === "") return;
-    
-    const numFulfilledQuantity = Number(fulfilledQuantity);
-    if (isNaN(numFulfilledQuantity) || numFulfilledQuantity <= 0) {
-      toast({ title: "Invalid Quantity", description: "Fulfilled quantity must be a positive number.", variant: "destructive" });
-      return;
+  
+  const handleFulfillAndInvoice = (request: StockRequest) => {
+    if(!request.supplierPrice) {
+        toast({ title: "Error", description: "Cannot create invoice, supplier price is missing.", variant: "destructive" });
+        return;
     }
-    if (numFulfilledQuantity > actionableRequest.requestedQuantity) {
-      toast({ title: "Invalid Quantity", description: "Fulfilled quantity cannot exceed requested quantity.", variant: "destructive" });
-      return;
-    }
-
-    setIsSubmittingPreparation(true);
-    // Construct query parameters
-    const queryParams = new URLSearchParams({
-        stockRequestId: actionableRequest.id,
-        productId: actionableRequest.productId,
-        productName: actionableRequest.productName,
-        fulfilledQty: String(numFulfilledQuantity),
-        // Supplier notes from this dialog can be passed to prefill invoice notes
-        supplierNotesDialog: supplierNotes, 
+     const queryParams = new URLSearchParams({
+        stockRequestId: request.id,
+        productId: request.productId,
+        productName: request.productName,
+        fulfilledQty: String(request.requestedQuantity),
+        supplierPrice: String(request.supplierPrice) // Pass the awarded price
     });
-
-    // For now, we just navigate. The actual stock request update will happen after invoice submission.
     router.push(`/supplier/invoices/new?${queryParams.toString()}`);
-    setIsPrepareInvoiceModalOpen(false);
-    setActionableRequest(null);
-    setIsSubmittingPreparation(false); // Reset after navigation
+  }
+
+  const handleSubmitBid = async () => {
+    if (!db || !user || !actionableRequest || pricePerUnit === "") return;
+    
+    const numPrice = Number(pricePerUnit);
+    if (isNaN(numPrice) || numPrice <= 0) {
+      toast({ title: "Invalid Price", description: "Price must be a positive number.", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmittingBid(true);
+    try {
+      const requestRef = doc(db, 'stockRequests', actionableRequest.id);
+      const newBid: Bid = {
+        id: doc(collection(db, 'bids')).id, // Generate a unique ID for the bid
+        supplierId: user.uid,
+        supplierName: user.displayName || user.email || "Unnamed Supplier",
+        pricePerUnit: numPrice,
+        notes: bidNotes,
+        createdAt: serverTimestamp(),
+      };
+
+      await updateDoc(requestRef, {
+        bids: arrayUnion(newBid),
+        status: 'pending_award', // Change status to indicate bids are present
+        updatedAt: serverTimestamp(),
+      });
+      
+      toast({ title: "Bid Submitted", description: `Your bid for ${actionableRequest.productName} has been submitted.` });
+      setIsBidModalOpen(false);
+      setActionableRequest(null);
+    } catch (e: any) {
+      console.error("Error submitting bid:", e);
+      toast({ title: "Error", description: "Could not submit your bid.", variant: "destructive" });
+    } finally {
+      setIsSubmittingBid(false);
+    }
   };
+
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'N/A';
     return timestamp.toDate ? format(timestamp.toDate(), 'PPp') : 'Invalid Date';
   };
+  
+  const userHasBid = (request: StockRequest) => {
+    return request.bids?.some(bid => bid.supplierId === user?.uid);
+  }
 
   if (authLoading || (!user && !authLoading)) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -133,36 +167,41 @@ export default function SupplierStockRequestsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-headline font-semibold flex items-center gap-2"><FilePlus2 className="h-7 w-7 text-primary"/>Stock Fulfillment & Invoicing</h1>
+        <h1 className="text-3xl font-headline font-semibold flex items-center gap-2"><FileQuestion className="h-7 w-7 text-primary"/>Stock Fulfillment</h1>
         <Button onClick={fetchRequests} variant="outline" size="sm" disabled={isLoading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
       </div>
-      <p className="text-muted-foreground">View requests, confirm fulfillment details, and generate invoices.</p>
+      <p className="text-muted-foreground">View open requests for bids and manage your awarded contracts.</p>
 
       <Card>
         <CardHeader>
+          <CardTitle>Open for Bidding</CardTitle>
+          <CardDescription>Place your bid on these open stock requests.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          {isLoading && requests.length === 0 ? (
+          {isLoading ? (
             <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
-          ) : requests.length === 0 ? (
-            <p className="p-6 text-center text-muted-foreground">No stock requests currently require your fulfillment.</p>
+          ) : requests.filter(r => r.status === 'pending_bids').length === 0 ? (
+            <p className="p-6 text-center text-muted-foreground">No stock requests are currently open for bidding.</p>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Qty Req.</TableHead><TableHead>Requester</TableHead><TableHead>Date Req.</TableHead><TableHead>Finance Notes</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Qty Req.</TableHead><TableHead>Requester</TableHead><TableHead>Date Req.</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
-                {requests.map((req) => (
+                {requests.filter(r => r.status === 'pending_bids').map((req) => (
                   <TableRow key={req.id}>
                     <TableCell className="font-medium">{req.productName}</TableCell>
                     <TableCell>{req.requestedQuantity}</TableCell>
                     <TableCell className="text-xs">{req.requesterName}</TableCell>
                     <TableCell className="text-xs">{formatDate(req.createdAt)}</TableCell>
-                    <TableCell className="text-xs max-w-xs truncate">{req.financeNotes || '-'}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="default" size="sm" onClick={() => handleOpenPrepareInvoiceModal(req)} title="Prepare & Invoice">
-                        <FilePlus2 className="mr-1 h-3 w-3" /> Prepare & Invoice
-                      </Button>
+                      {userHasBid(req) ? (
+                         <Badge variant="statusGreen"><Check className="mr-1 h-3 w-3"/> Bid Submitted</Badge>
+                      ) : (
+                        <Button variant="default" size="sm" onClick={() => handleOpenBidModal(req)} title="Place Bid">
+                            <Gavel className="mr-1 h-3 w-3" /> Place Bid
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -170,37 +209,68 @@ export default function SupplierStockRequestsPage() {
             </Table>
           )}
         </CardContent>
-        {requests.length > 0 && 
-          <CardFooter className="pt-4"><p className="text-xs text-muted-foreground">Showing {requests.length} requests pending fulfillment.</p></CardFooter>}
+      </Card>
+      
+       <Card>
+        <CardHeader>
+          <CardTitle>Awaiting My Fulfillment</CardTitle>
+          <CardDescription>These requests have been awarded to you. Fulfill the order and create an invoice.</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
+          ) : requests.filter(r => r.status === 'awaiting_fulfillment').length === 0 ? (
+            <p className="p-6 text-center text-muted-foreground">No requests have been awarded to you yet.</p>
+          ) : (
+            <Table>
+              <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Qty</TableHead><TableHead>Awarded Price/Unit</TableHead><TableHead>Awarded On</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {requests.filter(r => r.status === 'awaiting_fulfillment').map((req) => (
+                  <TableRow key={req.id}>
+                    <TableCell className="font-medium">{req.productName}</TableCell>
+                    <TableCell>{req.requestedQuantity}</TableCell>
+                    <TableCell className="font-semibold text-primary">{formatKsh(req.supplierPrice)}</TableCell>
+                    <TableCell className="text-xs">{formatDate(req.financeActionTimestamp)}</TableCell>
+                    <TableCell className="text-right">
+                       <Button variant="default" size="sm" onClick={() => handleFulfillAndInvoice(req)} title="Fulfill and Create Invoice">
+                            <FilePlus2 className="mr-1 h-3 w-3" /> Fulfill & Invoice
+                        </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
       </Card>
 
-      <Dialog open={isPrepareInvoiceModalOpen} onOpenChange={setIsPrepareInvoiceModalOpen}>
+      <Dialog open={isBidModalOpen} onOpenChange={setIsBidModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Prepare Invoice for {actionableRequest?.productName}</DialogTitle>
+            <DialogTitle>Submit Bid for {actionableRequest?.productName}</DialogTitle>
             <DialogDescription>
-              Confirm quantity to fulfill. Requested: {actionableRequest?.requestedQuantity}.
+              Requested Qty: {actionableRequest?.requestedQuantity}. Your bid will be reviewed by management.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-                <Label htmlFor="fulfilledQuantityModal">Quantity You Will Fulfill (Max: {actionableRequest?.requestedQuantity})</Label>
+                <Label htmlFor="pricePerUnit">Your Price Per Unit (KES)</Label>
                 <Input 
-                    id="fulfilledQuantityModal" 
+                    id="pricePerUnit" 
                     type="number"
-                    value={fulfilledQuantity}
-                    onChange={(e) => setFulfilledQuantity(e.target.value === '' ? '' : Math.max(0, Math.min(Number(e.target.value), actionableRequest?.requestedQuantity || 0)))}
-                    max={actionableRequest?.requestedQuantity}
-                    min="1"
+                    value={pricePerUnit}
+                    onChange={(e) => setPricePerUnit(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+                    min="0"
+                    placeholder="e.g., 500.00"
                 />
             </div>
             <div>
-                <Label htmlFor="supplierNotesModal">Notes for Zellow (Optional)</Label>
+                <Label htmlFor="bidNotes">Notes (Optional)</Label>
                 <Textarea 
-                    id="supplierNotesModal" 
-                    value={supplierNotes} 
-                    onChange={(e) => setSupplierNotes(e.target.value)}
-                    placeholder="e.g., Partial fulfillment, expected restock..."
+                    id="bidNotes" 
+                    value={bidNotes} 
+                    onChange={(e) => setBidNotes(e.target.value)}
+                    placeholder="e.g., Delivery timeline, bulk discounts..."
                 />
             </div>
           </div>
@@ -208,11 +278,11 @@ export default function SupplierStockRequestsPage() {
             <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
             <Button 
               type="button" 
-              onClick={handleConfirmPreparationAndNavigateToInvoice} 
-              disabled={isSubmittingPreparation || fulfilledQuantity === "" || Number(fulfilledQuantity) <= 0}
+              onClick={handleSubmitBid} 
+              disabled={isSubmittingBid || pricePerUnit === "" || Number(pricePerUnit) <= 0}
             >
-              {isSubmittingPreparation && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-              Proceed to Create Invoice
+              {isSubmittingBid && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+              Submit Bid
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -10,9 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import type { Product, StockRequest, StockRequestStatus } from "@/types";
-import { PlusCircle, Search, Edit, AlertTriangle, PackageCheck, PackageX, RefreshCw, Boxes, ShoppingBasket, ClipboardList, ImageOff } from "lucide-react";
+import { PlusCircle, Search, Edit, AlertTriangle, RefreshCw, Boxes, ClipboardList, ImageOff, Gavel } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback, useMemo } from "react"; // Added useMemo
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { collection, getDocs, query, orderBy, where, doc, addDoc, serverTimestamp, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -32,26 +32,24 @@ const requestStockFormSchema = z.object({
 });
 type RequestStockFormValues = z.infer<typeof requestStockFormSchema>;
 
-const LOW_STOCK_THRESHOLD = 10; // Define low stock threshold
+const LOW_STOCK_THRESHOLD = 10;
 
 const getStockLevelColor = (stock: number): string => {
-  if (stock === 0) return 'bg-destructive'; // Red
-  if (stock < LOW_STOCK_THRESHOLD) return 'bg-orange-500'; // Orange
-  return 'bg-green-500'; // Green
+  if (stock === 0) return 'bg-destructive';
+  if (stock < LOW_STOCK_THRESHOLD) return 'bg-orange-500';
+  return 'bg-green-500';
 };
-
 
 const getStockRequestStatusVariant = (status: StockRequestStatus): BadgeProps['variant'] => {
   switch (status) {
-    case 'pending_finance_approval': return 'statusYellow';
-    case 'pending_supplier_fulfillment': return 'statusAmber';
-    case 'awaiting_receipt': return 'statusBlue';
+    case 'pending_bids': return 'statusYellow';
+    case 'pending_award': return 'statusAmber';
+    case 'awarded': return 'statusIndigo';
+    case 'awaiting_fulfillment': return 'statusLightBlue';
     case 'received': return 'statusGreen';
     case 'fulfilled': return 'statusGreen';
-    case 'rejected_finance':
-    case 'rejected_supplier':
-    case 'cancelled': 
-      return 'statusRed';
+    case 'rejected_finance': return 'statusRed';
+    case 'cancelled': return 'statusRed';
     default: return 'outline';
   }
 };
@@ -81,7 +79,6 @@ export default function InventoryPage() {
     if (!db) return;
     setIsLoadingProducts(true);
     try {
-      // Default sort by name for initial fetch, will be re-sorted in useMemo
       const q = query(collection(db, 'products'), orderBy("name", "asc"));
       const snapshot = await getDocs(q);
       setProducts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
@@ -135,31 +132,20 @@ export default function InventoryPage() {
       item.categories?.some(cat => cat.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
-    if (role === 'InventoryManager' || role === 'Admin') {
-      searchFiltered.sort((a, b) => {
-        // Prioritize out of stock
-        if (a.stock === 0 && b.stock !== 0) return -1;
-        if (a.stock !== 0 && b.stock === 0) return 1;
-
-        // Then prioritize low stock
-        const aIsLowStock = a.stock > 0 && a.stock < LOW_STOCK_THRESHOLD;
-        const bIsLowStock = b.stock > 0 && b.stock < LOW_STOCK_THRESHOLD;
-        if (aIsLowStock && !bIsLowStock) return -1;
-        if (!aIsLowStock && bIsLowStock) return 1;
-        
-        // If both are low stock, sort by stock level then name
-        if (aIsLowStock && bIsLowStock) {
-          if (a.stock !== b.stock) {
-            return a.stock - b.stock;
-          }
-        }
-        
-        // Finally, sort by name alphabetically for items in the same stock category
-        return a.name.localeCompare(b.name);
-      });
-    }
+    searchFiltered.sort((a, b) => {
+      if (a.stock === 0 && b.stock !== 0) return -1;
+      if (a.stock !== 0 && b.stock === 0) return 1;
+      const aIsLowStock = a.stock > 0 && a.stock < LOW_STOCK_THRESHOLD;
+      const bIsLowStock = b.stock > 0 && b.stock < LOW_STOCK_THRESHOLD;
+      if (aIsLowStock && !bIsLowStock) return -1;
+      if (!aIsLowStock && bIsLowStock) return 1;
+      if (aIsLowStock && bIsLowStock) {
+        if (a.stock !== b.stock) return a.stock - b.stock;
+      }
+      return a.name.localeCompare(b.name);
+    });
     return searchFiltered;
-  }, [products, searchTerm, role]);
+  }, [products, searchTerm]);
 
   const handleOpenRequestDialog = (product: Product) => {
     setProductToRequest(product);
@@ -171,22 +157,22 @@ export default function InventoryPage() {
     if (!db || !user || !productToRequest) return;
     setIsSubmittingRequest(true);
     try {
-      const newRequest: Omit<StockRequest, 'id' | 'createdAt' | 'updatedAt'> = {
+      const newRequest: Omit<StockRequest, 'id' | 'createdAt' | 'updatedAt' | 'bids'> = {
         productId: productToRequest.id,
         productName: productToRequest.name,
         requestedQuantity: values.requestedQuantity,
         requesterId: user.uid,
         requesterName: user.displayName || user.email || "Unknown User",
-        supplierId: productToRequest.supplier, 
-        status: 'pending_finance_approval',
+        status: 'pending_bids',
         notes: values.notes || "",
       };
       await addDoc(collection(db, 'stockRequests'), {
         ...newRequest,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+        bids: [], // Initialize with an empty array of bids
       });
-      toast({ title: "Stock Request Submitted", description: `Request for ${productToRequest.name} sent for approval.` });
+      toast({ title: "Stock Request Submitted", description: `Request for ${productToRequest.name} is now open for bidding.` });
       setIsRequestDialogOpen(false);
       setProductToRequest(null);
     } catch (e: any) {
@@ -225,7 +211,7 @@ export default function InventoryPage() {
       </div>
       <p className="text-muted-foreground">
         View product stock levels. 
-        {role === 'InventoryManager' && " Request new stock from suppliers."}
+        {role === 'InventoryManager' && " Initiate requests for bids from suppliers."}
       </p>
 
       <div className="mb-6">
@@ -279,7 +265,7 @@ export default function InventoryPage() {
                   </div>
                   {role === 'InventoryManager' && (
                     <Button variant="outline" size="sm" onClick={() => handleOpenRequestDialog(item)} disabled={isRequestDialogOpen}>
-                      <ShoppingBasket className="mr-1 h-3 w-3"/> Request
+                      <Gavel className="mr-1 h-3 w-3"/> Request Bids
                     </Button>
                   )}
                   {role === 'Admin' && (
@@ -321,8 +307,9 @@ export default function InventoryPage() {
                                 <p><strong>Date:</strong> {formatDate(req.createdAt)}</p>
                                 {req.notes && <p className="truncate" title={req.notes}><strong>Your Notes:</strong> {req.notes}</p>}
                                 {req.financeNotes && <p className="truncate" title={req.financeNotes}><strong>Finance Notes:</strong> {req.financeNotes}</p>}
-                                {req.supplierNotes && <p className="truncate" title={req.supplierNotes}><strong>Supplier Notes:</strong> {req.supplierNotes}</p>}
-                                {req.fulfilledQuantity !== undefined && <p><strong>Qty Fulfilled:</strong> {req.fulfilledQuantity}</p>}
+                                {req.supplierName && <p className="text-green-600 truncate" title={req.supplierName}><strong>Awarded To:</strong> {req.supplierName}</p>}
+                                {req.supplierPrice && <p className="text-green-600"><strong>Price:</strong> {formatKsh(req.supplierPrice)}/unit</p>}
+                                {req.receivedQuantity !== undefined && <p><strong>Qty Received:</strong> {req.receivedQuantity}</p>}
                             </CardContent>
                         </Card>
                     ))}
@@ -333,12 +320,11 @@ export default function InventoryPage() {
         </Card>
       )}
 
-
       <Dialog open={isRequestDialogOpen} onOpenChange={(open) => { if (!open) setProductToRequest(null); setIsRequestDialogOpen(open);}}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request Stock for: {productToRequest?.name}</DialogTitle>
-            <DialogDescription>Specify quantity and any notes for this stock request.</DialogDescription>
+            <DialogTitle>Request Bids for: {productToRequest?.name}</DialogTitle>
+            <DialogDescription>Specify quantity and any notes. This will be visible to all suppliers.</DialogDescription>
           </DialogHeader>
           <form onSubmit={requestForm.handleSubmit(onRequestStockSubmit)} className="space-y-4 py-2">
             <div>
@@ -347,21 +333,18 @@ export default function InventoryPage() {
               {requestForm.formState.errors.requestedQuantity && <p className="text-xs text-destructive mt-1">{requestForm.formState.errors.requestedQuantity.message}</p>}
             </div>
             <div>
-              <Label htmlFor="notes">Notes (Optional)</Label>
-              <Textarea id="notes" {...requestForm.register("notes")} placeholder="e.g., Urgent requirement, specific supplier preference."/>
+              <Label htmlFor="notes">Notes for Suppliers (Optional)</Label>
+              <Textarea id="notes" {...requestForm.register("notes")} placeholder="e.g., Specific material requirements, delivery window preferences."/>
             </div>
             <DialogFooter>
               <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
               <Button type="submit" disabled={isSubmittingRequest}>
-                {isSubmittingRequest && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Submit Request
+                {isSubmittingRequest && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Submit Request for Bids
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }
-
-    

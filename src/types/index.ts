@@ -1,14 +1,4 @@
 
-
-
-
-
-
-
-
-
-
-
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -40,7 +30,7 @@ export interface User {
   disabled?: boolean;
   disabledAt?: any; // Firestore Timestamp
   createdAt?: any; // Firestore Timestamp
-  currentLocation?: { lat: number; lng: number; timestamp: any } | null; // Firestore Timestamp or Date for timestamp
+  currentLocation?: { lat: number; lng: number; timestamp: any } | null;
   currentRouteId?: string | null;
   assignedOrdersCount?: number;
 }
@@ -89,7 +79,8 @@ export interface Product {
   id: string;
   name: string;
   description: string;
-  price: number;
+  price: number; // This is now the SELLING PRICE (product_price)
+  supplierPrice?: number | null; // This is the COST PRICE from the supplier
   published?: boolean;
   imageUrl?: string;
   stock: number;
@@ -136,7 +127,7 @@ export interface ShippingAddress {
 export interface OrderItem {
   productId: string;
   name: string;
-  price: number;
+  price: number; // The price at which the item was sold
   quantity: number;
   imageUrl?: string | null;
   customizations?: Record<string, any> | null;
@@ -209,7 +200,6 @@ export interface CartItem {
   cartItemId: string;
 }
 
-
 export interface Task {
   id: string;
   orderId?: string;
@@ -219,7 +209,7 @@ export interface Task {
   assigneeId?: string;
   assigneeName?: string;
   status: 'pending' | 'in-progress' | 'completed' | 'needs_approval' | 'blocked' | 'rejected';
-  customizations?: Record<string, any> | null; // Added field
+  customizations?: Record<string, any> | null;
   proofOfWorkUrl?: string | null;
   serviceManagerNotes?: string | null;
   relatedDocId?: string;
@@ -280,7 +270,7 @@ export interface CustomizationGroupOptionDefinition {
   priceAdjustmentIfChecked?: number;
   acceptedFileTypes?: string;
   maxFileSizeMB?: number;
-  defaultValue?: string | boolean; // Ensure this exists for completeness
+  defaultValue?: string | boolean;
 }
 
 export interface CustomizationGroupDefinition {
@@ -292,14 +282,22 @@ export interface CustomizationGroupDefinition {
 }
 
 export type StockRequestStatus =
-  | 'pending_finance_approval'
-  | 'pending_supplier_fulfillment'
-  | 'awaiting_receipt'
-  | 'received'
+  | 'pending_bids'
+  | 'pending_award'
+  | 'awarded'
+  | 'awaiting_fulfillment'
   | 'fulfilled'
   | 'rejected_finance'
-  | 'rejected_supplier'
   | 'cancelled';
+
+export interface Bid {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  pricePerUnit: number;
+  notes?: string;
+  createdAt: any;
+}
 
 export interface StockRequest {
   id: string;
@@ -308,13 +306,25 @@ export interface StockRequest {
   requestedQuantity: number;
   requesterId: string;
   requesterName: string;
+  status: StockRequestStatus;
+  notes?: string; // Inventory Manager's initial notes
+  createdAt: any;
+  updatedAt: any;
+  
+  // Bidding and Awarding
+  bids?: Bid[];
+  winningBidId?: string;
+  supplierPrice?: number; // The winning price per unit
   supplierId?: string;
   supplierName?: string;
-  status: StockRequestStatus;
+
+  // Finance
   financeManagerId?: string | null;
   financeManagerName?: string | null;
   financeActionTimestamp?: any;
   financeNotes?: string;
+  
+  // Fulfillment and Receipt
   supplierNotes?: string;
   fulfilledQuantity?: number;
   supplierActionTimestamp?: any;
@@ -324,9 +334,6 @@ export interface StockRequest {
   receivedByName?: string;
   receivedAt?: any;
   invoiceId?: string;
-  createdAt: any;
-  updatedAt: any;
-  notes?: string;
 }
 
 export interface InvoiceItem {
@@ -345,14 +352,14 @@ export type InvoiceStatus =
   | 'paid'
   | 'overdue'
   | 'cancelled'
-  | 'rejected';
+  | 'rejected'
+  | 'reconciled'; // Added status
 
 export interface Invoice {
   id: string;
   invoiceNumber: string;
   supplierId?: string;
   supplierName?: string;
-  clientId?: string;
   clientName: string;
   invoiceDate: any;
   dueDate: any;
@@ -375,7 +382,6 @@ export interface Invoice {
   financeManagerName?: string;
 }
 
-// Feedback System
 export interface FeedbackThread {
   id: string;
   subject: string;
@@ -385,8 +391,8 @@ export interface FeedbackThread {
   targetRole: UserRole | 'Customer Broadcast';
   status: 'open' | 'replied' | 'closed';
   lastMessageSnippet: string;
-  createdAt: any; // Firestore Timestamp
-  updatedAt: any; // Firestore Timestamp
+  createdAt: any;
+  updatedAt: any;
   lastReplierRole?: UserRole;
 }
 
@@ -397,5 +403,5 @@ export interface FeedbackMessage {
   senderName: string;
   senderRole: UserRole;
   message: string;
-  createdAt: any; // Firestore Timestamp
+  createdAt: any;
 }

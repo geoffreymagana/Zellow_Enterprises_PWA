@@ -9,28 +9,35 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle, XCircle, Eye, Filter, RefreshCw, Coins } from 'lucide-react';
-import type { StockRequest, StockRequestStatus } from '@/types';
-import { collection, query, where, orderBy, onSnapshot, Unsubscribe, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { Loader2, CheckCircle, XCircle, Eye, RefreshCw, Coins, Trophy, ArrowRight, FilePlus2, Hourglass } from 'lucide-react';
+import type { StockRequest, StockRequestStatus, Bid } from '@/types';
+import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 
 const getStockRequestStatusVariant = (status?: StockRequestStatus | null): BadgeProps['variant'] => {
   if (!status) return 'outline';
   switch (status) {
-    case 'pending_finance_approval': return 'statusYellow';
-    case 'pending_supplier_fulfillment': return 'statusAmber';
+    case 'pending_bids': return 'statusYellow';
+    case 'pending_award': return 'statusAmber';
+    case 'awarded': return 'statusIndigo';
+    case 'awaiting_fulfillment': return 'statusLightBlue';
     case 'fulfilled': return 'statusGreen';
-    case 'rejected_finance':
-    case 'rejected_supplier':
-    case 'cancelled': 
-      return 'statusRed';
+    case 'rejected_finance': return 'statusRed';
+    case 'cancelled': return 'statusRed';
     default: return 'outline';
   }
 };
+
+const formatKsh = (amount?: number): string => {
+    if (amount === undefined || amount === null) return 'N/A';
+    return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(amount);
+};
+
 
 export default function FinanceApprovalsPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -39,53 +46,26 @@ export default function FinanceApprovalsPage() {
 
   const [requests, setRequests] = useState<StockRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState<StockRequestStatus | "all">("pending_finance_approval");
-
-  const [actionableRequest, setActionableRequest] = useState<StockRequest | null>(null);
-  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
-  const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  
+  const [viewingRequest, setViewingRequest] = useState<StockRequest | null>(null);
+  const [isSubmittingAward, setIsSubmittingAward] = useState(false);
 
   const formatDate = (timestamp: any): string => {
     if (!timestamp) return 'N/A';
-    try {
-      // Check if it's a Firestore Timestamp-like object with a toDate method
-      if (timestamp.toDate && typeof timestamp.toDate === 'function') {
-        return format(timestamp.toDate(), 'PPp');
-      }
-      // Check if it's already a Date object
-      if (timestamp instanceof Date) {
-        const date = new Date(timestamp); // Create new Date instance to be safe
-         if (isNaN(date.getTime())) { 
-          return 'Invalid Date Instance';
-        }
-        return format(date, 'PPp');
-      }
-      // Try to parse it (e.g., if it's a string or number)
-      const date = new Date(timestamp);
-      if (isNaN(date.getTime())) {
-        return 'Invalid Date Input';
-      }
-      return format(date, 'PPp');
-    } catch (error) {
-      // console.error('Error formatting date:', timestamp, error);
-      return 'Date Format Error';
-    }
+    const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    return format(date, 'PPp');
   };
 
   const fetchRequests = useCallback(() => {
-    if (!db || !user || (role !== 'Admin' && role !== 'FinanceManager')) {
+    if (!db || !user || !['Admin', 'FinanceManager', 'InventoryManager'].includes(role || '')) {
       setIsLoading(false);
       return () => {};
     }
     setIsLoading(true);
     let q;
-    if (filterStatus === "all") {
-      q = query(collection(db, 'stockRequests'), orderBy("createdAt", "desc"));
-    } else {
-      q = query(collection(db, 'stockRequests'), where("status", "==", filterStatus), orderBy("createdAt", "desc"));
-    }
+    // Finance and Admin see requests needing bid awards
+    q = query(collection(db, 'stockRequests'), where("status", "in", ["pending_award", "pending_bids"]), orderBy("createdAt", "desc"));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StockRequest)));
@@ -96,11 +76,11 @@ export default function FinanceApprovalsPage() {
       setIsLoading(false);
     });
     return unsubscribe;
-  }, [db, user, role, toast, filterStatus]);
+  }, [db, user, role, toast]);
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user || (role !== 'Admin' && role !== 'FinanceManager')) {
+    if (!user || !['Admin', 'FinanceManager', 'InventoryManager'].includes(role || '')) {
       router.replace('/dashboard');
       return;
     }
@@ -108,134 +88,157 @@ export default function FinanceApprovalsPage() {
     return () => unsubscribe();
   }, [authLoading, user, role, router, fetchRequests]);
 
-  const handleOpenActionModal = (request: StockRequest, type: "approve" | "reject") => {
-    setActionableRequest(request);
-    setActionType(type);
-    setRejectionReason("");
-    setIsActionModalOpen(true);
-  };
-
-  const handleConfirmAction = async () => {
-    if (!db || !user || !actionableRequest || !actionType) return;
-    setIsSubmittingAction(true);
-
-    const newStatus = actionType === "approve" ? 'pending_supplier_fulfillment' : 'rejected_finance';
-    const financeNotes = actionType === "reject" ? rejectionReason : "Approved for procurement.";
+  const handleAwardBid = async (request: StockRequest, winningBid: Bid) => {
+    if (!db || !user) return;
+    setIsSubmittingAward(true);
+    
+    const requestRef = doc(db, 'stockRequests', request.id);
 
     try {
-      const requestRef = doc(db, 'stockRequests', actionableRequest.id);
       await updateDoc(requestRef, {
-        status: newStatus,
+        status: 'awaiting_fulfillment',
+        winningBidId: winningBid.id,
+        supplierPrice: winningBid.pricePerUnit,
+        supplierId: winningBid.supplierId,
+        supplierName: winningBid.supplierName,
         financeManagerId: user.uid,
         financeManagerName: user.displayName || user.email,
         financeActionTimestamp: serverTimestamp(),
-        financeNotes: financeNotes,
         updatedAt: serverTimestamp(),
       });
-      toast({ title: `Request ${actionType === "approve" ? "Approved" : "Rejected"}`, description: `Stock request for ${actionableRequest.productName || 'N/A'} has been ${newStatus.replace(/_/g, ' ')}.` });
-      setIsActionModalOpen(false);
-      setActionableRequest(null);
+      toast({ title: "Bid Awarded", description: `Request awarded to ${winningBid.supplierName}.` });
+      setViewingRequest(null);
     } catch (e: any) {
-      console.error(`Error ${actionType}ing request:`, e);
-      toast({ title: "Error", description: `Could not ${actionType} the request.`, variant: "destructive" });
+      console.error("Error awarding bid:", e);
+      toast({ title: "Error", description: `Could not award bid: ${e.message}`, variant: "destructive" });
     } finally {
-      setIsSubmittingAction(false);
+      setIsSubmittingAward(false);
     }
   };
   
+  const requestsNeedingAward = requests.filter(r => r.status === 'pending_award');
 
   if (authLoading || (!user && !authLoading)) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
-  const pendingFinanceApprovalRequests = requests.filter(r => r.status === 'pending_finance_approval');
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-headline font-semibold flex items-center gap-2"><Coins className="h-7 w-7 text-primary"/>Stock Request Approvals</h1>
+        <h1 className="text-3xl font-headline font-semibold flex items-center gap-2"><Trophy className="h-7 w-7 text-primary"/>Bid & Award Center</h1>
         <Button onClick={fetchRequests} variant="outline" size="sm" disabled={isLoading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
       </div>
-      <p className="text-muted-foreground">Review and process pending stock procurement requests.</p>
+      <p className="text-muted-foreground">Review supplier bids on stock requests and award the contract.</p>
 
       <Card>
         <CardHeader>
-          {/* TODO: Add filter by status if needed */}
+          <CardTitle>Requests Awaiting Bid Award</CardTitle>
+          <CardDescription>These requests have received one or more bids and are ready for you to select a winner.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          {isLoading && pendingFinanceApprovalRequests.length === 0 ? (
+          {isLoading && requestsNeedingAward.length === 0 ? (
             <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
-          ) : pendingFinanceApprovalRequests.length === 0 ? (
-            <p className="p-6 text-center text-muted-foreground">No stock requests awaiting finance approval.</p>
+          ) : requestsNeedingAward.length === 0 ? (
+            <p className="p-6 text-center text-muted-foreground">No stock requests are currently awaiting a bid award.</p>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Qty Req.</TableHead><TableHead>Requester</TableHead><TableHead>Date Req.</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Qty Req.</TableHead><TableHead># Bids</TableHead><TableHead>Best Bid</TableHead><TableHead>Date Req.</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
-                {pendingFinanceApprovalRequests.map((req) => (
-                  <TableRow key={req.id}>
-                    <TableCell className="font-medium">{req.productName || ''}</TableCell>
-                    <TableCell>{req.requestedQuantity}</TableCell>
-                    <TableCell className="text-xs">{req.requesterName || ''}</TableCell>
-                    <TableCell className="text-xs">{formatDate(req.createdAt)}</TableCell>
-                    <TableCell>
-                        <Badge variant={getStockRequestStatusVariant(req.status)} className="capitalize text-xs">
-                            {typeof req.status === 'string' ? req.status.replace(/_/g, ' ') : 'N/A'}
-                        </Badge>
-                    </TableCell>
-                    <TableCell className="text-right space-x-1">
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenActionModal(req, "approve")} title="Approve Request">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenActionModal(req, "reject")} title="Reject Request">
-                        <XCircle className="h-4 w-4 text-red-600" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {requestsNeedingAward.map((req) => {
+                  const bestBid = req.bids?.sort((a,b) => a.pricePerUnit - b.pricePerUnit)[0];
+                  return (
+                    <TableRow key={req.id}>
+                      <TableCell className="font-medium">{req.productName || ''}</TableCell>
+                      <TableCell>{req.requestedQuantity}</TableCell>
+                      <TableCell>{req.bids?.length || 0}</TableCell>
+                      <TableCell>{bestBid ? formatKsh(bestBid.pricePerUnit) : 'N/A'}</TableCell>
+                      <TableCell className="text-xs">{formatDate(req.createdAt)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" onClick={() => setViewingRequest(req)} disabled={!req.bids || req.bids.length === 0}>
+                           <Eye className="mr-2 h-4 w-4"/> Review Bids
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           )}
         </CardContent>
-        {pendingFinanceApprovalRequests.length > 0 && 
-          <CardFooter className="pt-4"><p className="text-xs text-muted-foreground">Showing {pendingFinanceApprovalRequests.length} requests awaiting approval.</p></CardFooter>}
+        {requestsNeedingAward.length > 0 && 
+          <CardFooter className="pt-4"><p className="text-xs text-muted-foreground">Showing {requestsNeedingAward.length} requests awaiting bid award.</p></CardFooter>}
       </Card>
 
-      <Dialog open={isActionModalOpen} onOpenChange={setIsActionModalOpen}>
-        <DialogContent>
+      <Card>
+        <CardHeader>
+            <CardTitle>Open for Bidding</CardTitle>
+            <CardDescription>These requests are live and awaiting bids from suppliers.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
+          ) : requests.filter(r => r.status === 'pending_bids').length === 0 ? (
+             <p className="p-6 text-center text-muted-foreground">No requests are currently open for bidding.</p>
+          ) : (
+            requests.filter(r => r.status === 'pending_bids').map(req => (
+              <div key={req.id} className="text-sm p-2 border-b last:border-b-0 flex justify-between items-center">
+                <span>{req.productName} (Qty: {req.requestedQuantity})</span>
+                <Badge variant="statusYellow" className="text-xs">Awaiting Bids</Badge>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+
+      <Dialog open={!!viewingRequest} onOpenChange={() => setViewingRequest(null)}>
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="capitalize">{actionType} Stock Request for {actionableRequest?.productName || 'N/A'}</DialogTitle>
+            <DialogTitle>Review Bids for: {viewingRequest?.productName}</DialogTitle>
             <DialogDescription>
-              Requested Qty: {actionableRequest?.requestedQuantity || 'N/A'}. Requested by: {actionableRequest?.requesterName || 'N/A'} on {formatDate(actionableRequest?.createdAt)}.
+              Requested Qty: {viewingRequest?.requestedQuantity}. Select the winning bid to proceed.
             </DialogDescription>
           </DialogHeader>
-          {actionType === "reject" && (
-            <div className="py-2 space-y-1">
-              <Label htmlFor="rejectionReason">Reason for Rejection (Required)</Label>
-              <Textarea 
-                id="rejectionReason" 
-                value={rejectionReason} 
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Provide a clear reason..."
-              />
-            </div>
-          )}
+          <div className="py-4 space-y-3 max-h-[60vh] overflow-y-auto">
+            {viewingRequest?.bids && viewingRequest.bids.length > 0 ? (
+                viewingRequest.bids.sort((a,b) => a.pricePerUnit - b.pricePerUnit).map(bid => (
+                    <Card key={bid.id} className="bg-muted/50">
+                        <CardContent className="p-3">
+                            <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+                                <div>
+                                    <p className="font-semibold">{bid.supplierName}</p>
+                                    <p className="text-xs text-muted-foreground">Submitted: {formatDate(bid.createdAt)}</p>
+                                </div>
+                                <div className="text-left sm:text-right">
+                                    <p className="font-bold text-lg text-primary">{formatKsh(bid.pricePerUnit)} <span className="text-sm font-normal text-muted-foreground">/ unit</span></p>
+                                    <p className="text-sm font-medium">Total: {formatKsh(bid.pricePerUnit * (viewingRequest.requestedQuantity || 0))}</p>
+                                </div>
+                            </div>
+                            {bid.notes && <p className="text-xs mt-2 border-t pt-2">Notes: {bid.notes}</p>}
+                            <div className="mt-3 flex justify-end">
+                                <Button 
+                                    size="sm" 
+                                    onClick={() => handleAwardBid(viewingRequest, bid)} 
+                                    disabled={isSubmittingAward}
+                                >
+                                    {isSubmittingAward && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                                    <Trophy className="mr-2 h-4 w-4"/> Award to this Supplier
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))
+            ) : (
+                <p>No bids submitted for this request yet.</p>
+            )}
+          </div>
           <DialogFooter>
-            <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-            <Button 
-              type="button" 
-              onClick={handleConfirmAction} 
-              disabled={isSubmittingAction || (actionType === "reject" && !rejectionReason.trim())}
-              variant={actionType === "reject" ? "destructive" : "default"}
-            >
-              {isSubmittingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-              Confirm {actionType?.charAt(0).toUpperCase() + (actionType || '').slice(1)}
-            </Button>
+            <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
-
