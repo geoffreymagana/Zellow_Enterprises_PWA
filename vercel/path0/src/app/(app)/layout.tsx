@@ -458,7 +458,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   );
 };
 
-function AppGroupLayout({ children }: LayoutProps) {
+function AppLayoutContent({ children }: LayoutProps) {
   const { user, role, loading } = useAuth();
   const pathname = usePathname();
   const router = useRouter(); 
@@ -496,17 +496,17 @@ function AppGroupLayout({ children }: LayoutProps) {
 
   const isAdminPanelRole = role && ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager'].includes(role);
 
-  // Wrap the content that uses useSearchParams in a Suspense boundary
-  const content = <Suspense fallback={<div className="flex-1" />}><NonAdminLayout>{children}</NonAdminLayout></Suspense>;
-
   if (isAdminPanelRole) {
     return <SidebarProvider><AdminLayout>{children}</AdminLayout></SidebarProvider>;
   }
 
-  return content;
+  return <NonAdminLayout>{children}</NonAdminLayout>;
 }
 
-export default AppGroupLayout;
-
-
-    
+export default function AppGroupLayout({ children }: LayoutProps) {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
+      <AppLayoutContent>{children}</AppLayoutContent>
+    </Suspense>
+  );
+}
