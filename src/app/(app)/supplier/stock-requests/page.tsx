@@ -33,12 +33,18 @@ const getStockRequestStatusVariant = (status: StockRequestStatus): BadgeProps['v
   }
 };
 
+const formatKsh = (price?: number): string => {
+    if (price === undefined || price === null) return 'N/A';
+    return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
+};
+
 export default function SupplierStockRequestsPage() {
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
-  const [requests, setRequests] = useState<StockRequest[]>([]);
+  const [openForBiddingRequests, setOpenForBiddingRequests] = useState<StockRequest[]>([]);
+  const [awardedToMeRequests, setAwardedToMeRequests] = useState<StockRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   const [actionableRequest, setActionableRequest] = useState<StockRequest | null>(null);
@@ -53,31 +59,40 @@ export default function SupplierStockRequestsPage() {
       return () => {};
     }
     setIsLoading(true);
-    // Suppliers see requests open for bidding, AND requests they have been awarded
-    const q = query(
+
+    const openForBidsQuery = query(
         collection(db, 'stockRequests'), 
-        where("status", "in", ["pending_bids", "awaiting_fulfillment"]),
+        where("status", "in", ["pending_bids", "pending_award"]),
         orderBy("createdAt", "desc")
     );
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      let fetchedRequests = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StockRequest));
-      // For 'awaiting_fulfillment', filter to only show if it was awarded to the current supplier
-      fetchedRequests = fetchedRequests.filter(req => {
-        if (req.status === 'awaiting_fulfillment') {
-          return req.supplierId === user.uid;
-        }
-        return true; // Keep all 'pending_bids' requests
-      });
 
-      setRequests(fetchedRequests);
-      setIsLoading(false);
+    const awardedToMeQuery = query(
+      collection(db, 'stockRequests'),
+      where('supplierId', '==', user.uid),
+      where('status', '==', 'awaiting_fulfillment'),
+      orderBy('financeActionTimestamp', 'desc')
+    );
+
+    const unsubOpenBids = onSnapshot(openForBidsQuery, (snapshot) => {
+        setOpenForBiddingRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StockRequest)));
+        setIsLoading(false); // Set loading to false after first query completes
     }, (error) => {
-      console.error("Error fetching stock requests for supplier:", error);
-      toast({ title: "Error", description: "Could not load stock requests.", variant: "destructive" });
+      console.error("Error fetching open stock requests:", error);
+      toast({ title: "Error", description: "Could not load open requests.", variant: "destructive" });
       setIsLoading(false);
     });
-    return unsubscribe;
+
+    const unsubAwardedToMe = onSnapshot(awardedToMeQuery, (snapshot) => {
+        setAwardedToMeRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StockRequest)));
+    }, (error) => {
+      console.error("Error fetching awarded stock requests:", error);
+      toast({ title: "Error", description: "Could not load your awarded requests.", variant: "destructive" });
+    });
+
+    return () => {
+        unsubOpenBids();
+        unsubAwardedToMe();
+    };
   }, [db, user, role, toast]);
 
   useEffect(() => {
@@ -104,7 +119,6 @@ export default function SupplierStockRequestsPage() {
     }
      const queryParams = new URLSearchParams({
         stockRequestId: request.id,
-        productId: request.productId,
         productName: request.productName,
         fulfilledQty: String(request.requestedQuantity),
         supplierPrice: String(request.supplierPrice) // Pass the awarded price
@@ -182,13 +196,13 @@ export default function SupplierStockRequestsPage() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
-          ) : requests.filter(r => r.status === 'pending_bids').length === 0 ? (
+          ) : openForBiddingRequests.length === 0 ? (
             <p className="p-6 text-center text-muted-foreground">No stock requests are currently open for bidding.</p>
           ) : (
             <Table>
               <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Qty Req.</TableHead><TableHead>Requester</TableHead><TableHead>Date Req.</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
-                {requests.filter(r => r.status === 'pending_bids').map((req) => (
+                {openForBiddingRequests.map((req) => (
                   <TableRow key={req.id}>
                     <TableCell className="font-medium">{req.productName}</TableCell>
                     <TableCell>{req.requestedQuantity}</TableCell>
@@ -219,13 +233,13 @@ export default function SupplierStockRequestsPage() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
-          ) : requests.filter(r => r.status === 'awaiting_fulfillment').length === 0 ? (
+          ) : awardedToMeRequests.length === 0 ? (
             <p className="p-6 text-center text-muted-foreground">No requests have been awarded to you yet.</p>
           ) : (
             <Table>
               <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Qty</TableHead><TableHead>Awarded Price/Unit</TableHead><TableHead>Awarded On</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
-                {requests.filter(r => r.status === 'awaiting_fulfillment').map((req) => (
+                {awardedToMeRequests.map((req) => (
                   <TableRow key={req.id}>
                     <TableCell className="font-medium">{req.productName}</TableCell>
                     <TableCell>{req.requestedQuantity}</TableCell>
