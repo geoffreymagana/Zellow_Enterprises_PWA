@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useEffect, useState, useCallback } from 'react';
 import { collection, getDocs, query, where, onSnapshot, Unsubscribe, Timestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { User as AppUser, Order, OrderStatus, Product, StockRequest, Invoice, InvoiceStatus, Task } from '@/types';
+import type { User as AppUser, Order, OrderStatus, Product, StockRequest, Invoice, InvoiceStatus, Task, UserRole } from '@/types';
 import { useRouter } from 'next/navigation'; 
 import { CustomizationOrdersList } from '@/components/dashboard/CustomizationOrdersList';
 import { BulkOrdersList } from '@/components/dashboard/BulkOrdersList';
@@ -40,6 +40,8 @@ const DashboardItem = ({ title, value, icon: Icon, link, description, isLoadingV
     </CardContent>
   </Card>
 );
+
+const technicianRoles: UserRole[] = ['Engraving', 'Printing', 'Assembly', 'Quality Check', 'Packaging'];
 
 
 export default function DashboardPage() {
@@ -373,7 +375,7 @@ export default function DashboardPage() {
         setIsLoadingSupplierNewStockRequests(false); setIsLoadingSupplierFulfilled(false); setIsLoadingSupplierPendingInvoices(false);
       }
 
-      if (role === 'Technician') {
+      if (technicianRoles.includes(role as UserRole)) {
         setIsLoadingTechnicianActiveTasks(true); setIsLoadingTechnicianCompletedToday(true);
         const qTechActive = query(tasksCol, where('assigneeId', '==', user.uid), where('status', 'in', ['pending', 'in-progress']));
         const unsubTechActive = onSnapshot(qTechActive, (snapshot) => {
@@ -419,7 +421,7 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubSmNeedingAction);
 
-        const qSmTechnicians = query(usersCol, where('role', '==', 'Technician'), where('disabled', '!=', true));
+        const qSmTechnicians = query(usersCol, where('role', 'in', technicianRoles), where('disabled', '!=', true));
         const unsubSmTechnicians = onSnapshot(qSmTechnicians, (snapshot) => {
           setSmActiveTechnicians(snapshot.size); setIsLoadingSmActiveTechnicians(false);
         }, (error) => {
@@ -429,7 +431,7 @@ export default function DashboardPage() {
         
         // Fetch technician colleagues list for Service Manager
         setIsLoadingTechnicianColleagues(true);
-        const qTechs = query(usersCol, where('role', '==', 'Technician'), where('disabled', '!=', true), orderBy('displayName'));
+        const qTechs = query(usersCol, where('role', 'in', technicianRoles), where('disabled', '!=', true), orderBy('displayName'));
         const unsubTechs = onSnapshot(qTechs, (snapshot) => {
             const colleagues: AppUser[] = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
             setTechnicianColleagues(colleagues);
@@ -456,7 +458,12 @@ export default function DashboardPage() {
   const getRoleSpecificGreeting = () => {
     switch (role) {
       case 'Admin': return "Admin Control Panel";
-      case 'Technician': return "Technician Dashboard";
+      case 'Engraving':
+      case 'Printing':
+      case 'Assembly':
+      case 'Quality Check':
+      case 'Packaging':
+        return "Technician Dashboard";
       case 'Rider': return "Rider Dashboard";
       case 'Supplier': return "Supplier Portal";
       case 'FinanceManager': return "Finance Overview";
@@ -532,7 +539,11 @@ export default function DashboardPage() {
             <DashboardItem title="All Stock Requests" icon={ListChecks} link="/supplier/stock-requests" description="View all requests assigned to you." />
           </>
         );
-      case 'Technician':
+      case 'Engraving':
+      case 'Printing':
+      case 'Assembly':
+      case 'Quality Check':
+      case 'Packaging':
         return (
           <>
             <DashboardItem title="My Active Tasks" value={technicianActiveTasks} icon={Wrench} link="/tasks" isLoadingValue={isLoadingTechnicianActiveTasks} description="Tasks pending or in-progress."/>
@@ -588,7 +599,7 @@ export default function DashboardPage() {
         Hello, {user.displayName || user.email}! Your role is: <span className="font-semibold text-primary">{role || 'Not Assigned'}</span>.
       </p>
       
-      {role !== 'Admin' && role !== 'DispatchManager' && role !== 'FinanceManager' && role !== 'InventoryManager' && role !== 'Supplier' && role !== 'ServiceManager' && role !== 'Technician' && (
+      {role !== 'Admin' && role !== 'Supplier' && role !== 'ServiceManager' && !technicianRoles.includes(role || null) && ( 
         <Alert>
           <BarChart2 className="h-4 w-4 mr-2" />
           <AlertTitle>Data Overview</AlertTitle>
@@ -660,7 +671,7 @@ export default function DashboardPage() {
           </AlertDescription>
         </Alert>
       )}
-       {role === 'Technician' && (
+       {technicianRoles.includes(role || null) && (
         <Alert variant="default" className="border-sky-500/50 bg-sky-500/5 text-sky-700 dark:text-sky-300">
           <Wrench className="h-4 w-4 mr-2 text-sky-500" />
           <AlertTitle className="text-sky-600 dark:text-sky-400">Technician Dashboard</AlertTitle>
@@ -689,7 +700,7 @@ export default function DashboardPage() {
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            {(role === 'Technician') && <Link href="/tasks"><Button>View Tasks</Button></Link>}
+            {technicianRoles.includes(role || null) && <Link href="/tasks"><Button>View Tasks</Button></Link>}
             {(role === 'Rider') && <Link href="/deliveries"><Button>Manage Deliveries</Button></Link>}
              {role === 'DispatchManager' && <Link href="/admin/dispatch"><Button><Component className="mr-2 h-4 w-4" />Open Dispatch Center</Button></Link>}
              {role === 'FinanceManager' && (<>
@@ -713,4 +724,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

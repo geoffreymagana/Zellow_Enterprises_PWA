@@ -6,7 +6,7 @@ import { Badge, BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
-import type { Task, Order, OrderItem as OrderItemType, Product, ProductCustomizationOption, CustomizationGroupDefinition, User as AppUser } from "@/types";
+import type { Task, Order, OrderItem as OrderItemType, Product, ProductCustomizationOption, CustomizationGroupDefinition, User as AppUser, UserRole } from "@/types";
 import { Filter, Loader2, Wrench, CheckCircle, AlertTriangle, Eye, Image as ImageIconPlaceholder, Palette, UserCog, Upload, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
@@ -47,6 +47,8 @@ interface ResolvedOptionDetails {
   colorHex?: string;
 }
 
+const technicianRoles: UserRole[] = ['Engraving', 'Printing', 'Assembly', 'Quality Check', 'Packaging'];
+
 export default function TasksPage() {
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -79,7 +81,7 @@ export default function TasksPage() {
     }
     setIsLoadingTechnicians(true);
     try {
-      const techQuery = query(collection(db, 'users'), where("role", "==", "Technician"), where("disabled", "!=", true));
+      const techQuery = query(collection(db, 'users'), where("role", "in", technicianRoles), where("disabled", "!=", true));
       const techSnapshot = await getDocs(techQuery);
       const fetchedTechs: AppUser[] = [];
       techSnapshot.forEach(docUser => fetchedTechs.push({ uid: docUser.id, ...docUser.data() } as AppUser));
@@ -100,7 +102,7 @@ export default function TasksPage() {
 
 
   const fetchTasks = useCallback(() => {
-    if (!user || !db || (role !== 'Technician' && role !== 'ServiceManager' && role !== 'Admin')) {
+    if (!user || !db || (role && !technicianRoles.includes(role) && role !== 'ServiceManager' && role !== 'Admin')) {
       setIsLoading(false);
       return () => {}; 
     }
@@ -116,7 +118,7 @@ export default function TasksPage() {
     else if (filter === 'completed') statusFilters = ['completed', 'rejected'];
     else statusFilters = ['pending', 'in-progress', 'completed', 'needs_approval', 'blocked', 'rejected']; // 'all'
 
-    if (role === 'Technician') {
+    if (role && technicianRoles.includes(role)) {
       q = query(
         collection(db, 'tasks'), 
         where('assigneeId', '==', user.uid),
@@ -137,14 +139,13 @@ export default function TasksPage() {
     }, (error) => {
       console.error("Error fetching tasks: ", error);
       toast({ title: "Error", description: "Could not fetch tasks.", variant: "destructive" });
-      setIsLoading(false);
     });
     return unsubscribe;
   }, [user, db, role, toast, filter]);
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user || (role !== 'Technician' && role !== 'ServiceManager' && role !== 'Admin')) {
+    if (!user || (role && !technicianRoles.includes(role) && role !== 'ServiceManager' && role !== 'Admin')) {
       router.replace('/dashboard');
       return;
     }
@@ -346,7 +347,7 @@ export default function TasksPage() {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   
-  if (role !== 'Technician' && role !== 'ServiceManager' && role !== 'Admin') {
+  if (role && !technicianRoles.includes(role) && role !== 'ServiceManager' && role !== 'Admin') {
      return <div className="text-center py-10">Access denied.</div>;
   }
 
@@ -355,7 +356,7 @@ export default function TasksPage() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <h1 className="text-3xl font-headline font-semibold">
-            {role === 'Technician' ? "My Tasks" : (role === 'ServiceManager' ? "Manage Production Tasks" : "All Production Tasks (Admin)")}
+            {role && technicianRoles.includes(role) ? "My Tasks" : (role === 'ServiceManager' ? "Manage Production Tasks" : "All Production Tasks (Admin)")}
           </h1>
            <div className="flex gap-2">
               <Select value={filter} onValueChange={(value) => setFilter(value as any)}>
@@ -422,7 +423,7 @@ export default function TasksPage() {
                       <Button size="sm" onClick={handleAssigneeChange} disabled={isLoadingTechnicians || isUpdatingAssignee || !selectedAssigneeId || selectedAssigneeId === selectedTask?.assigneeId} className="h-9">{isUpdatingAssignee && <Loader2 className="mr-1 h-4 w-4 animate-spin"/>} Update</Button>
                   </div>)}
               </div>)}
-              {role === 'Technician' && selectedTask?.assigneeName && <div><p className="text-sm font-medium">Assigned To:</p><p className="text-sm text-muted-foreground">{selectedTask.assigneeName}</p></div>}
+              {role && technicianRoles.includes(role) && selectedTask?.assigneeName && <div><p className="text-sm font-medium">Assigned To:</p><p className="text-sm text-muted-foreground">{selectedTask.assigneeName}</p></div>}
               {selectedTask?.proofOfWorkUrl && (<div className="pt-3"><h4 className="text-md font-semibold mb-2 border-t pt-3">Proof of Work:</h4><div className="relative w-full aspect-video bg-muted rounded-md overflow-hidden"><Image src={selectedTask.proofOfWorkUrl} alt="Proof of work" layout="fill" objectFit="contain" /></div></div>)}
               {selectedTask?.serviceManagerNotes && (<div className="pt-3"><h4 className="text-md font-semibold mb-1 border-t pt-3 text-destructive">Rejection Reason:</h4><p className="text-sm text-muted-foreground whitespace-pre-line">{selectedTask.serviceManagerNotes}</p></div>)}
               {modalOrderItem && modalOrderItem.customizations && Object.keys(modalOrderItem.customizations).length > 0 && (<div className="pt-3"><h4 className="text-md font-semibold mb-2 border-t pt-3">Customization Details:</h4><div className="space-y-1.5 text-sm">{Object.entries(modalOrderItem.customizations).map(([optionId, selectedValue]) => { const details = getDisplayableCustomizationValue(optionId, selectedValue, modalCustomizationOptions); return (<div key={optionId} className="flex flex-col sm:flex-row sm:items-start sm:gap-2 border-b pb-1.5 last:border-b-0">
@@ -432,13 +433,14 @@ export default function TasksPage() {
           <DialogFooter className="pt-4 border-t flex-col sm:flex-row sm:justify-between gap-2">
             <DialogClose asChild><Button type="button" variant="outline" size="sm">Close</Button></DialogClose>
              <div className="flex flex-wrap gap-2 justify-end">
-                {selectedTask && role === 'Technician' && selectedTask.status === 'pending' && (<Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'in-progress')}><Wrench className="mr-2 h-4 w-4" /> Start Task</Button>)}
-                {selectedTask && role === 'Technician' && selectedTask.status === 'in-progress' && (<div className="w-full space-y-2">
+                {selectedTask && role && technicianRoles.includes(role) && selectedTask.status === 'pending' && (<Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'in-progress')}><Wrench className="mr-2 h-4 w-4" /> Start Task</Button>)}
+                {selectedTask && role && technicianRoles.includes(role) && selectedTask.status === 'in-progress' && (<div className="w-full space-y-2">
                     <Separator/>
                     <Label htmlFor="proofUpload">Upload Proof & Submit for Approval</Label>
                     <Input id="proofUpload" type="file" onChange={handleProofUpload} disabled={uploadState.uploading}/>
                     {uploadState.error && <p className="text-xs text-destructive">{uploadState.error}</p>}
-                    <Button size="sm" onClick={handleSubmitForApproval} disabled={!uploadState.url || uploadState.uploading} className="w-full">{uploadState.uploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Uploading...</> : <><CheckCircle className="mr-2 h-4 w-4"/> Submit for Approval</>}</Button>
+                    <Button size="sm" onClick={handleSubmitForApproval} disabled={!uploadState.url || uploadState.uploading} className="w-full">{uploadState.uploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Uploading...</> : <><CheckCircle className="mr-2 h-4 w-4"/> Submit for Approval</>}
+                    </Button>
                 </div>)}
                 {selectedTask && role === 'ServiceManager' && selectedTask.status === 'needs_approval' && (<>
                     <Button size="sm" variant="destructive" onClick={() => setIsRejectionModalOpen(true)}><XCircle className="mr-2 h-4 w-4"/> Reject</Button>

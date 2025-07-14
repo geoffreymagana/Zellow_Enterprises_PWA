@@ -17,14 +17,15 @@ interface NavItem {
   showCartCount?: boolean;
 }
 
-const allAppRoles: UserRole[] = ['Customer', 'Technician', 'Rider', 'Supplier', 'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'];
+const technicianRoles: UserRole[] = ['Engraving', 'Printing', 'Assembly', 'Quality Check', 'Packaging'];
+const allAppRoles: UserRole[] = ['Customer', ...technicianRoles, 'Rider', 'Supplier', 'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'];
 
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Home', icon: Home, roles: [...allAppRoles, 'Admin', null] }, 
   { href: '/gift-boxes', label: 'Gift Boxes', icon: Gift, roles: ['Customer'] },
   { href: '/orders', label: 'My Orders', icon: ShoppingCart, roles: ['Customer'] },
   { href: '/orders/cart', label: 'Cart', icon: ShoppingCart, roles: ['Customer'], showCartCount: true },
-  { href: '/tasks', label: 'Tasks', icon: ListChecks, roles: ['Technician', 'ServiceManager'] },
+  { href: '/tasks', label: 'Tasks', icon: ListChecks, roles: [...technicianRoles, 'ServiceManager'] },
   { href: '/deliveries', label: 'My Deliveries', icon: Truck, roles: ['Rider'] },
   { href: '/admin/dispatch', label: 'Dispatch', icon: SlidersHorizontal, roles: ['DispatchManager', 'Admin'] },
   { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['Supplier', 'FinanceManager'] },
