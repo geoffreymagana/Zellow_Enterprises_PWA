@@ -54,7 +54,7 @@ export function PushSubscriptionManager() {
         };
 
         checkSubscriptionInDb();
-    }, [user, db]);
+    }, [user]);
 
     const handleToggleSubscription = async () => {
         if (isChanging || !user) return;
@@ -132,12 +132,12 @@ export function PushSubscriptionManager() {
         return <div className="flex items-center text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Checking notification status...</div>;
     }
 
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    if (typeof window !== 'undefined' && (!('serviceWorker' in navigator) || !('PushManager' in window))) {
         return <p className="text-sm text-muted-foreground">Push notifications are not supported by this browser.</p>;
     }
     
-    if (Notification.permission === 'denied') {
-        return <p className="text-sm text-destructive">You have blocked notifications. Please enable them in your browser settings to subscribe.</p>
+    if (typeof window !== 'undefined' && Notification.permission === 'denied') {
+        return <p className="text-sm text-destructive">You have blocked notifications. Please enable them in your browser settings to subscribe.</p>;
     }
 
     return (
