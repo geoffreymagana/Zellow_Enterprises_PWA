@@ -1,16 +1,16 @@
 // src/app/api/push/unsubscribe/route.ts
 import { NextResponse } from 'next/server';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, doc, deleteDoc } from 'firebase-admin/firestore';
 import { initializeApp, getApps } from 'firebase-admin/app';
-import { serviceAccount } from '@/lib/firebase-admin-config';
+import { getServiceAccount } from '@/lib/firebase-admin-config';
 
 if (!getApps().length) {
   initializeApp({
     credential: {
-      projectId: serviceAccount.project_id,
-      clientEmail: serviceAccount.client_email,
-      privateKey: serviceAccount.private_key.replace(/\\n/g, '\n'),
+      projectId: getServiceAccount().project_id,
+      clientEmail: getServiceAccount().client_email,
+      privateKey: getServiceAccount().private_key,
     },
   });
 }
