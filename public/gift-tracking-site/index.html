@@ -3,50 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Track Your Gift</title>
-    <link rel="stylesheet" href="style.css">
-    <!-- The core Firebase JS SDK is always required and must be listed first -->
+    <title>Track Your Gift - Zellow Enterprises</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Firebase Libraries -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <!-- Add SDKs for Firebase products that you want to use -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
-            <div class="logo">Zellow Enterprises</div>
+            <div class="logo">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-icon"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+                <h1>Zellow Enterprises</h1>
+            </div>
         </header>
-        <main id="app-root">
-            <div class="loader-container" id="loader">
-                <div class="loader"></div>
+
+        <main id="main-content">
+            <div id="loader" class="loader">
+                <div class="spinner"></div>
                 <p>Loading your gift details...</p>
             </div>
-            <div id="content" class="hidden">
-                <!-- Content will be injected by script.js -->
+
+            <div id="error-view" class="view hidden">
+                <h2><span class="icon">⚠️</span> Tracking Error</h2>
+                <p id="error-message">Could not find tracking details for this gift. Please check the link or contact the sender.</p>
             </div>
-             <div id="error-container" class="hidden">
-                <h2>Oops!</h2>
-                <p id="error-message">Could not find tracking details for this gift.</p>
+
+            <div id="tracking-view" class="view hidden">
+                <div class="recipient-greeting">
+                    <h2>A Special Gift For <span id="recipient-name">You</span>!</h2>
+                    <p>From: <span id="sender-name">A friend</span></p>
+                </div>
+
+                <div id="gift-message-card" class="message-card hidden">
+                    <p id="gift-message-text"></p>
+                </div>
+
+                <div class="status-card">
+                    <h3>Current Status:</h3>
+                    <p id="current-status" class="status-text">Processing</p>
+                    <p id="status-timestamp" class="timestamp"></p>
+                    <div class="progress-bar-container">
+                        <div id="progress-bar" class="progress-bar"></div>
+                    </div>
+                </div>
+
+                <div class="history-card">
+                    <h3>Tracking History</h3>
+                    <ul id="tracking-history">
+                        <!-- History items will be injected here -->
+                    </ul>
+                </div>
             </div>
+
+            <div id="delivered-view" class="view hidden">
+                 <div class="delivered-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                </div>
+                <h2>Your Gift Has Been Delivered!</h2>
+                <p>We hope you enjoy your special gift. Thank you for being a part of the Zellow family!</p>
+            </div>
+
         </main>
         <footer>
-            <p>&copy; 2024 Zellow Enterprises. All Rights Reserved.</p>
+            <p>&copy; <span id="current-year"></span> Zellow Enterprises. All rights reserved.</p>
         </footer>
     </div>
+    
     <script>
-        // IMPORTANT: Replace with your actual Firebase project configuration
-        // This should be done via a build script or environment variable injection
-        // DO NOT commit your actual keys to a public repository.
+        // Your web app's Firebase configuration
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
         const firebaseConfig = {
           apiKey: "YOUR_API_KEY",
           authDomain: "YOUR_AUTH_DOMAIN",
-          databaseURL: "YOUR_DATABASE_URL",
           projectId: "YOUR_PROJECT_ID",
           storageBucket: "YOUR_STORAGE_BUCKET",
           messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-          appId: "YOUR_APP_ID"
+          appId: "YOUR_APP_ID",
+          measurementId: "YOUR_MEASUREMENT_ID"
         };
+
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
     </script>
     <script src="script.js"></script>
 </body>
