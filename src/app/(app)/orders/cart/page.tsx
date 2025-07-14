@@ -188,7 +188,15 @@ export default function CartPage() {
                                         {details.isColor && details.colorHex && (
                                           <span style={{ backgroundColor: details.colorHex }} className="inline-block w-3 h-3 rounded-sm border border-muted-foreground mr-1"></span>
                                         )}
-                                        {optionId.toLowerCase().includes('image') && typeof selectedValue === 'string' && selectedValue.includes('res.cloudinary.com') ? (
+                                        {optionId.toLowerCase().includes('image') && typeof selectedValue === 'string' && (() => {
+                                            try {
+                                                const url = new URL(selectedValue);
+                                                const host = url.host;
+                                                return host === 'res.cloudinary.com' || host.endsWith('.res.cloudinary.com');
+                                            } catch (e) {
+                                                return false;
+                                            }
+                                        })() ? (
                                             <a href={String(selectedValue)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center">
                                                 <ImageIcon className="h-3 w-3 mr-1" /> View Image
                                             </a>
