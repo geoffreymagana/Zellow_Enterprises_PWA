@@ -33,7 +33,6 @@ export function PushSubscriptionManager() {
     const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
     useEffect(() => {
-        // This effect runs only once on mount to check initial subscription status from Firestore.
         if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !window.PushManager || !user || !db) {
             setIsLoading(false);
             return;
@@ -58,12 +57,20 @@ export function PushSubscriptionManager() {
 
     const handleToggleSubscription = async () => {
         if (isChanging || !user) return;
+
+        // Check for permission upfront when user tries to subscribe
+        if (!isSubscribed && Notification.permission === 'denied') {
+            toast({ title: "Permission Denied", description: "You have blocked notifications. Please enable them in your browser settings to subscribe.", variant: "destructive" });
+            return;
+        }
+
         setIsChanging(true);
+
+        const sw = await navigator.serviceWorker.ready;
 
         if (isSubscribed) {
             // Unsubscribe logic
             try {
-                const sw = await navigator.serviceWorker.ready;
                 const subscription = await sw.pushManager.getSubscription();
                 if (subscription) {
                     await subscription.unsubscribe();
@@ -98,7 +105,6 @@ export function PushSubscriptionManager() {
             }
             
             try {
-                const sw = await navigator.serviceWorker.ready;
                 const applicationServerKey = await urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
                 const sub = await sw.pushManager.subscribe({
                     userVisibleOnly: true,
@@ -118,6 +124,8 @@ export function PushSubscriptionManager() {
                 toast({ title: "Subscribed!", description: "You will now receive push notifications." });
             } catch (error: any) {
                 console.error("Failed to subscribe:", error);
+                // The permission prompt is handled by the browser when `subscribe()` is called.
+                // If it was already denied, the catch block will likely run.
                 if (Notification.permission === 'denied') {
                     toast({ title: "Permission Denied", description: "Please enable push notifications in your browser settings.", variant: "destructive" });
                 } else {
@@ -134,10 +142,6 @@ export function PushSubscriptionManager() {
 
     if (typeof window !== 'undefined' && (!('serviceWorker' in navigator) || !('PushManager' in window))) {
         return <p className="text-sm text-muted-foreground">Push notifications are not supported by this browser.</p>;
-    }
-    
-    if (typeof window !== 'undefined' && Notification.permission === 'denied') {
-        return <p className="text-sm text-destructive">You have blocked notifications. Please enable them in your browser settings to subscribe.</p>;
     }
 
     return (
