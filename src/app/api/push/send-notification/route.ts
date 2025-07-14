@@ -1,12 +1,17 @@
+
 // src/app/api/push/send-notification/route.ts
 import { NextResponse } from 'next/server';
 import { getFirestore } from 'firebase-admin/firestore';
-import { initializeApp, getApps } from 'firebase-admin/app';
+import { initializeApp, getApps, App } from 'firebase-admin/app';
 import { getServiceAccount } from '@/lib/firebase-admin-config';
 import webPush, { PushSubscription } from 'web-push';
 
-if (!getApps().length) {
-  initializeApp({
+function initializeFirebaseAdmin(): App {
+  const apps = getApps();
+  if (apps.length > 0) {
+    return apps[0];
+  }
+  return initializeApp({
     credential: {
       projectId: getServiceAccount().project_id,
       clientEmail: getServiceAccount().client_email,
@@ -14,17 +19,18 @@ if (!getApps().length) {
     },
   });
 }
-const db = getFirestore();
 
-// Configure web-push
-if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-    webPush.setVapidDetails(
-        'mailto:support@zellow.com', // Replace with your contact email
-        process.env.VAPID_PUBLIC_KEY,
-        process.env.VAPID_PRIVATE_KEY
-    );
-} else {
+function initializeWebPush() {
+    if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+        webPush.setVapidDetails(
+            'mailto:support@zellow.com', // Replace with your contact email
+            process.env.VAPID_PUBLIC_KEY,
+            process.env.VAPID_PRIVATE_KEY
+        );
+        return true;
+    }
     console.warn("VAPID keys are not set. Push notifications will not be sent.");
+    return false;
 }
 
 interface NotificationPayload {
@@ -40,10 +46,14 @@ interface NotificationPayload {
 // This is an internal function to be triggered by Firestore triggers or other server logic
 // For demonstration, we'll create an API route. In production, secure this endpoint.
 export async function sendPushNotification(userId: string, payload: NotificationPayload) {
-    if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+    const isWebPushInitialized = initializeWebPush();
+    if (!isWebPushInitialized) {
         console.log("Cannot send notification: VAPID keys not configured.");
         return;
     }
+    
+    initializeFirebaseAdmin();
+    const db = getFirestore();
 
     try {
         const subscriptionDoc = await db.collection('pushSubscriptions').doc(userId).get();

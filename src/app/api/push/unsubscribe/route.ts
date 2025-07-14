@@ -1,12 +1,17 @@
+
 // src/app/api/push/unsubscribe/route.ts
 import { NextResponse } from 'next/server';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, doc, deleteDoc } from 'firebase-admin/firestore';
-import { initializeApp, getApps } from 'firebase-admin/app';
+import { initializeApp, getApps, App } from 'firebase-admin/app';
 import { getServiceAccount } from '@/lib/firebase-admin-config';
 
-if (!getApps().length) {
-  initializeApp({
+function initializeFirebaseAdmin(): App {
+  const apps = getApps();
+  if (apps.length > 0) {
+    return apps[0];
+  }
+  return initializeApp({
     credential: {
       projectId: getServiceAccount().project_id,
       clientEmail: getServiceAccount().client_email,
@@ -14,7 +19,6 @@ if (!getApps().length) {
     },
   });
 }
-const db = getFirestore();
 
 export async function POST(request: Request) {
   const { token } = await request.json();
@@ -24,6 +28,8 @@ export async function POST(request: Request) {
   }
 
   try {
+    initializeFirebaseAdmin();
+    const db = getFirestore();
     const decodedToken = await getAuth().verifyIdToken(token);
     const userId = decodedToken.uid;
 

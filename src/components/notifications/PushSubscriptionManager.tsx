@@ -7,9 +7,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, BellOff, BellRing } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import type { User } from '@/types';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 async function urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -26,40 +27,48 @@ export function PushSubscriptionManager() {
     const { user } = useAuth();
     const { toast } = useToast();
     const [isSubscribed, setIsSubscribed] = useState(false);
-    const [subscription, setSubscription] = useState<PushSubscription | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isChanging, setIsChanging] = useState(false);
 
     const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
     useEffect(() => {
-        // This effect runs only once on mount to check initial subscription status.
-        if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !window.PushManager) {
+        // This effect runs only once on mount to check initial subscription status from Firestore.
+        if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !window.PushManager || !user || !db) {
             setIsLoading(false);
             return;
         }
 
-        navigator.serviceWorker.ready.then(reg => {
-            reg.pushManager.getSubscription().then(sub => {
-                if (sub) {
-                    setIsSubscribed(true);
-                    setSubscription(sub);
-                }
+        const checkSubscriptionInDb = async () => {
+            setIsLoading(true);
+            try {
+                const subDocRef = doc(db, 'pushSubscriptions', user.uid);
+                const docSnap = await getDoc(subDocRef);
+                setIsSubscribed(docSnap.exists());
+            } catch (error) {
+                console.error("Error checking subscription in Firestore:", error);
+                setIsSubscribed(false);
+            } finally {
                 setIsLoading(false);
-            });
-        });
-    }, []); // Empty dependency array ensures this runs only once.
+            }
+        };
+
+        checkSubscriptionInDb();
+    }, [user, db]);
 
     const handleToggleSubscription = async () => {
         if (isChanging || !user) return;
         setIsChanging(true);
 
-        const currentSubscription = await navigator.serviceWorker.ready.then(reg => reg.pushManager.getSubscription());
-
-        if (currentSubscription) {
+        if (isSubscribed) {
             // Unsubscribe logic
             try {
-                await currentSubscription.unsubscribe();
+                const sw = await navigator.serviceWorker.ready;
+                const subscription = await sw.pushManager.getSubscription();
+                if (subscription) {
+                    await subscription.unsubscribe();
+                }
+
                 const token = await auth.currentUser?.getIdToken();
                 if (!token) throw new Error("Could not get auth token.");
                 
@@ -70,7 +79,6 @@ export function PushSubscriptionManager() {
                 });
 
                 setIsSubscribed(false);
-                setSubscription(null);
                 toast({ title: "Unsubscribed", description: "You will no longer receive push notifications." });
             } catch (error) {
                 console.error("Failed to unsubscribe:", error);
@@ -106,7 +114,6 @@ export function PushSubscriptionManager() {
                     body: JSON.stringify({ subscription: sub, token }),
                 });
 
-                setSubscription(sub);
                 setIsSubscribed(true);
                 toast({ title: "Subscribed!", description: "You will now receive push notifications." });
             } catch (error: any) {
