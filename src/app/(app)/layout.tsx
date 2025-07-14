@@ -1,6 +1,6 @@
 
 "use client";
-import { ReactNode, FC, useState, useEffect, useCallback, useRef } from 'react';
+import { ReactNode, FC, useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { Button } from '@/components/ui/button';
@@ -458,7 +458,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   );
 };
 
-export default function AppGroupLayout({ children }: LayoutProps) {
+function AppGroupLayout({ children }: LayoutProps) {
   const { user, role, loading } = useAuth();
   const pathname = usePathname();
   const router = useRouter(); 
@@ -496,9 +496,14 @@ export default function AppGroupLayout({ children }: LayoutProps) {
 
   const isAdminPanelRole = role && ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager'].includes(role);
 
+  // Wrap the content that uses useSearchParams in a Suspense boundary
+  const content = <Suspense fallback={<div className="flex-1" />}><NonAdminLayout>{children}</NonAdminLayout></Suspense>;
+
   if (isAdminPanelRole) {
     return <SidebarProvider><AdminLayout>{children}</AdminLayout></SidebarProvider>;
   }
 
-  return <NonAdminLayout>{children}</NonAdminLayout>;
+  return content;
 }
+
+export default AppGroupLayout;
