@@ -1,23 +1,24 @@
+
 import * as React from "react"
 
 const MOBILE_BREAKPOINT = 768
 
 export function useIsMobile() {
-  const [isMobile, setIsMobile] = React.useState(false); // Default to false on server
+  const [isMobile, setIsMobile] = React.useState(false);
 
   React.useEffect(() => {
-    // This effect runs only on the client, after hydration
     const checkIsMobile = () => {
       setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
     };
 
-    // Set the initial value
-    checkIsMobile();
+    // Initial check after component mounts
+    checkIsMobile(); 
 
-    // Listen for resize events
     window.addEventListener("resize", checkIsMobile);
+    
+    // Cleanup listener on unmount
     return () => window.removeEventListener("resize", checkIsMobile);
-  }, []);
+  }, []); // Empty dependency array ensures this runs only once on the client
 
   return isMobile;
 }

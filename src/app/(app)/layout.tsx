@@ -32,6 +32,7 @@ import { useCart } from '@/contexts/CartContext';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { FeedbackThread, UserRole } from '@/types';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface LayoutProps {
   children: ReactNode;
@@ -366,6 +367,8 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
       }
     }, 500); // 500ms debounce
   };
+  
+  const isMobile = useIsMobile();
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -450,15 +453,15 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
           </div>
         </div>
       </header>
-      <main className="flex-1 container mx-auto px-4 py-6" style={{paddingBottom: user && role !== 'Admin' ? 'calc(var(--bottom-nav-height) + 1rem)' : '1rem'}}>
+      <main className="flex-1 container mx-auto px-4 py-6" style={{paddingBottom: user && role !== 'Admin' && isMobile ? 'calc(var(--bottom-nav-height) + 1rem)' : '1rem'}}>
         {children}
       </main>
-      {user && role !== 'Admin' && <BottomNav />}
+      {user && role !== 'Admin' && isMobile && <BottomNav />}
     </div>
   );
 };
 
-const AppLayoutContent = ({ children }: LayoutProps) => {
+function AppLayoutContent({ children }: LayoutProps) {
   const { user, role, loading } = useAuth();
   const pathname = usePathname();
   const router = useRouter(); 
