@@ -137,7 +137,7 @@ export default function AdminReportsPage() {
         totalRevenue += order.totalAmount;
         detailedOrders.push(order);
       });
-      setSalesSummaryData({ totalPaidOrders: paidOrdersSnapshot.size, totalRevenue, detailedOrders: detailedOrders });
+      setSalesSummaryData({ totalPaidOrders: paidOrdersSnapshot.size, totalRevenue, detailedPaidOrders: detailedOrders });
     } catch (error) { toast({ title: "Error", description: "Failed to load sales summary.", variant: "destructive" }); }
     setIsLoadingSalesSummary(false);
   }, [toast]);
@@ -184,7 +184,7 @@ export default function AdminReportsPage() {
   }, [auditTrailData, auditDateRange, auditSupplierFilter, auditStatusFilter]);
 
   const downloadCSV = (data: any[], filename: string, headers: string[]) => {
-    if (data.length === 0) { toast({ title: "No Data", description: "No data available to download.", variant: "default" }); return; }
+    if (!data || data.length === 0) { toast({ title: "No Data", description: "No data available to download.", variant: "default" }); return; }
     
     const formatValueForCSV = (value: any, key: string) => {
       if (value === null || value === undefined) return '';
@@ -305,7 +305,7 @@ export default function AdminReportsPage() {
       <Card>
         <CardHeader>
             <div className="flex items-center justify-between"><CardTitle className="font-headline text-xl">Sales Summary</CardTitle>
-                 <Button variant="outline" size="sm" onClick={() => downloadCSV(salesSummaryData?.detailedPaidOrders || [], 'sales_summary_details', ['ID', 'CustomerName', 'CustomerEmail', 'TotalAmount', 'PaymentStatus', 'Status', 'CreatedAt', 'Items', 'ShippingAddress'])} disabled={isLoadingSalesSummary || !salesSummaryData || salesSummaryData.detailedPaidOrders.length === 0}><Download className="mr-2 h-4 w-4" /> Download Paid Orders CSV</Button>
+                 <Button variant="outline" size="sm" onClick={() => downloadCSV(salesSummaryData?.detailedPaidOrders || [], 'sales_summary_details', ['ID', 'CustomerName', 'CustomerEmail', 'TotalAmount', 'PaymentStatus', 'Status', 'CreatedAt', 'Items', 'ShippingAddress'])} disabled={isLoadingSalesSummary || !salesSummaryData || !salesSummaryData.detailedPaidOrders || salesSummaryData.detailedPaidOrders.length === 0}><Download className="mr-2 h-4 w-4" /> Download Paid Orders CSV</Button>
             </div><CardDescription>Summary of paid orders and revenue.</CardDescription>
         </CardHeader>
         <CardContent>{isLoadingSalesSummary ? <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : salesSummaryData ? (<div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="p-4 bg-muted/50 rounded-md"><p className="text-sm text-muted-foreground">Total Paid Orders</p><p className="text-2xl font-bold">{salesSummaryData.totalPaidOrders}</p></div><div className="p-4 bg-muted/50 rounded-md"><p className="text-sm text-muted-foreground">Total Revenue from Paid Orders</p><p className="text-2xl font-bold">{formatPrice(salesSummaryData.totalRevenue)}</p></div></div>) : (<p className="text-muted-foreground text-center py-6">No sales data available.</p>)}</CardContent>
@@ -313,4 +313,3 @@ export default function AdminReportsPage() {
     </div>
   );
 }
-
