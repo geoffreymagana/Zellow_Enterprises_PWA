@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
+import Link from 'next/link';
 
 interface OrderStatusDistribution {
   status: OrderStatus;
@@ -187,7 +188,7 @@ export default function AdminReportsPage() {
     });
   }, [auditTrailData, auditDateRange, auditSupplierFilter, auditStatusFilter]);
 
- const downloadCSV = (data: any[], filename: string, headers: string[]) => {
+  const downloadCSV = (data: any[], filename: string, headers: string[]) => {
     if (!data || data.length === 0) {
       toast({ title: "No Data", description: "No data available to download.", variant: "default" });
       return;
@@ -198,21 +199,23 @@ export default function AdminReportsPage() {
         if (value instanceof Timestamp) return formatDate(value, true);
         if (value instanceof Date) return format(value, 'yyyy-MM-dd HH:mm:ss');
         if (Array.isArray(value)) {
-            // For Order 'items' array
             if (value.every(item => typeof item === 'object' && item !== null && 'name' in item && 'quantity' in item)) {
               return value.map(item => `${item.quantity}x ${item.name}`).join('; ');
             }
             return value.join('; ');
         }
         if (typeof value === 'object') {
-            // For ShippingAddress
             if ('fullName' in value && 'addressLine1' in value) {
               const addr = value as ShippingAddress;
               return `${addr.fullName}, ${addr.addressLine1}, ${addr.city}, ${addr.county}`;
             }
             return JSON.stringify(value);
         }
-        return String(value).replace(/"/g, '""');
+        let stringValue = String(value);
+        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+          return `"${stringValue.replace(/"/g, '""')}"`;
+        }
+        return stringValue;
     };
 
     const csvRows = [headers.join(',')];
@@ -220,7 +223,7 @@ export default function AdminReportsPage() {
       const values = headers.map(header => {
         const key = header.toLowerCase().replace(/\s/g, '');
         const rowValue = Object.entries(row).find(([k,v]) => k.toLowerCase() === key)?.[1];
-        return `"${formatValueForCSV(rowValue)}"`;
+        return formatValueForCSV(rowValue);
       });
       csvRows.push(values.join(','));
     });
