@@ -81,7 +81,7 @@ export default function SupplierStockRequestsPage() {
 
     const unsubOpenBids = onSnapshot(openForBidsQuery, (snapshot) => {
         setOpenForBiddingRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StockRequest)));
-        if(isLoading) setIsLoading(false); // Set loading to false after first query completes
+        setIsLoading(false); // Set loading to false after first query completes
     }, (error) => {
       console.error("Error fetching open stock requests:", error);
       toast({ title: "Error", description: "Could not load open requests.", variant: "destructive" });
@@ -99,7 +99,7 @@ export default function SupplierStockRequestsPage() {
         unsubOpenBids();
         unsubAwardedToMe();
     };
-  }, [db, user, role, toast, isLoading]); // Added isLoading to dependency array
+  }, [db, user, role, toast]);
 
   useEffect(() => {
     if (authLoading) return;
