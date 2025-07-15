@@ -34,6 +34,11 @@ type RequestStockFormValues = z.infer<typeof requestStockFormSchema>;
 
 const LOW_STOCK_THRESHOLD = 10;
 
+const formatKsh = (amount?: number): string => {
+    if (amount === undefined || amount === null) return 'N/A';
+    return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(amount);
+};
+
 const getStockLevelColor = (stock: number): string => {
   if (stock === 0) return 'bg-destructive';
   if (stock < LOW_STOCK_THRESHOLD) return 'bg-orange-500';
