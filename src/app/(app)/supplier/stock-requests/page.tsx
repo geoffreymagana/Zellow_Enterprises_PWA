@@ -50,6 +50,7 @@ export default function SupplierStockRequestsPage() {
   const [actionableRequest, setActionableRequest] = useState<StockRequest | null>(null);
   const [isBidModalOpen, setIsBidModalOpen] = useState(false);
   const [pricePerUnit, setPricePerUnit] = useState<number | string>("");
+  const [taxRate, setTaxRate] = useState<number | string>(0);
   const [bidNotes, setBidNotes] = useState("");
   const [isSubmittingBid, setIsSubmittingBid] = useState(false);
 
@@ -108,6 +109,7 @@ export default function SupplierStockRequestsPage() {
   const handleOpenBidModal = (request: StockRequest) => {
     setActionableRequest(request);
     setPricePerUnit(""); 
+    setTaxRate(0);
     setBidNotes("");
     setIsBidModalOpen(true);
   };
@@ -135,6 +137,12 @@ export default function SupplierStockRequestsPage() {
       return;
     }
 
+    const numTaxRate = Number(taxRate);
+    if (isNaN(numTaxRate) || numTaxRate < 0 || numTaxRate > 100) {
+        toast({ title: "Invalid Tax Rate", description: "Tax rate must be between 0 and 100.", variant: "destructive" });
+        return;
+    }
+
     setIsSubmittingBid(true);
     try {
       const requestRef = doc(db, 'stockRequests', actionableRequest.id);
@@ -143,8 +151,9 @@ export default function SupplierStockRequestsPage() {
         supplierId: user.uid,
         supplierName: user.displayName || user.email || "Unnamed Supplier",
         pricePerUnit: numPrice,
+        taxRate: numTaxRate,
         notes: bidNotes,
-        createdAt: new Date(), // Use client-side timestamp
+        createdAt: new Date(),
       };
 
       await updateDoc(requestRef, {
@@ -233,7 +242,7 @@ export default function SupplierStockRequestsPage() {
           <CardTitle>Awaiting My Fulfillment</CardTitle>
           <CardDescription>These requests have been awarded to you. Fulfill the order and create an invoice.</CardDescription>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-0 pb-4">
           {isLoading ? (
             <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
           ) : awardedToMeRequests.length === 0 ? (
@@ -279,6 +288,18 @@ export default function SupplierStockRequestsPage() {
                     onChange={(e) => setPricePerUnit(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
                     min="0"
                     placeholder="e.g., 500.00"
+                />
+            </div>
+             <div>
+                <Label htmlFor="taxRate">Your Tax Rate (%)</Label>
+                <Input 
+                    id="taxRate" 
+                    type="number"
+                    value={taxRate}
+                    onChange={(e) => setTaxRate(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+                    min="0"
+                    max="100"
+                    placeholder="e.g., 5 for 5%"
                 />
             </div>
             <div>

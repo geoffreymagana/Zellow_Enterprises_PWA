@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import type { Invoice, InvoiceStatus } from "@/types"; 
 import { FileText, Search, Download, Eye, Loader2, CheckCircle, XCircle, CalendarDays, FileClock, AlertCircle, CheckCircle2 as PaidIcon, Hourglass, FileX, FileDiff, PlusCircle, Filter } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -38,6 +38,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import { Logo } from '@/components/common/Logo';
 
 const formatKsh = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -78,6 +81,70 @@ const FILTER_OPTIONS: {value: InvoiceStatus | "all" | "overdue" | "approved_unpa
 
 const supplierFilterOptions = FILTER_OPTIONS.filter(t => !["pending_approval", "approved_unpaid"].includes(t.value));
 
+const InvoiceTemplate = React.forwardRef<HTMLDivElement, { invoice: Invoice, type: 'invoice' | 'receipt' }>(({ invoice, type }, ref) => {
+  const isReceipt = type === 'receipt';
+  return (
+    <div ref={ref} className="p-8 bg-white text-black font-sans text-sm">
+      <header className="flex justify-between items-start mb-10">
+        <div>
+          <Logo iconSize={32} textSize="text-2xl" />
+          <p className="text-xs text-gray-600 mt-1">GTC Office Tower, Nairobi</p>
+        </div>
+        <div className="text-right">
+          <h1 className="text-3xl font-bold uppercase tracking-wider text-gray-800">{isReceipt ? 'Receipt' : 'Invoice'}</h1>
+          <p><strong>{isReceipt ? 'Receipt' : 'Invoice'} #:</strong> {invoice.invoiceNumber}</p>
+          <p><strong>Date:</strong> {formatDate(invoice.invoiceDate, false)}</p>
+          {!isReceipt && <p><strong>Due:</strong> {formatDate(invoice.dueDate, false)}</p>}
+          {isReceipt && invoice.paymentDetails?.paidAt && <p><strong>Paid On:</strong> {formatDate(invoice.paymentDetails.paidAt, false)}</p>}
+        </div>
+      </header>
+      <section className="mb-10">
+        <h2 className="font-semibold mb-1">Bill To:</h2>
+        <p>{invoice.clientName}</p>
+        <p>Finance Department</p>
+      </section>
+      <section>
+        <table className="w-full">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="p-2 text-left font-semibold">Description</th>
+              <th className="p-2 text-center font-semibold">Qty</th>
+              <th className="p-2 text-right font-semibold">Unit Price</th>
+              <th className="p-2 text-right font-semibold">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoice.items.map((item, index) => (
+              <tr key={index} className="border-b">
+                <td className="p-2">{item.description}</td>
+                <td className="p-2 text-center">{item.quantity}</td>
+                <td className="p-2 text-right">{formatKsh(item.unitPrice)}</td>
+                <td className="p-2 text-right">{formatKsh(item.totalPrice)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+      <section className="flex justify-end mt-6">
+        <div className="w-64 space-y-2">
+          <div className="flex justify-between"><span>Subtotal:</span><span>{formatKsh(invoice.subTotal)}</span></div>
+          <div className="flex justify-between"><span>Tax ({invoice.taxRate ?? 0}%):</span><span>{formatKsh(invoice.taxAmount ?? 0)}</span></div>
+          <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2"><span>Total Amount:</span><span>{formatKsh(invoice.totalAmount)}</span></div>
+        </div>
+      </section>
+      {isReceipt && (
+        <section className="mt-8 text-center">
+            <p className="text-2xl font-bold text-green-600">PAID</p>
+            <p className="text-xs">Transaction ID: {invoice.paymentDetails?.transactionId || 'N/A'}</p>
+        </section>
+      )}
+      <footer className="mt-12 pt-4 border-t text-center text-xs text-gray-500">
+        <p>Thank you for your business!</p>
+      </footer>
+    </div>
+  );
+});
+InvoiceTemplate.displayName = 'InvoiceTemplate';
 
 export default function InvoicesPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -102,6 +169,9 @@ export default function InvoicesPage() {
   const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const pdfRef = useRef<HTMLDivElement>(null);
+
 
   const [isMarkingPaid, setIsMarkingPaid] = useState(false);
 
@@ -113,7 +183,7 @@ export default function InvoicesPage() {
   };
 
   const fetchInvoices = useCallback(() => {
-    if (!db || !user || (role !== 'FinanceManager' && role !== 'Admin' && role !== 'Supplier')) {
+    if (!db || !user || (role !== 'FinanceManager' && role !== 'Admin' && role !== 'Supplier' && role !== 'InventoryManager')) {
       setIsLoading(false);
       return () => {};
     }
@@ -138,7 +208,7 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user || !['Supplier', 'FinanceManager', 'Admin'].includes(role || '')) {
+    if (!user || !['Supplier', 'FinanceManager', 'Admin', 'InventoryManager'].includes(role || '')) {
       router.replace('/dashboard');
       return;
     }
@@ -243,6 +313,26 @@ export default function InvoicesPage() {
     }
   };
 
+  const handleDownloadPdf = async (type: 'invoice' | 'receipt') => {
+    if (!pdfRef.current || !viewingInvoice) return;
+    setIsGeneratingPdf(true);
+    toast({ title: `Generating ${type}...`, description: "Please wait." });
+    try {
+      const canvas = await html2canvas(pdfRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Zellow-${type}-${viewingInvoice.invoiceNumber}.pdf`);
+    } catch (err) {
+      console.error(`Error generating ${type} PDF:`, err);
+      toast({ title: "PDF Generation Failed", variant: "destructive" });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   if (authLoading || (!user && !authLoading)) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
@@ -306,7 +396,7 @@ export default function InvoicesPage() {
           {isLoading && filteredInvoices.length === 0 ? (
             <div className="p-10 text-center"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto"/></div>
           ) : filteredInvoices.length === 0 ? (
-            <p className="p-10 text-center text-muted-foreground text-lg">
+            <p className="p-10 text-center text-lg text-muted-foreground">
               {allInvoices.length === 0 ? (role === 'Supplier' ? "No invoices submitted yet." : "No supplier invoices found.") : "No invoices match your current filter."}
             </p>
           ) : (
@@ -347,7 +437,11 @@ export default function InvoicesPage() {
       {/* Invoice Details Dialog */}
       {viewingInvoice && (
       <Dialog open={!!viewingInvoice} onOpenChange={(isOpen) => { if (!isOpen) setViewingInvoice(null); }}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl">
+          {/* Hidden printable/PDF element */}
+          <div className="absolute -left-[9999px] top-0 w-[210mm]">
+            <InvoiceTemplate ref={pdfRef} invoice={viewingInvoice} type={viewingInvoice.status === 'paid' ? 'receipt' : 'invoice'} />
+          </div>
           <DialogHeader>
             <DialogTitle>Invoice Details: {viewingInvoice?.invoiceNumber}</DialogTitle>
             <DialogDescription>
@@ -380,9 +474,19 @@ export default function InvoicesPage() {
               {viewingInvoice.notes && <p className="text-xs text-muted-foreground"><strong>Notes:</strong> {viewingInvoice.notes}</p>}
               {viewingInvoice.paymentDetails?.paidAt && <p className="text-xs text-green-600"><strong>Paid on:</strong> {formatDate(viewingInvoice.paymentDetails.paidAt)}</p>}
             </div>
-          <DialogFooter className="sm:justify-between gap-2">
-            <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
-            <div className="flex gap-2">
+          <DialogFooter className="flex-col sm:flex-row sm:justify-between gap-2">
+            <div>
+              {viewingInvoice.status === 'paid' ? (
+                <Button variant="secondary" size="sm" onClick={() => handleDownloadPdf('receipt')} disabled={isGeneratingPdf}>
+                  {isGeneratingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>} Download Receipt
+                </Button>
+              ) : (
+                <Button variant="secondary" size="sm" onClick={() => handleDownloadPdf('invoice')} disabled={isGeneratingPdf}>
+                  {isGeneratingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>} Download Invoice
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2 justify-end">
               {(role === 'FinanceManager' || role === 'Admin') && viewingInvoice?.status === 'pending_approval' && (
                 <>
                   <Button variant="destructive" size="sm" onClick={() => { if(viewingInvoice) {handleOpenActionModal(viewingInvoice, "reject"); setViewingInvoice(null);}}} disabled={isSubmittingAction}>Reject</Button>
@@ -394,6 +498,7 @@ export default function InvoicesPage() {
                     {isMarkingPaid && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Mark as Paid
                  </Button>
               )}
+               <DialogClose asChild><Button type="button" variant="outline" size="sm">Close</Button></DialogClose>
             </div>
           </DialogFooter>
         </DialogContent>
@@ -440,4 +545,3 @@ export default function InvoicesPage() {
     </div>
   );
 }
-

@@ -250,7 +250,8 @@ export default function FinanceApprovalsPage() {
                                 </div>
                                 <div className="text-left sm:text-right">
                                     <p className="font-bold text-lg text-primary">{formatKsh(bid.pricePerUnit)} <span className="text-sm font-normal text-muted-foreground">/ unit</span></p>
-                                    <p className="text-sm font-medium">Total Bid: {formatKsh(bid.pricePerUnit * (viewingRequest.requestedQuantity || 0))}</p>
+                                    <p className="text-xs">Tax Rate: {bid.taxRate ?? 0}%</p>
+                                    <p className="text-sm font-medium">Total Bid (Excl. Tax): {formatKsh(bid.pricePerUnit * (viewingRequest.requestedQuantity || 0))}</p>
                                     {currentProductPrice !== undefined && (
                                       <p className={cn("text-xs font-medium flex items-center justify-start sm:justify-end gap-1", iconColor)}>
                                         <Icon className="h-3 w-3" />

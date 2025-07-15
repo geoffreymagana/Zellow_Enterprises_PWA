@@ -1,5 +1,6 @@
 
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -298,6 +299,7 @@ export interface Bid {
   supplierId: string;
   supplierName: string;
   pricePerUnit: number;
+  taxRate?: number; // Added tax rate
   notes?: string;
   createdAt: any;
 }
@@ -356,7 +358,7 @@ export type InvoiceStatus =
   | 'overdue'
   | 'cancelled'
   | 'rejected'
-  | 'reconciled'; // Added status
+  | 'reconciled'; 
 
 export interface Invoice {
   id: string;
