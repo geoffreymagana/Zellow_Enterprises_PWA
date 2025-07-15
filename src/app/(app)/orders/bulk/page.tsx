@@ -225,7 +225,7 @@ export default function BulkOrderRequestPage() {
                                 <div><FormLabel>Price</FormLabel><Input value={selectedProduct ? formatPrice(selectedProduct.price) : 'N/A'} disabled /></div>
                             </div>
                             <FormField control={form.control} name={`items.${index}.notes`} render={({ field }) => (<FormItem><FormLabel>Notes (Optional)</FormLabel><FormControl><Textarea {...field} placeholder="Any specific instructions for this item..." rows={2}/></FormControl><FormMessage/></FormItem>)}/>
-                            <Button type="button" variant="destructive" size="icon" className="absolute -top-3 -right-3 h-7 w-7" onClick={() => remove(index)}><Trash2 className="h-4 w-4"/></Button>
+                            <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-7 w-7" onClick={() => remove(index)}><Trash2 className="h-4 w-4"/></Button>
                         </div>
                     )
                 })}
