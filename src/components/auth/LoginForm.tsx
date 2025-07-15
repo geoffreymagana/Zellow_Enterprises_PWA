@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -29,6 +29,7 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -41,8 +42,11 @@ export function LoginForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      await login(values.email, values.password);
-      router.push('/dashboard'); // Redirect after successful login
+      const success = await login(values.email, values.password);
+      if (success) {
+        const redirectUrl = searchParams.get('redirect') || '/dashboard';
+        router.replace(redirectUrl);
+      }
     } catch (error) {
       // Error is handled by toast in AuthContext
     } finally {

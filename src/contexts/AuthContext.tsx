@@ -2,7 +2,7 @@
 "use client";
 
 import type { User, UserRole, UserStatus } from '@/types';
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import React, from 'react';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { 
   onAuthStateChanged, 
@@ -13,7 +13,7 @@ import {
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase'; 
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, addDoc, writeBatch } from 'firebase/firestore'; // Added more imports
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
 interface SignupData {
@@ -29,23 +29,22 @@ interface AuthContextType {
   user: User | null;
   role: UserRole | null;
   loading: boolean;
-  login: (email: string, pass: string) => Promise<void>;
+  login: (email: string, pass: string) => Promise<boolean>; // Returns boolean for success
   signup: (data: SignupData) => Promise<void>; // Added signup
   logout: () => Promise<void>;
   updateUserProfile: (newDisplayName: string) => Promise<void>;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<UserRole | null>(null);
-  const [loading, setLoading] = useState(true);
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = React.useState<User | null>(null);
+  const [role, setRole] = React.useState<UserRole | null>(null);
+  const [loading, setLoading] = React.useState(true);
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!auth || !db) {
       toast({
         title: "Configuration Error",
@@ -106,12 +105,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(appUser);
           setRole(userRole);
         } else {
-          // This case might happen if a user is created in Auth but not in Firestore.
-          // For this app's logic, we should probably sign them out.
-           await firebaseSignOut(auth);
-           setUser(null); 
-           setRole(null);
-           console.warn(`User document for ${firebaseUser.uid} not found. User has been signed out.`);
+          await firebaseSignOut(auth);
+          setUser(null); 
+          setRole(null);
+          console.warn(`User document for ${firebaseUser.uid} not found. User has been signed out.`);
         }
       } else { 
         setUser(null);
@@ -123,7 +120,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [router, toast]); 
 
-  const login = async (email: string, pass: string) => {
+  const login = async (email: string, pass: string): Promise<boolean> => {
     if (!auth) {
       toast({ title: "Login Failed", description: "Firebase Auth service not available.", variant: "destructive" });
       setLoading(false); 
@@ -131,11 +128,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, pass);
-      // onAuthStateChanged will handle the rest of the logic (fetching user doc, role, status checks, etc.)
-      const redirectUrl = searchParams.get('redirect') || '/dashboard';
-      router.replace(redirectUrl);
+      await signInWithEmailAndPassword(auth, email, pass);
+      // onAuthStateChanged will handle the rest of the logic.
       toast({ title: "Login Successful", description: "Welcome back!"});
+      return true; // Indicate success
     } catch (error: any) {
       console.error("Login failed:", error);
       let errorMessage = "An unexpected error occurred. Please try again.";
@@ -156,6 +152,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       toast({ title: "Login Failed", description: errorMessage, variant: "destructive" });
       setLoading(false); 
+      return false; // Indicate failure
     }
   };
 
@@ -177,7 +174,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       const batch = writeBatch(db);
 
-      // 1. Create user document
       const userDocRef = doc(db, 'users', firebaseUser.uid);
       batch.set(userDocRef, {
         uid: firebaseUser.uid,
@@ -194,7 +190,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         disabled: false,
       });
 
-      // 2. Create approval request document
       const approvalRequestRef = doc(collection(db, 'approvalRequests'));
       batch.set(approvalRequestRef, {
         type: 'user_registration',
