@@ -54,6 +54,7 @@ export default function BulkOrderRequestPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
 
   const form = useForm<BulkOrderRequestFormValues>({
     resolver: zodResolver(bulkOrderRequestSchema),
@@ -83,11 +84,21 @@ export default function BulkOrderRequestPage() {
     if (!db) return;
     setIsLoadingProducts(true);
     try {
-      const q = query(collection(db, 'products'), where("published", "==", true), orderBy("name", "asc"));
+      const q = query(
+        collection(db, 'products'), 
+        where("published", "==", true), 
+        orderBy("name", "asc")
+      );
       const snapshot = await getDocs(q);
-      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
+      const productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+      setProducts(productsData);
     } catch (e: any) {
-      toast({ title: "Error", description: "Could not load product list.", variant: "destructive" });
+      console.error('Fetch products error:', e);
+      toast({ 
+        title: "Error", 
+        description: `Could not load product list: ${e.message}`, 
+        variant: "destructive" 
+      });
     } finally {
       setIsLoadingProducts(false);
     }
@@ -167,16 +178,20 @@ export default function BulkOrderRequestPage() {
                 <h3 className="text-lg font-semibold border-t pt-4">Requested Items</h3>
                 {fields.map((field, index) => {
                     const selectedProductId = form.watch(`items.${index}.productId`);
+                    const quantity = form.watch(`items.${index}.quantity`);
                     const selectedProduct = products.find(p => p.id === selectedProductId);
+                    const rowTotal = selectedProduct ? selectedProduct.price * (quantity || 0) : 0;
+
                     return (
                         <div key={field.id} className="p-4 border rounded-lg space-y-3 relative bg-muted/50">
+                            <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-7 w-7" onClick={() => remove(index)}><Trash2 className="h-4 w-4"/></Button>
                             <FormField
                                 control={form.control}
                                 name={`items.${index}.productId`}
                                 render={({ field }) => (
                                 <FormItem className="flex flex-col">
                                     <FormLabel>Product</FormLabel>
-                                    <Popover>
+                                    <Popover open={openPopoverIndex === index} onOpenChange={(open) => setOpenPopoverIndex(open ? index : null)}>
                                     <PopoverTrigger asChild>
                                         <FormControl>
                                         <Button
@@ -200,14 +215,16 @@ export default function BulkOrderRequestPage() {
                                                 <CommandItem
                                                     value={p.name}
                                                     key={p.id}
-                                                    onSelect={() => form.setValue(`items.${index}.productId`, p.id)}
+                                                    onSelect={() => {
+                                                        form.setValue(`items.${index}.productId`, p.id);
+                                                        setOpenPopoverIndex(null);
+                                                    }}
                                                     className="flex items-center gap-2"
                                                 >
                                                     <div className="relative w-8 h-8 rounded-sm bg-accent overflow-hidden flex-shrink-0">
                                                         {p.imageUrl ? <Image src={p.imageUrl} alt={p.name} layout="fill" objectFit="cover" data-ai-hint="product"/> : <ImageOff className="h-4 w-4 text-muted-foreground"/>}
                                                     </div>
                                                     <span className="flex-grow truncate">{p.name}</span>
-                                                    <span className="text-xs text-muted-foreground">{formatPrice(p.price)}</span>
                                                     <Check className={cn("mr-2 h-4 w-4", p.id === field.value ? "opacity-100" : "opacity-0")} />
                                                 </CommandItem>
                                             ))}
@@ -222,10 +239,9 @@ export default function BulkOrderRequestPage() {
                             />
                             <div className="grid grid-cols-2 gap-4">
                                 <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" {...field} min="1"/></FormControl><FormMessage/></FormItem>)}/>
-                                <div><FormLabel>Price</FormLabel><Input value={selectedProduct ? formatPrice(selectedProduct.price) : 'N/A'} disabled /></div>
+                                <div><FormLabel>Row Total</FormLabel><Input value={formatPrice(rowTotal)} disabled /></div>
                             </div>
                             <FormField control={form.control} name={`items.${index}.notes`} render={({ field }) => (<FormItem><FormLabel>Notes (Optional)</FormLabel><FormControl><Textarea {...field} placeholder="Any specific instructions for this item..." rows={2}/></FormControl><FormMessage/></FormItem>)}/>
-                            <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-7 w-7" onClick={() => remove(index)}><Trash2 className="h-4 w-4"/></Button>
                         </div>
                     )
                 })}
