@@ -224,7 +224,7 @@ export default function DispatchCenterPage() {
                       setSelectedOrder(order);
                       setAssignmentNotes("");
                    }}>
-                <p className="font-semibold text-sm">ID: {order.id.substring(0,8)}...</p>
+                <p className="font-semibold text-sm">ID: {order.id.substring(0,8)}... ({order.customerName})</p>
                 <p className="text-xs text-muted-foreground truncate" title={displayAddress}>{displayAddress}</p>
                 <Badge variant={getOrderStatusBadgeVariant(order.status)} className="capitalize text-xs mt-1">{order.status.replace(/_/g, " ")}</Badge>
                 {order.riderName && <p className="text-xs mt-1">Rider: {order.riderName}</p>}
