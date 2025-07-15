@@ -4,11 +4,9 @@
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-// Table components are no longer needed
-// import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/hooks/useAuth";
 import type { Order, OrderStatus } from "@/types";
-import { Eye, RefreshCw, FileText, Loader2, ShoppingCart } from "lucide-react";
+import { Eye, RefreshCw, FileText, Loader2, ShoppingCart, PackagePlus, Layers } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
@@ -151,11 +149,13 @@ export default function OrdersPage() {
                   Date: {formatDate(order.createdAt)}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex-grow">
+              <CardContent className="flex-grow space-y-2">
                 <p className="text-sm font-semibold">Total: {formatPrice(order.totalAmount)}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {order.items.length} item(s)
-                </p>
+                <div className="flex flex-wrap gap-1">
+                   <Badge variant="outline" className="text-xs">{order.items.length} item(s)</Badge>
+                   {order.isBulkOrder && <Badge variant="outline" className="text-xs flex items-center gap-1"><PackagePlus className="h-3 w-3"/>Bulk Order</Badge>}
+                   {order.items.some(i => i.customizations) && <Badge variant="outline" className="text-xs flex items-center gap-1"><Layers className="h-3 w-3"/>Customized</Badge>}
+                </div>
               </CardContent>
               <CardFooter>
                 <Link href={`/track/order/${order.id}`} passHref className="w-full">
@@ -174,3 +174,4 @@ export default function OrdersPage() {
     </div>
   );
 }
+

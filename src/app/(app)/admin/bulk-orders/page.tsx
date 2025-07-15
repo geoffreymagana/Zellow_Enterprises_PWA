@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Loader2, PackagePlus, FileWarning, Eye, CheckCircle, XCircle } from 'lucide-react';
 import type { BulkOrderRequest, BulkOrderStatus, Order, OrderItem, DeliveryHistoryEntry } from '@/types';
-import { collection, query, where, orderBy, onSnapshot, doc, writeBatch, serverTimestamp, getDocs, updateDoc, documentId } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, writeBatch, serverTimestamp, getDocs, updateDoc, documentId, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
@@ -131,7 +131,6 @@ export default function AdminBulkOrdersPage() {
           paymentStatus: 'pending',
           isBulkOrder: true,
           bulkOrderRequestId: viewingRequest.id,
-          // Defaulting other required fields
           shippingAddress: { // A placeholder or require this in the form
             fullName: viewingRequest.requesterName,
             addressLine1: viewingRequest.companyName || 'To be confirmed',
@@ -140,7 +139,8 @@ export default function AdminBulkOrdersPage() {
             phone: viewingRequest.requesterPhone,
             email: viewingRequest.requesterEmail,
           },
-          deliveryHistory: [{ status: 'pending', timestamp: serverTimestamp(), notes: 'Bulk order request approved and created.' }],
+          // IMPORTANT FIX: Use Timestamp.now() instead of serverTimestamp() inside an array
+          deliveryHistory: [{ status: 'pending', timestamp: Timestamp.now(), notes: 'Bulk order request approved and created.' }],
         };
         batch.set(newOrderRef, { ...newOrder, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
         batch.update(requestRef, { status: newStatus, adminNotes, updatedAt: serverTimestamp(), convertedOrderId: newOrderRef.id });
@@ -249,3 +249,4 @@ export default function AdminBulkOrdersPage() {
     </div>
   );
 }
+

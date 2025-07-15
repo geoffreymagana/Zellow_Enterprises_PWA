@@ -70,11 +70,13 @@ export function CustomizationOrdersList() {
         fetchedOrders.push({ id: docSnapshot.id, ...docSnapshot.data() } as Order);
       });
       
-      const customizationOrders = fetchedOrders.filter(order => 
-        order.items.some(item => item.customizations && Object.keys(item.customizations).length > 0)
-      );
+      const serviceManagerOrders = fetchedOrders.filter(order => {
+        const hasCustomizations = order.items.some(item => item.customizations && Object.keys(item.customizations).length > 0);
+        const isBulk = order.isBulkOrder === true;
+        return hasCustomizations || isBulk;
+      });
 
-      setOrders(customizationOrders);
+      setOrders(serviceManagerOrders);
       setIsLoading(false);
     }, (error) => {
         console.error("Failed to fetch orders:", error);
@@ -200,3 +202,4 @@ export function CustomizationOrdersList() {
     </Card>
   );
 }
+
