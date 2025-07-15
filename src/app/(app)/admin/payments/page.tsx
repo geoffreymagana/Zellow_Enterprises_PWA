@@ -10,8 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Edit, Filter, DollarSign, CheckCircle, PackageOpen, AlertTriangle, RefreshCw, CreditCard, Banknote, Truck } from 'lucide-react';
-import type { Order, OrderStatus, PaymentStatus } from '@/types';
+import { Loader2, Search, Edit, Filter, DollarSign, CheckCircle, PackageOpen, AlertTriangle, RefreshCw, CreditCard, Banknote, Truck, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import type { Order, Invoice, PaymentStatus } from '@/types';
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import Link from 'next/link';
 import { collection, getDocs, query, orderBy, where, doc, updateDoc, serverTimestamp, Timestamp, writeBatch } from 'firebase/firestore';
@@ -19,8 +19,10 @@ import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
-const paymentStatuses: PaymentStatus[] = ['pending', 'paid', 'failed', 'refunded'];
-const ALL_STATUSES_SENTINEL = "__ALL_PAYMENT_STATUSES__";
+type UnifiedTransaction = (Order | Invoice) & { transactionType: 'revenue' | 'expense' };
+
+const paymentStatuses: (PaymentStatus | "all")[] = ['all', 'pending', 'paid', 'failed', 'refunded'];
+const ALL_STATUSES_SENTINEL = "all";
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -46,7 +48,7 @@ export default function AdminPaymentsPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [transactions, setTransactions] = useState<UnifiedTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(ALL_STATUSES_SENTINEL);
@@ -55,30 +57,39 @@ export default function AdminPaymentsPage() {
 
   const [summaryStats, setSummaryStats] = useState({
     totalRevenue: 0,
-    pendingPayments: 0,
+    totalExpenses: 0,
+    pendingCodPayments: 0,
     transactionsToday: 0,
   });
 
-  const fetchOrdersAndStats = useCallback(async () => {
+  const fetchFinancialData = useCallback(async () => {
     if (!db) {
       toast({ title: "Error", description: "Firestore is not available.", variant: "destructive" });
       setIsLoading(false); return;
     }
     setIsLoading(true);
     try {
-      let q = query(collection(db, 'orders'), orderBy("createdAt", "desc"));
+      const ordersQuery = query(collection(db, 'orders'), orderBy("createdAt", "desc"));
+      const paidInvoicesQuery = query(collection(db, 'invoices'), where("status", "==", "paid"), orderBy("updatedAt", "desc"));
       
-      const querySnapshot = await getDocs(q);
-      const fetchedOrders: Order[] = [];
+      const [ordersSnapshot, invoicesSnapshot] = await Promise.all([
+        getDocs(ordersQuery),
+        getDocs(paidInvoicesQuery)
+      ]);
+
       let revenue = 0;
-      let pending = 0;
+      let expenses = 0;
+      let pendingCod = 0;
       let todayTx = 0;
       const todayStart = new Date(); todayStart.setHours(0,0,0,0);
       const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
+      
+      const fetchedTransactions: UnifiedTransaction[] = [];
 
-      querySnapshot.forEach((docSnapshot) => {
-        const order = { id: docSnapshot.id, ...docSnapshot.data() } as Order;
-        fetchedOrders.push(order);
+      ordersSnapshot.forEach((docSnapshot) => {
+        const order = { id: docSnapshot.id, ...docSnapshot.data(), transactionType: 'revenue' } as UnifiedTransaction;
+        fetchedTransactions.push(order);
+
         if (order.paymentStatus === 'paid') {
           revenue += order.totalAmount;
           const paymentDate = order.updatedAt?.toDate() || order.createdAt?.toDate();
@@ -86,14 +97,29 @@ export default function AdminPaymentsPage() {
             todayTx++;
           }
         } else if (order.paymentStatus === 'pending' && order.paymentMethod === 'cod') {
-          pending += order.totalAmount;
+          pendingCod += order.totalAmount;
         }
       });
-      setOrders(fetchedOrders);
-      setSummaryStats({ totalRevenue: revenue, pendingPayments: pending, transactionsToday: todayTx });
+      
+      invoicesSnapshot.forEach((docSnapshot) => {
+        const invoice = { id: docSnapshot.id, ...docSnapshot.data(), transactionType: 'expense' } as UnifiedTransaction;
+        fetchedTransactions.push(invoice);
+        expenses += invoice.totalAmount;
+      });
+
+      // Sort all transactions by date after merging
+      fetchedTransactions.sort((a, b) => {
+          const dateA = a.updatedAt?.toDate() || a.createdAt?.toDate() || 0;
+          const dateB = b.updatedAt?.toDate() || b.createdAt?.toDate() || 0;
+          return dateB - dateA;
+      });
+      
+      setTransactions(fetchedTransactions);
+      setSummaryStats({ totalRevenue: revenue, totalExpenses: expenses, pendingCodPayments: pendingCod, transactionsToday: todayTx });
+
     } catch (error) {
-      console.error("Failed to fetch orders:", error);
-      toast({ title: "Error", description: "Failed to fetch payment data.", variant: "destructive" });
+      console.error("Failed to fetch financial data:", error);
+      toast({ title: "Error", description: "Failed to fetch financial data.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -104,21 +130,30 @@ export default function AdminPaymentsPage() {
       if (!user || (role !== 'Admin' && role !== 'FinanceManager')) {
         router.replace('/dashboard');
       } else {
-        fetchOrdersAndStats();
+        fetchFinancialData();
       }
     }
-  }, [user, role, authLoading, router, fetchOrdersAndStats]);
+  }, [user, role, authLoading, router, fetchFinancialData]);
 
-  const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(tx => {
       const searchTermLower = searchTerm.toLowerCase();
-      const idMatch = order.id.toLowerCase().includes(searchTermLower);
-      const nameMatch = order.customerName?.toLowerCase().includes(searchTermLower);
-      const emailMatch = order.customerEmail?.toLowerCase().includes(searchTermLower);
-      const statusMatch = statusFilter === ALL_STATUSES_SENTINEL || order.paymentStatus === statusFilter;
-      return (idMatch || nameMatch || emailMatch) && statusMatch;
+      let searchMatch = false;
+      if (tx.transactionType === 'revenue') {
+          const order = tx as Order;
+          searchMatch = order.id.toLowerCase().includes(searchTermLower) ||
+                        order.customerName?.toLowerCase().includes(searchTermLower) ||
+                        order.customerEmail?.toLowerCase().includes(searchTermLower);
+      } else {
+          const invoice = tx as Invoice;
+          searchMatch = invoice.invoiceNumber.toLowerCase().includes(searchTermLower) ||
+                        invoice.supplierName?.toLowerCase().includes(searchTermLower);
+      }
+      
+      const statusMatch = statusFilter === ALL_STATUSES_SENTINEL || tx.paymentStatus === statusFilter;
+      return searchMatch && statusMatch;
     });
-  }, [orders, searchTerm, statusFilter]);
+  }, [transactions, searchTerm, statusFilter]);
   
 
   const handleMarkAsPaid = async () => {
@@ -129,11 +164,10 @@ export default function AdminPaymentsPage() {
       await updateDoc(orderRef, {
         paymentStatus: 'paid',
         updatedAt: serverTimestamp(),
-        // Optionally, add a specific payment confirmation timestamp or details
       });
       toast({ title: "Payment Updated", description: `Order ${orderToUpdatePayment.id} marked as paid.` });
       setOrderToUpdatePayment(null);
-      fetchOrdersAndStats(); // Re-fetch to update summaries and list
+      fetchFinancialData(); 
     } catch (error) {
       console.error("Error updating payment status:", error);
       toast({ title: "Error", description: "Failed to update payment status.", variant: "destructive" });
@@ -154,22 +188,32 @@ export default function AdminPaymentsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-headline font-semibold">Payment Records & Administration</h1>
-          <p className="text-muted-foreground">View transaction histories and manage financial data.</p>
+          <p className="text-muted-foreground">View all incoming and outgoing transactions.</p>
         </div>
-        <Button onClick={fetchOrdersAndStats} variant="outline" size="sm" disabled={isLoading}>
+        <Button onClick={fetchFinancialData} variant="outline" size="sm" disabled={isLoading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} /> Refresh Data
         </Button>
       </div>
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue (Paid)</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <ArrowUpRight className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
             {isLoading ? <Loader2 className="h-6 w-6 animate-spin"/> : <div className="text-2xl font-bold">{formatPrice(summaryStats.totalRevenue)}</div>}
-            <p className="text-xs text-muted-foreground">From all successfully paid orders.</p>
+            <p className="text-xs text-muted-foreground">From successfully paid customer orders.</p>
+          </CardContent>
+        </Card>
+         <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Paid to Suppliers</CardTitle>
+            <ArrowDownLeft className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Loader2 className="h-6 w-6 animate-spin"/> : <div className="text-2xl font-bold">{formatPrice(summaryStats.totalExpenses)}</div>}
+            <p className="text-xs text-muted-foreground">From paid supplier invoices.</p>
           </CardContent>
         </Card>
         <Card>
@@ -178,7 +222,7 @@ export default function AdminPaymentsPage() {
             <Truck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {isLoading ? <Loader2 className="h-6 w-6 animate-spin"/> : <div className="text-2xl font-bold">{formatPrice(summaryStats.pendingPayments)}</div>}
+            {isLoading ? <Loader2 className="h-6 w-6 animate-spin"/> : <div className="text-2xl font-bold">{formatPrice(summaryStats.pendingCodPayments)}</div>}
             <p className="text-xs text-muted-foreground">From 'Cash on Delivery' orders.</p>
           </CardContent>
         </Card>
@@ -189,7 +233,7 @@ export default function AdminPaymentsPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? <Loader2 className="h-6 w-6 animate-spin"/> : <div className="text-2xl font-bold">+{summaryStats.transactionsToday}</div>}
-            <p className="text-xs text-muted-foreground">Orders marked as paid today.</p>
+            <p className="text-xs text-muted-foreground">Customer orders marked as paid today.</p>
           </CardContent>
         </Card>
       </div>
@@ -200,7 +244,7 @@ export default function AdminPaymentsPage() {
             <div className="relative w-full sm:max-w-md">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by Order ID, Customer..."
+                placeholder="Search by ID, Customer/Supplier..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-8 w-full"
@@ -211,7 +255,6 @@ export default function AdminPaymentsPage() {
                 <SelectValue placeholder="Filter by payment status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL_STATUSES_SENTINEL}>All Payment Statuses</SelectItem>
                 {paymentStatuses.map(status => (
                   <SelectItem key={status} value={status} className="capitalize">
                     {status.replace(/_/g, ' ')}
@@ -227,21 +270,22 @@ export default function AdminPaymentsPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {isLoading && filteredOrders.length === 0 ? (
+          {isLoading && filteredTransactions.length === 0 ? (
             <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
-          ) : filteredOrders.length === 0 ? (
+          ) : filteredTransactions.length === 0 ? (
             <div className="p-10 text-center">
               <PackageOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">
-                {orders.length === 0 ? "No payment records found." : "No records match your current search/filter."}
+                {transactions.length === 0 ? "No payment records found." : "No records match your current search/filter."}
               </p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Order ID</TableHead>
-                  <TableHead>Customer</TableHead>
+                  <TableHead>Reference ID</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Party</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Method</TableHead>
                   <TableHead>Status</TableHead>
@@ -250,32 +294,47 @@ export default function AdminPaymentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredOrders.map((order) => (
-                  <TableRow key={order.id}>
+                {filteredTransactions.map((tx) => {
+                  const isRevenue = tx.transactionType === 'revenue';
+                  const order = isRevenue ? tx as Order : null;
+                  const invoice = !isRevenue ? tx as Invoice : null;
+                  const referenceId = order?.id || invoice?.invoiceNumber || 'N/A';
+                  const partyName = order?.customerName || invoice?.supplierName || 'N/A';
+                  const date = order?.createdAt || invoice?.createdAt;
+                  const paymentMethod = order?.paymentMethod || 'Bank Transfer';
+                  const paymentStatus = order?.paymentStatus || invoice?.status;
+                  const amount = order?.totalAmount || invoice?.totalAmount;
+                  const viewLink = order ? `/admin/orders/edit/${order.id}` : (invoice ? `/invoices` : '#');
+
+                  return (
+                  <TableRow key={tx.id}>
                     <TableCell className="font-medium whitespace-nowrap">
-                      <Link href={`/admin/orders/edit/${order.id}`} className="text-primary hover:underline">
-                        {order.id.substring(0,8)}...
+                      <Link href={viewLink} className="text-primary hover:underline">
+                        {referenceId.substring(0,8)}...
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <div className="font-medium">{order.customerName || "N/A"}</div>
-                      <div className="text-xs text-muted-foreground">{order.customerEmail || "N/A"}</div>
+                        <Badge variant={isRevenue ? 'statusGreen' : 'statusRed'} className="capitalize bg-opacity-20 text-opacity-100">
+                          {isRevenue ? <ArrowUpRight className="mr-1 h-3 w-3"/> : <ArrowDownLeft className="mr-1 h-3 w-3"/>}
+                          {tx.transactionType}
+                        </Badge>
                     </TableCell>
-                    <TableCell>{formatDate(order.createdAt)}</TableCell>
+                    <TableCell>{partyName}</TableCell>
+                    <TableCell>{formatDate(date)}</TableCell>
                     <TableCell className="capitalize">
-                      {order.paymentMethod === 'cod' && <Truck className="inline h-4 w-4 mr-1 text-muted-foreground" />}
-                      {order.paymentMethod === 'mpesa' && <Banknote className="inline h-4 w-4 mr-1 text-green-600" />}
-                      {order.paymentMethod === 'card' && <CreditCard className="inline h-4 w-4 mr-1 text-blue-600" />}
-                      {order.paymentMethod?.replace(/_/g, " ") || 'N/A'}
+                      {paymentMethod === 'cod' && <Truck className="inline h-4 w-4 mr-1 text-muted-foreground" />}
+                      {paymentMethod === 'mpesa' && <Banknote className="inline h-4 w-4 mr-1 text-green-600" />}
+                      {paymentMethod === 'card' && <CreditCard className="inline h-4 w-4 mr-1 text-blue-600" />}
+                      {paymentMethod.replace(/_/g, " ")}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={getPaymentStatusBadgeVariant(order.paymentStatus)} className="capitalize">
-                        {order.paymentStatus.replace(/_/g, " ")}
+                      <Badge variant={getPaymentStatusBadgeVariant(paymentStatus as PaymentStatus)} className="capitalize">
+                        {paymentStatus?.replace(/_/g, " ")}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">{formatPrice(order.totalAmount)}</TableCell>
+                    <TableCell className="text-right font-semibold">{formatPrice(amount)}</TableCell>
                     <TableCell className="text-right">
-                      {order.paymentStatus === 'pending' && order.paymentMethod === 'cod' && (
+                      {order && order.paymentStatus === 'pending' && order.paymentMethod === 'cod' && (
                         <AlertDialog open={orderToUpdatePayment?.id === order.id} onOpenChange={(isOpen) => { if (!isOpen) setOrderToUpdatePayment(null); }}>
                             <AlertDialogTrigger asChild>
                                 <Button variant="outline" size="xs" onClick={() => setOrderToUpdatePayment(order)}>Mark Paid</Button>
@@ -297,20 +356,18 @@ export default function AdminPaymentsPage() {
                             </AlertDialogContent>
                         </AlertDialog>
                       )}
-                       <Link href={`/admin/orders/edit/${order.id}#payment`} passHref>
-                         <Button variant="ghost" size="icon" aria-label="View Order Payment Details"><Edit className="h-4 w-4"/></Button>
+                       <Link href={viewLink} passHref>
+                         <Button variant="ghost" size="icon" aria-label="View Details"><Edit className="h-4 w-4"/></Button>
                        </Link>
                     </TableCell>
                   </TableRow>
-                ))}
+                )})}
               </TableBody>
             </Table>
           )}
         </CardContent>
-        {filteredOrders.length > 0 && <CardFooter className="pt-4"><p className="text-xs text-muted-foreground">Showing {filteredOrders.length} of {orders.length} records.</p></CardFooter>}
+        {filteredTransactions.length > 0 && <CardFooter className="pt-4"><p className="text-xs text-muted-foreground">Showing {filteredTransactions.length} of {transactions.length} records.</p></CardFooter>}
       </Card>
     </div>
   );
 }
-
-    
