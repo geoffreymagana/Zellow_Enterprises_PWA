@@ -238,20 +238,20 @@ export default function AdminReportsPage() {
         if (Array.isArray(value)) {
             // Check if it's an array of order items
             if (value.every(item => typeof item === 'object' && item !== null && 'name' in item && 'quantity' in item)) {
-              return value.map(item => `${item.quantity}x ${item.name}`).join('; ');
+              return `"${value.map(item => `${item.quantity}x ${item.name}`).join('; ')}"`;
             }
-            return value.join('; ');
+            return `"${value.join('; ')}"`;
         }
         if (typeof value === 'object') {
             // Specifically handle ShippingAddress object
             if ('fullName' in value && 'addressLine1' in value) {
               const addr = value as ShippingAddress;
-              return `${addr.fullName}, ${addr.addressLine1}, ${addr.city}, ${addr.county}`.replace(/,/g, ' '); // Replace commas to avoid CSV issues
+              const addressParts = [addr.fullName, addr.addressLine1, addr.addressLine2, addr.city, addr.county].filter(Boolean);
+              return `"${addressParts.join(', ')}"`;
             }
-            return JSON.stringify(value);
+            return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
         }
         let stringValue = String(value);
-        // Escape quotes and commas for CSV
         if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
           return `"${stringValue.replace(/"/g, '""')}"`;
         }
@@ -283,8 +283,8 @@ export default function AdminReportsPage() {
   };
 
   const auditHeaders = ["ID", "ProductName", "RequestedQuantity", "RequesterName", "Status", "SupplierName", "SupplierPrice", "ReceivedQuantity", "CreatedAt", "FinanceActionTimestamp", "ReceivedAt"];
-  const salesHeaders = ['ID', 'CustomerName', 'CustomerEmail', 'TotalAmount', 'PaymentStatus', 'Status', 'CreatedAt', 'Items', 'ShippingAddress'];
-  const orderHeaders = ['ID', 'CustomerName', 'CustomerEmail', 'TotalAmount', 'Status', 'CreatedAt'];
+  const salesHeaders = ['id', 'customerName', 'customerEmail', 'totalAmount', 'paymentStatus', 'status', 'createdAt', 'items', 'shippingAddress'];
+  const orderHeaders = ['id', 'customerName', 'customerEmail', 'totalAmount', 'status', 'createdAt'];
   const userHeaders = ['uid', 'displayName', 'email', 'role', 'status', 'createdAt', 'disabled'];
 
   if (authLoading || (!user && !authLoading)) {
@@ -454,5 +454,4 @@ export default function AdminReportsPage() {
     </div>
   );
 }
-
     
