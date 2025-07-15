@@ -356,7 +356,7 @@ export default function AdminPaymentsPage() {
             <DialogHeader>
                 <DialogTitle>Transaction Details</DialogTitle>
                 <DialogDescription>
-                    {viewingTransaction?.transactionType === 'revenue' ? `Order ID: ${(viewingTransaction as Order).id}` : `Invoice #: ${(viewingTransaction as Invoice).invoiceNumber}`}
+                    {viewingTransaction && (viewingTransaction.transactionType === 'revenue' ? `Order ID: ${(viewingTransaction as Order).id}` : `Invoice #: ${(viewingTransaction as Invoice).invoiceNumber}`)}
                 </DialogDescription>
             </DialogHeader>
             <div className="space-y-3 py-2 max-h-[60vh] overflow-y-auto pr-2">
