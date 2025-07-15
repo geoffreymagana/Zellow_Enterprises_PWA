@@ -233,22 +233,25 @@ export default function AdminReportsPage() {
 
     const formatValueForCSV = (value: any): string => {
         if (value === null || value === undefined) return '';
-        if (value instanceof Timestamp) return formatDate(value, true);
+        if (value instanceof Timestamp) return format(value.toDate(), 'yyyy-MM-dd HH:mm:ss');
         if (value instanceof Date) return format(value, 'yyyy-MM-dd HH:mm:ss');
         if (Array.isArray(value)) {
+            // Check if it's an array of order items
             if (value.every(item => typeof item === 'object' && item !== null && 'name' in item && 'quantity' in item)) {
               return value.map(item => `${item.quantity}x ${item.name}`).join('; ');
             }
             return value.join('; ');
         }
         if (typeof value === 'object') {
+            // Specifically handle ShippingAddress object
             if ('fullName' in value && 'addressLine1' in value) {
               const addr = value as ShippingAddress;
-              return `${addr.fullName}, ${addr.addressLine1}, ${addr.city}, ${addr.county}`;
+              return `${addr.fullName}, ${addr.addressLine1}, ${addr.city}, ${addr.county}`.replace(/,/g, ' '); // Replace commas to avoid CSV issues
             }
             return JSON.stringify(value);
         }
         let stringValue = String(value);
+        // Escape quotes and commas for CSV
         if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
           return `"${stringValue.replace(/"/g, '""')}"`;
         }
@@ -268,7 +271,7 @@ export default function AdminReportsPage() {
     });
 
     const csvString = csvRows.join('\n');
-    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' }); // Add BOM for Excel
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `${filename}_${formatDateForFilename()}.csv`;
@@ -399,7 +402,7 @@ export default function AdminReportsPage() {
       <Card>
         <CardHeader>
             <div className="flex items-center justify-between"><CardTitle className="font-headline text-xl">Sales Summary</CardTitle>
-                 <Button variant="outline" size="sm" onClick={() => downloadCSV(salesSummaryData?.detailedPaidOrders, 'sales_summary_details', salesHeaders)} disabled={isLoadingSalesSummary || !salesSummaryData || !salesSummaryData.detailedPaidOrders || salesSummaryData.detailedPaidOrders.length === 0}><Download className="mr-2 h-4 w-4" /> Download Paid Orders CSV</Button>
+                 <Button variant="outline" size="sm" onClick={() => downloadCSV(salesSummaryData?.detailedPaidOrders || [], 'sales_summary_details', salesHeaders)} disabled={isLoadingSalesSummary || !salesSummaryData || salesSummaryData.detailedPaidOrders.length === 0}><Download className="mr-2 h-4 w-4" /> Download Paid Orders CSV</Button>
             </div><CardDescription>Summary of paid orders and revenue.</CardDescription>
         </CardHeader>
         <CardContent>{isLoadingSalesSummary ? <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : salesSummaryData ? (<div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="p-4 bg-muted/50 rounded-md"><p className="text-sm text-muted-foreground">Total Paid Orders</p><p className="text-2xl font-bold">{salesSummaryData.totalPaidOrders}</p></div><div className="p-4 bg-muted/50 rounded-md"><p className="text-sm text-muted-foreground">Total Revenue from Paid Orders</p><p className="text-2xl font-bold">{formatPrice(salesSummaryData.totalRevenue)}</p></div></div>) : (<p className="text-muted-foreground text-center py-6">No sales data available.</p>)}</CardContent>
@@ -438,8 +441,8 @@ export default function AdminReportsPage() {
                     {filteredUserData.map(u => (
                         <TableRow key={u.uid}><TableCell className="font-medium">{u.displayName}</TableCell><TableCell>{u.email}</TableCell><TableCell>{u.role}</TableCell>
                         <TableCell>
-                            <Badge variant={getAccountStatusVariant(u)} className="capitalize">
-                                {u.disabled ? "Inactive" : u.status}
+                            <Badge variant={u.disabled ? 'statusRed' : 'statusGreen'} className="capitalize">
+                                {u.disabled ? "Inactive" : "Active"}
                             </Badge>
                         </TableCell>
                         <TableCell className="text-xs">{formatDate(u.createdAt)}</TableCell></TableRow>
