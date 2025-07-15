@@ -44,11 +44,12 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   const { user, role, logout } = useAuth();
   const sidebarContext = useSidebar();
   const pathname = usePathname();
+  const isMobile = useIsMobile();
 
   if (!sidebarContext) {
     return <div className="flex items-center justify-center min-h-screen">Error: Sidebar context not found.</div>;
   }
-  const { searchTerm, setSearchTerm, setOpenMobile, isMobile } = sidebarContext;
+  const { searchTerm, setSearchTerm, setOpenMobile } = sidebarContext;
 
   const baseAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager'] },
@@ -291,7 +292,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
       {isMobile && <BottomNav />}
     </div>
   );
-}
+};
 
 const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   const { user, role, logout } = useAuth();
@@ -299,6 +300,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isMobile = useIsMobile();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchParams.get('q') || '');
   const [unreadCount, setUnreadCount] = useState(0);
@@ -367,8 +369,6 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
       }
     }, 500); // 500ms debounce
   };
-  
-  const isMobile = useIsMobile();
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -461,7 +461,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   );
 };
 
-function AppLayoutContent({ children }: LayoutProps) {
+const AppLayoutContent: FC<LayoutProps> = ({ children }) => {
   const { user, role, loading } = useAuth();
   const pathname = usePathname();
   const router = useRouter(); 
@@ -488,7 +488,6 @@ function AppLayoutContent({ children }: LayoutProps) {
     return <>{children}</>;
   }
 
-  // Allow public access to order tracking page even if no user
   if (pathname.startsWith('/track/order/')) {
     return <>{children}</>;
   }
