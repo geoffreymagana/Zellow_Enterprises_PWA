@@ -7,10 +7,10 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Download, BarChart2, Users, ShoppingCart, DollarSign, Package, AlertTriangle, FilterX, CalendarIcon } from 'lucide-react';
+import { Loader2, Download, BarChart2, Users, ShoppingCart, DollarSign, Package, AlertTriangle, FilterX, CalendarIcon, UserCheck, Activity } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order, OrderItem, OrderStatus, Product, StockRequest, StockRequestStatus, User as AppUser, ShippingAddress } from '@/types';
+import type { Order, OrderItem, OrderStatus, Product, StockRequest, StockRequestStatus, User as AppUser, ShippingAddress, UserRole } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { format, isSameMonth } from 'date-fns';
 import { DateRange } from "react-day-picker";
@@ -35,6 +35,9 @@ interface SalesSummaryData {
   totalRevenue: number;
   detailedPaidOrders: Order[];
 }
+
+// Define all manageable roles for filtering
+const allManageableRoles: UserRole[] = ['Admin', 'Customer', 'Engraving', 'Printing', 'Assembly', 'Quality Check', 'Packaging', 'Rider', 'Supplier', 'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'];
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -78,13 +81,19 @@ export default function AdminReportsPage() {
   const [salesSummaryData, setSalesSummaryData] = useState<SalesSummaryData | null>(null);
   const [isLoadingSalesSummary, setIsLoadingSalesSummary] = useState(true);
 
-  // State for new Audit Trail report
+  // State for Audit Trail report
   const [auditTrailData, setAuditTrailData] = useState<StockRequest[]>([]);
   const [isLoadingAuditTrail, setIsLoadingAuditTrail] = useState(true);
   const [suppliers, setSuppliers] = useState<AppUser[]>([]);
   const [auditDateRange, setAuditDateRange] = useState<DateRange | undefined>(undefined);
   const [auditSupplierFilter, setAuditSupplierFilter] = useState<string>("all");
   const [auditStatusFilter, setAuditStatusFilter] = useState<StockRequestStatus | "all">("all");
+
+  // State for User Reports
+  const [allUsers, setAllUsers] = useState<AppUser[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  const [userDateRange, setUserDateRange] = useState<DateRange | undefined>(undefined);
+  const [userRoleFilter, setUserRoleFilter] = useState<string>("all");
 
   const formatDate = (timestamp: any, includeTime: boolean = false) => {
     if (!timestamp) return 'N/A';
@@ -93,87 +102,86 @@ export default function AdminReportsPage() {
     return includeTime ? format(date, 'PPp') : format(date, 'PP');
   };
 
-  const fetchOrderStatusDistribution = useCallback(async () => {
-    if (!db) { setIsLoadingOrderStatus(false); return; }
+  const fetchReportData = useCallback(async () => {
+    if (!db) { return; }
+    
+    // Set all loaders to true
     setIsLoadingOrderStatus(true);
-    try {
-      const ordersSnapshot = await getDocs(collection(db, 'orders'));
-      const ordersByStatus = new Map<OrderStatus, Order[]>();
+    setIsLoadingStockLevel(true);
+    setIsLoadingSalesSummary(true);
+    setIsLoadingAuditTrail(true);
+    setIsLoadingUsers(true);
 
+    try {
+      // Parallel fetching
+      const [
+        ordersSnapshot,
+        productsSnapshot,
+        stockRequestsSnapshot,
+        suppliersSnapshot,
+        usersSnapshot,
+      ] = await Promise.all([
+        getDocs(collection(db, 'orders')),
+        getDocs(query(collection(db, 'products'), orderBy('name'))),
+        getDocs(query(collection(db, 'stockRequests'), orderBy("createdAt", "desc"))),
+        getDocs(query(collection(db, 'users'), where("role", "==", "Supplier"))),
+        getDocs(query(collection(db, 'users'), orderBy("createdAt", "desc"))),
+      ]);
+
+      // Process Order Status & Sales Summary
+      const ordersByStatus = new Map<OrderStatus, Order[]>();
+      let totalRevenue = 0;
+      const detailedPaidOrders: Order[] = [];
       ordersSnapshot.forEach(doc => {
         const order = { id: doc.id, ...doc.data() } as Order;
         if (!ordersByStatus.has(order.status)) {
           ordersByStatus.set(order.status, []);
         }
         ordersByStatus.get(order.status)!.push(order);
+        if (order.paymentStatus === 'paid') {
+            totalRevenue += order.totalAmount;
+            detailedPaidOrders.push(order);
+        }
       });
-      
-      const distribution: OrderStatusDistribution[] = Array.from(ordersByStatus.entries()).map(([status, orders]) => ({
-        status,
-        count: orders.length,
-        orders,
-      })).sort((a,b) => b.count - a.count); // Sort by count desc
-
+      const distribution: OrderStatusDistribution[] = Array.from(ordersByStatus.entries()).map(([status, orders]) => ({ status, count: orders.length, orders })).sort((a,b) => b.count - a.count);
       setOrderStatusData(distribution);
-    } catch (error) { toast({ title: "Error", description: "Failed to load order status report.", variant: "destructive" }); }
-    setIsLoadingOrderStatus(false);
-  }, [toast]);
+      setSalesSummaryData({ totalPaidOrders: detailedPaidOrders.length, totalRevenue, detailedPaidOrders });
+      setIsLoadingOrderStatus(false);
+      setIsLoadingSalesSummary(false);
 
-  const fetchStockLevelOverview = useCallback(async () => {
-    if (!db) { setIsLoadingStockLevel(false); return; }
-    setIsLoadingStockLevel(true);
-    try {
-      const productsSnapshot = await getDocs(query(collection(db, 'products'), orderBy('name')));
+      // Process Stock Level
       setStockLevelData(productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StockLevelData)));
-    } catch (error) { toast({ title: "Error", description: "Failed to load stock level report.", variant: "destructive" }); }
-    setIsLoadingStockLevel(false);
-  }, [toast]);
+      setIsLoadingStockLevel(false);
 
-  const fetchSalesSummary = useCallback(async () => {
-    if (!db) { setIsLoadingSalesSummary(false); return; }
-    setIsLoadingSalesSummary(true);
-    try {
-      const paidOrdersQuery = query(collection(db, 'orders'), where('paymentStatus', '==', 'paid'));
-      const paidOrdersSnapshot = await getDocs(paidOrdersQuery);
-      let totalRevenue = 0;
-      const detailedOrders: Order[] = [];
-      paidOrdersSnapshot.forEach(doc => {
-        const order = { id: doc.id, ...doc.data() } as Order;
-        totalRevenue += order.totalAmount;
-        detailedOrders.push(order);
-      });
-      setSalesSummaryData({ totalPaidOrders: paidOrdersSnapshot.size, totalRevenue, detailedOrders: detailedOrders });
-    } catch (error) { toast({ title: "Error", description: "Failed to load sales summary.", variant: "destructive" }); }
-    setIsLoadingSalesSummary(false);
-  }, [toast]);
-  
-  const fetchAuditTrailData = useCallback(async () => {
-    if (!db) { setIsLoadingAuditTrail(false); return; }
-    setIsLoadingAuditTrail(true);
-    try {
-        const [requestsSnapshot, suppliersSnapshot] = await Promise.all([
-            getDocs(query(collection(db, 'stockRequests'), orderBy("createdAt", "desc"))),
-            getDocs(query(collection(db, 'users'), where("role", "==", "Supplier")))
-        ]);
-        setAuditTrailData(requestsSnapshot.docs.map(d => ({id: d.id, ...d.data()} as StockRequest)));
-        setSuppliers(suppliersSnapshot.docs.map(d => ({uid: d.id, ...d.data()} as AppUser)));
+      // Process Audit Trail
+      setAuditTrailData(stockRequestsSnapshot.docs.map(d => ({id: d.id, ...d.data()} as StockRequest)));
+      setSuppliers(suppliersSnapshot.docs.map(d => ({uid: d.id, ...d.data()} as AppUser)));
+      setIsLoadingAuditTrail(false);
+
+      // Process User Reports
+      setAllUsers(usersSnapshot.docs.map(d => ({uid: d.id, ...d.data()} as AppUser)));
+      setIsLoadingUsers(false);
+
     } catch (error) {
-        toast({ title: "Error", description: "Failed to load audit trail data.", variant: "destructive" });
-    } finally {
-        setIsLoadingAuditTrail(false);
+       console.error("Error fetching report data:", error);
+       toast({ title: "Error", description: "Failed to load one or more reports.", variant: "destructive" });
+       // Set all loaders to false on error
+       setIsLoadingOrderStatus(false);
+       setIsLoadingStockLevel(false);
+       setIsLoadingSalesSummary(false);
+       setIsLoadingAuditTrail(false);
+       setIsLoadingUsers(false);
     }
   }, [toast]);
+
 
   useEffect(() => {
     if (!authLoading && (!user || role !== 'Admin')) {
       router.replace('/dashboard');
     } else if (user && role === 'Admin') {
-      fetchOrderStatusDistribution();
-      fetchStockLevelOverview();
-      fetchSalesSummary();
-      fetchAuditTrailData();
+      fetchReportData();
     }
-  }, [user, role, authLoading, router, fetchOrderStatusDistribution, fetchStockLevelOverview, fetchSalesSummary, fetchAuditTrailData]);
+  }, [user, role, authLoading, router, fetchReportData]);
   
   const filteredAuditData = useMemo(() => {
     return auditTrailData.filter(req => {
@@ -187,6 +195,19 @@ export default function AdminReportsPage() {
         return dateMatch && supplierMatch && statusMatch;
     });
   }, [auditTrailData, auditDateRange, auditSupplierFilter, auditStatusFilter]);
+
+  const filteredUserData = useMemo(() => {
+    return allUsers.filter(usr => {
+      const joinDate = usr.createdAt?.toDate ? usr.createdAt.toDate() : null;
+      const dateMatch = !userDateRange || (
+        joinDate &&
+        (!userDateRange.from || joinDate >= userDateRange.from) &&
+        (!userDateRange.to || joinDate <= userDateRange.to)
+      );
+      const roleMatch = userRoleFilter === 'all' || usr.role === userRoleFilter;
+      return dateMatch && roleMatch;
+    });
+  }, [allUsers, userDateRange, userRoleFilter]);
 
   const downloadCSV = (data: any[], filename: string, headers: string[]) => {
     if (!data || data.length === 0) {
@@ -222,7 +243,9 @@ export default function AdminReportsPage() {
     data.forEach(row => {
       const values = headers.map(header => {
         const key = header.toLowerCase().replace(/\s/g, '');
-        const rowValue = Object.entries(row).find(([k,v]) => k.toLowerCase() === key)?.[1];
+        // Find a key in the row object that matches the header, case-insensitively
+        const rowKey = Object.keys(row).find(k => k.toLowerCase() === key);
+        const rowValue = rowKey ? row[rowKey] : '';
         return formatValueForCSV(rowValue);
       });
       csvRows.push(values.join(','));
@@ -243,6 +266,7 @@ export default function AdminReportsPage() {
   const auditHeaders = ["ID", "ProductName", "RequestedQuantity", "RequesterName", "Status", "SupplierName", "SupplierPrice", "ReceivedQuantity", "CreatedAt", "FinanceActionTimestamp", "ReceivedAt"];
   const salesHeaders = ['ID', 'CustomerName', 'CustomerEmail', 'TotalAmount', 'PaymentStatus', 'Status', 'CreatedAt', 'Items', 'ShippingAddress'];
   const orderHeaders = ['ID', 'CustomerName', 'CustomerEmail', 'TotalAmount', 'Status', 'CreatedAt'];
+  const userHeaders = ['uid', 'displayName', 'email', 'role', 'status', 'createdAt'];
 
   if (authLoading || (!user && !authLoading)) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -305,7 +329,7 @@ export default function AdminReportsPage() {
         </CardContent>
         {filteredAuditData.length > 0 && <CardFooter><p className="text-xs text-muted-foreground">Showing {filteredAuditData.length} of {auditTrailData.length} records.</p></CardFooter>}
       </Card>
-      
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between"><CardTitle className="font-headline text-xl">Order Status Distribution</CardTitle></div>
@@ -350,7 +374,7 @@ export default function AdminReportsPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between"><CardTitle className="font-headline text-xl">Stock Level Overview</CardTitle>
-             <Button variant="outline" size="sm" onClick={() => downloadCSV(stockLevelData, 'stock_level_overview', ['ID', 'Name', 'Categories', 'Stock', 'Price'])} disabled={isLoadingStockLevel || stockLevelData.length === 0}><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
+             <Button variant="outline" size="sm" onClick={() => downloadCSV(stockLevelData, 'stock_level_overview', ['id', 'name', 'categories', 'stock', 'price'])} disabled={isLoadingStockLevel || stockLevelData.length === 0}><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
           </div><CardDescription>Current stock levels for all products.</CardDescription>
         </CardHeader>
         <CardContent>{isLoadingStockLevel ? <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : stockLevelData.length === 0 ? <p className="text-muted-foreground text-center py-6">No product data available.</p> : (<Table><TableHeader><TableRow><TableHead>Product Name</TableHead><TableHead>Categories</TableHead><TableHead className="text-right">Stock</TableHead><TableHead className="text-right">Price</TableHead></TableRow></TableHeader><TableBody>{stockLevelData.map(product => (<TableRow key={product.id}><TableCell>{product.name}</TableCell><TableCell className="text-xs">{product.categories?.join(', ') || 'N/A'}</TableCell><TableCell className="text-right">{product.stock}</TableCell><TableCell className="text-right">{formatPrice(product.price)}</TableCell></TableRow>))}</TableBody></Table>)}</CardContent>
@@ -359,10 +383,55 @@ export default function AdminReportsPage() {
       <Card>
         <CardHeader>
             <div className="flex items-center justify-between"><CardTitle className="font-headline text-xl">Sales Summary</CardTitle>
-                 <Button variant="outline" size="sm" onClick={() => downloadCSV(salesSummaryData?.detailedPaidOrders || [], 'sales_summary_details', salesHeaders)} disabled={isLoadingSalesSummary || !salesSummaryData || !salesSummaryData.detailedPaidOrders || salesSummaryData.detailedPaidOrders.length === 0}><Download className="mr-2 h-4 w-4" /> Download Paid Orders CSV</Button>
+                 <Button variant="outline" size="sm" onClick={() => downloadCSV(salesSummaryData?.detailedPaidOrders || [], 'sales_summary_details', salesHeaders)} disabled={isLoadingSalesSummary || !salesSummaryData || salesSummaryData.detailedPaidOrders.length === 0}><Download className="mr-2 h-4 w-4" /> Download Paid Orders CSV</Button>
             </div><CardDescription>Summary of paid orders and revenue.</CardDescription>
         </CardHeader>
         <CardContent>{isLoadingSalesSummary ? <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : salesSummaryData ? (<div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="p-4 bg-muted/50 rounded-md"><p className="text-sm text-muted-foreground">Total Paid Orders</p><p className="text-2xl font-bold">{salesSummaryData.totalPaidOrders}</p></div><div className="p-4 bg-muted/50 rounded-md"><p className="text-sm text-muted-foreground">Total Revenue from Paid Orders</p><p className="text-2xl font-bold">{formatPrice(salesSummaryData.totalRevenue)}</p></div></div>) : (<p className="text-muted-foreground text-center py-6">No sales data available.</p>)}</CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <CardTitle className="font-headline text-xl flex items-center gap-2"><UserCheck /> User Registration Report</CardTitle>
+            <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredUserData, 'user_registrations', userHeaders)} disabled={isLoadingUsers || filteredUserData.length === 0}><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
+          </div>
+          <CardDescription>View and export user registration data.</CardDescription>
+        </CardHeader>
+        <CardContent>
+           <div className="flex flex-col md:flex-row gap-2 p-4 border rounded-lg bg-muted/50 mb-4 items-center">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button id="userDate" variant={"outline"} className={cn("w-full justify-start text-left font-normal md:w-[260px]", !userDateRange && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />
+                  {userDateRange?.from ? (userDateRange.to ? <>{format(userDateRange.from, "LLL dd, y")} - {format(userDateRange.to, "LLL dd, y")}</> : format(userDateRange.from, "LLL dd, y")) : <span>Filter by registration date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start"><Calendar initialFocus mode="range" defaultMonth={userDateRange?.from} selected={userDateRange} onSelect={setUserDateRange} numberOfMonths={2}/></PopoverContent>
+            </Popover>
+            <Select value={userRoleFilter} onValueChange={setUserRoleFilter}><SelectTrigger className="w-full md:w-[200px]"><SelectValue placeholder="Filter by role..." /></SelectTrigger>
+                <SelectContent><SelectItem value="all">All Roles</SelectItem>{allManageableRoles.map(r => r && <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+            </Select>
+            <Button variant="ghost" onClick={() => {setUserDateRange(undefined); setUserRoleFilter("all");}} className="w-full md:w-auto"><FilterX className="mr-2 h-4 w-4" /> Clear</Button>
+          </div>
+          {isLoadingUsers ? <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          : filteredUserData.length === 0 ? <p className="text-muted-foreground text-center py-6">No users match your filters.</p>
+          : (<Table><TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead><TableHead>Joined</TableHead></TableRow></TableHeader>
+                <TableBody>
+                    {filteredUserData.map(u => (
+                        <TableRow key={u.uid}><TableCell className="font-medium">{u.displayName}</TableCell><TableCell>{u.email}</TableCell><TableCell>{u.role}</TableCell><TableCell className="capitalize">{u.status}</TableCell><TableCell className="text-xs">{formatDate(u.createdAt)}</TableCell></TableRow>
+                    ))}
+                </TableBody>
+            </Table>)}
+        </CardContent>
+      </Card>
+      
+       <Card>
+        <CardHeader>
+          <CardTitle className="font-headline text-xl flex items-center gap-2"><Activity /> User Activity Report</CardTitle>
+          <CardDescription>This section is under construction. It will show user activities like logins, major actions, etc.</CardDescription>
+        </CardHeader>
+        <CardContent className="text-center text-muted-foreground py-10">
+            <p>User activity reporting will be available here soon.</p>
+        </CardContent>
       </Card>
     </div>
   );
