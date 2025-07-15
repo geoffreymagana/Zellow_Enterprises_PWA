@@ -9,15 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle, XCircle, Eye, RefreshCw, Coins, Trophy, ArrowRight, FilePlus2, Hourglass } from 'lucide-react';
-import type { StockRequest, StockRequestStatus, Bid } from '@/types';
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { Loader2, CheckCircle, XCircle, Eye, RefreshCw, Coins, Trophy, ArrowRight, FilePlus2, Hourglass, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import type { StockRequest, StockRequestStatus, Bid, Product } from '@/types';
+import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, writeBatch, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 const getStockRequestStatusVariant = (status?: StockRequestStatus | null): BadgeProps['variant'] => {
   if (!status) return 'outline';
@@ -45,6 +44,7 @@ export default function FinanceApprovalsPage() {
   const { toast } = useToast();
 
   const [requests, setRequests] = useState<StockRequest[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   const [viewingRequest, setViewingRequest] = useState<StockRequest | null>(null);
@@ -57,25 +57,42 @@ export default function FinanceApprovalsPage() {
     return format(date, 'PPp');
   };
 
-  const fetchRequests = useCallback(() => {
+  const fetchRequestsAndProducts = useCallback(async () => {
     if (!db || !user || !['Admin', 'FinanceManager', 'InventoryManager'].includes(role || '')) {
       setIsLoading(false);
-      return () => {};
+      return;
     }
     setIsLoading(true);
-    let q;
-    // Finance and Admin see requests needing bid awards
-    q = query(collection(db, 'stockRequests'), where("status", "in", ["pending_award", "pending_bids"]), orderBy("createdAt", "desc"));
     
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StockRequest)));
-      setIsLoading(false);
-    }, (error) => {
-      console.error("Error fetching stock requests:", error);
-      toast({ title: "Error", description: "Could not load stock requests for approval.", variant: "destructive" });
-      setIsLoading(false);
-    });
-    return unsubscribe;
+    try {
+      // Fetch products first to have them available for lookups
+      const productsSnapshot = await getDocs(collection(db, 'products'));
+      const productsData = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+      setProducts(productsData);
+
+      // Fetch requests needing bid awards
+      const requestsQuery = query(
+        collection(db, 'stockRequests'), 
+        where("status", "in", ["pending_award", "pending_bids"]), 
+        orderBy("createdAt", "desc")
+      );
+      
+      const unsubscribe = onSnapshot(requestsQuery, (snapshot) => {
+        setRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StockRequest)));
+        setIsLoading(false); // Only set loading false after requests are fetched
+      }, (error) => {
+        console.error("Error fetching stock requests:", error);
+        toast({ title: "Error", description: "Could not load stock requests for approval.", variant: "destructive" });
+        setIsLoading(false);
+      });
+
+      return unsubscribe;
+
+    } catch (error) {
+       console.error("Error fetching initial data:", error);
+       toast({ title: "Error", description: "Could not load page data.", variant: "destructive" });
+       setIsLoading(false);
+    }
   }, [db, user, role, toast]);
 
   useEffect(() => {
@@ -84,9 +101,14 @@ export default function FinanceApprovalsPage() {
       router.replace('/dashboard');
       return;
     }
-    const unsubscribe = fetchRequests();
-    return () => unsubscribe();
-  }, [authLoading, user, role, router, fetchRequests]);
+    const unsubscribe = fetchRequestsAndProducts();
+    // This will return the onSnapshot unsubscriber if it was created
+    return () => {
+      if (unsubscribe && typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, [authLoading, user, role, router, fetchRequestsAndProducts]);
 
   const handleAwardBid = async (request: StockRequest, winningBid: Bid) => {
     if (!db || !user) return;
@@ -118,6 +140,8 @@ export default function FinanceApprovalsPage() {
   
   const requestsNeedingAward = requests.filter(r => r.status === 'pending_award');
 
+  const productForViewingRequest = viewingRequest ? products.find(p => p.id === viewingRequest.productId) : null;
+
   if (authLoading || (!user && !authLoading)) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
@@ -126,7 +150,7 @@ export default function FinanceApprovalsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-headline font-semibold flex items-center gap-2"><Trophy className="h-7 w-7 text-primary"/>Bid & Award Center</h1>
-        <Button onClick={fetchRequests} variant="outline" size="sm" disabled={isLoading}>
+        <Button onClick={fetchRequestsAndProducts} variant="outline" size="sm" disabled={isLoading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
       </div>
@@ -200,10 +224,23 @@ export default function FinanceApprovalsPage() {
             <DialogDescription>
               Requested Qty: {viewingRequest?.requestedQuantity}. Select the winning bid to proceed.
             </DialogDescription>
+             {productForViewingRequest && (
+              <div className="text-sm text-muted-foreground pt-2">
+                Current Product Price: <span className="font-semibold text-foreground">{formatKsh(productForViewingRequest.price)}</span>
+              </div>
+            )}
           </DialogHeader>
           <div className="py-4 space-y-3 max-h-[60vh] overflow-y-auto">
             {viewingRequest?.bids && viewingRequest.bids.length > 0 ? (
-                viewingRequest.bids.sort((a,b) => a.pricePerUnit - b.pricePerUnit).map(bid => (
+                viewingRequest.bids.sort((a,b) => a.pricePerUnit - b.pricePerUnit).map(bid => {
+                  const currentProductPrice = productForViewingRequest?.price;
+                  const priceDifference = currentProductPrice !== undefined ? bid.pricePerUnit - currentProductPrice : 0;
+                  const isBetterPrice = priceDifference < 0;
+                  const isWorsePrice = priceDifference > 0;
+                  const Icon = isBetterPrice ? TrendingDown : isWorsePrice ? TrendingUp : Minus;
+                  const iconColor = isBetterPrice ? 'text-green-500' : isWorsePrice ? 'text-red-500' : 'text-muted-foreground';
+
+                  return (
                     <Card key={bid.id} className="bg-muted/50">
                         <CardContent className="p-3">
                             <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
@@ -213,7 +250,13 @@ export default function FinanceApprovalsPage() {
                                 </div>
                                 <div className="text-left sm:text-right">
                                     <p className="font-bold text-lg text-primary">{formatKsh(bid.pricePerUnit)} <span className="text-sm font-normal text-muted-foreground">/ unit</span></p>
-                                    <p className="text-sm font-medium">Total: {formatKsh(bid.pricePerUnit * (viewingRequest.requestedQuantity || 0))}</p>
+                                    <p className="text-sm font-medium">Total Bid: {formatKsh(bid.pricePerUnit * (viewingRequest.requestedQuantity || 0))}</p>
+                                    {currentProductPrice !== undefined && (
+                                      <p className={cn("text-xs font-medium flex items-center justify-start sm:justify-end gap-1", iconColor)}>
+                                        <Icon className="h-3 w-3" />
+                                        {formatKsh(Math.abs(priceDifference))} {isBetterPrice ? 'below' : (isWorsePrice ? 'above' : 'equal to')} list price
+                                      </p>
+                                    )}
                                 </div>
                             </div>
                             {bid.notes && <p className="text-xs mt-2 border-t pt-2">Notes: {bid.notes}</p>}
@@ -229,7 +272,8 @@ export default function FinanceApprovalsPage() {
                             </div>
                         </CardContent>
                     </Card>
-                ))
+                  )
+                })
             ) : (
                 <p>No bids submitted for this request yet.</p>
             )}
