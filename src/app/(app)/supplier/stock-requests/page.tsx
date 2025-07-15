@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import Link from 'next/link';
 
 const getStockRequestStatusVariant = (status: StockRequestStatus): BadgeProps['variant'] => {
   switch (status) {
@@ -130,10 +131,19 @@ export default function SupplierStockRequestsPage() {
             fulfilledQty: String(request.requestedQuantity),
             supplierPrice: String(request.supplierPrice)
         });
+        
+        // Before navigating, update the stock request status to 'awaiting_receipt'
+        const requestRef = doc(db, 'stockRequests', request.id);
+        await updateDoc(requestRef, {
+            status: 'awaiting_receipt',
+            supplierActionTimestamp: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+
         router.push(`/supplier/invoices/new?${queryParams.toString()}`);
     } catch (e: any) {
-        console.error("Error navigating to invoice page:", e);
-        toast({ title: "Error", description: "Could not navigate to invoice creation page.", variant: "destructive" });
+        console.error("Error updating status or navigating to invoice page:", e);
+        toast({ title: "Error", description: "Could not proceed to invoice creation.", variant: "destructive" });
     }
   }
 
