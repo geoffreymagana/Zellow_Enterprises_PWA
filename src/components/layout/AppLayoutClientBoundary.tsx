@@ -1,12 +1,11 @@
 
 "use client";
 
-import { ReactNode, FC, useState, useEffect, useCallback, useRef } from 'react';
+import { ReactNode, FC, useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Input } from '@/components/ui/input';
 import {
   Sidebar,
   SidebarContent,
@@ -20,11 +19,11 @@ import {
 } from "@/components/ui/sidebar";
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Users, Package, ShoppingCart, Layers, DollarSign,
   Truck, Settings as SettingsIcon, UserCircle, LogOutIcon, Menu, Bell,
-  FileArchive, ClipboardCheck, MapIcon, Ship, Home, Search as SearchIconLucide, ListChecks,
+  FileArchive, ClipboardCheck, MapIcon, Ship, Home,
   Aperture, Coins, Warehouse, PackageSearch, BarChart2, FileText, Wrench, PackagePlus
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -34,7 +33,7 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { FeedbackThread, UserRole } from '@/types';
 import { useIsMobile } from '@/hooks/use-mobile';
-
+import { HeaderSearch } from './HeaderSearch';
 
 interface LayoutProps {
   children: ReactNode;
@@ -192,16 +191,11 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
             </Link>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            <div className="relative w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96">
-               <SearchIconLucide className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search sections..."
-                className="h-9 w-full pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+            <HeaderSearch 
+              initialSearchTerm={searchTerm} 
+              onSearchChange={setSearchTerm} 
+              placeholder="Search sections..." 
+            />
             <div className="hidden md:block">
               <ThemeToggle />
             </div>
@@ -300,21 +294,9 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   const { user, role, logout } = useAuth();
   const { cartTotalItems } = useCart();
   const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const isMobile = useIsMobile();
 
-  const [localSearchTerm, setLocalSearchTerm] = useState(searchParams.get('q') || '');
   const [unreadCount, setUnreadCount] = useState(0);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    const currentQuerySearch = searchParams.get('q') || '';
-    if (currentQuerySearch !== localSearchTerm) {
-      setLocalSearchTerm(currentQuerySearch);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
 
   useEffect(() => {
     if (!db || !user || !role) return;
@@ -346,43 +328,13 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
     return () => unsubscribe();
   }, [db, user, role]);
 
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newSearchTerm = event.target.value;
-    setLocalSearchTerm(newSearchTerm);
-
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-
-    debounceTimeoutRef.current = setTimeout(() => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (newSearchTerm) {
-        params.set('q', newSearchTerm);
-      } else {
-        params.delete('q');
-      }
-      if (pathname === '/products' || pathname === '/gift-boxes') {
-         router.push(`${pathname}?${params.toString()}`);
-      } else if (newSearchTerm) { 
-        router.push(`/products?${params.toString()}`);
-      }
-    }, 500); 
-  };
-
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-[var(--header-height)]">
         <div className="container mx-auto h-full flex items-center justify-between px-4 gap-4">
-           <div className="relative flex-1 max-w-md sm:max-w-lg md:max-w-xl">
-             <SearchIconLucide className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder={role === 'Customer' ? "Search products, gift boxes..." : (role === 'InventoryManager' ? "Search inventory..." : "Search...")}
-              className="h-9 w-full pl-10"
-              value={localSearchTerm}
-              onChange={handleSearchChange}
-            />
-          </div>
+           <HeaderSearch 
+             placeholder={role === 'Customer' ? "Search products, gift boxes..." : (role === 'InventoryManager' ? "Search inventory..." : "Search...")} 
+           />
 
           <div className="flex items-center gap-2">
             <Link href="/feedback" passHref>
@@ -460,7 +412,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   );
 };
 
-export function AppLayoutClientBoundary({ children }: LayoutProps) {
+function AppLayoutContent({ children }: LayoutProps) {
   const { user, role, loading } = useAuth();
   const pathname = usePathname();
   const router = useRouter(); 
@@ -487,7 +439,6 @@ export function AppLayoutClientBoundary({ children }: LayoutProps) {
     return <>{children}</>;
   }
 
-  // Allow public access to order tracking page even if no user
   if (pathname.startsWith('/track/order/')) {
     return <>{children}</>;
   }
@@ -503,4 +454,12 @@ export function AppLayoutClientBoundary({ children }: LayoutProps) {
   }
 
   return <NonAdminLayout>{children}</NonAdminLayout>;
+}
+
+export function AppLayoutClientBoundary({ children }: LayoutProps) {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
+      <AppLayoutContent>{children}</AppLayoutContent>
+    </Suspense>
+  );
 }
