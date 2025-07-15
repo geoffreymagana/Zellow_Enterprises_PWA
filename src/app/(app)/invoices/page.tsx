@@ -1,7 +1,7 @@
 
 "use client";
 
-import * as React from "react"; // Added this line to fix the error
+import * as React from "react"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,13 @@ import { Logo } from '@/components/common/Logo';
 
 const formatKsh = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
+};
+
+const formatDate = (timestamp: any, includeTime: boolean = false): string => {
+    if (!timestamp) return 'N/A';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    return includeTime ? format(date, 'PPp') : format(date, 'PP');
 };
 
 const getInvoiceStatusBadgeVariant = (status: InvoiceStatus): BadgeProps['variant'] => {
@@ -175,13 +182,6 @@ export default function InvoicesPage() {
 
 
   const [isMarkingPaid, setIsMarkingPaid] = useState(false);
-
-  const formatDate = (timestamp: any, includeTime: boolean = false): string => {
-    if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    if (isNaN(date.getTime())) return 'Invalid Date';
-    return includeTime ? format(date, 'PPp') : format(date, 'PP');
-  };
 
   const fetchInvoices = useCallback(() => {
     if (!db || !user || (role !== 'FinanceManager' && role !== 'Admin' && role !== 'Supplier' && role !== 'InventoryManager')) {
