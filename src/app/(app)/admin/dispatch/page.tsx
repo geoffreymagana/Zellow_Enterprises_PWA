@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from '@/hooks/useAuth';
@@ -15,6 +16,7 @@ import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter } from "@/components/ui/alert-dialog";
+import { sendPushNotification } from '@/app/api/push/send-notification/route';
 
 const defaultOrderColors = ['#FF6347', '#4682B4', '#32CD32', '#FFD700', '#DA70D6', '#6A5ACD', '#FFA500', '#8A2BE2'];
 
@@ -128,6 +130,24 @@ export default function DispatchCenterPage() {
         updatedAt: serverTimestamp(),
       });
       toast({ title: "Success", description: `Order ${selectedOrder.id} assigned to ${riderToAssign.displayName || riderToAssign.email}.` });
+      
+      // Send Push Notification
+      try {
+        await sendPushNotification(selectedRiderForAssignment, {
+          title: "New Delivery Assignment",
+          options: {
+            body: `Order for ${selectedOrder.customerName} is ready for delivery.`,
+            icon: '/icons/Zellow-icon-192.png',
+            badge: '/icons/Zellow-icon-72.png',
+            data: { url: `/rider/map?orderId=${selectedOrder.id}` }
+          }
+        });
+        toast({ title: "Notification Sent", description: `Push notification sent to ${riderToAssign.displayName || riderToAssign.email}.` });
+      } catch (notificationError) {
+        console.error("Failed to send push notification:", notificationError);
+        toast({ title: "Notification Failed", description: "Could not send push notification to rider. They can still see the order in their app.", variant: "destructive" });
+      }
+
       setSelectedOrder(null);
       setSelectedRiderForAssignment(null);
       setAssignmentNotes(""); // Clear notes
