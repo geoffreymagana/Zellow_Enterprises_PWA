@@ -237,7 +237,7 @@ export default function SupplierStockRequestsPage() {
         </CardContent>
       </Card>
       
-       <Card>
+       <Card className="mb-20">
         <CardHeader>
           <CardTitle>Awaiting My Fulfillment</CardTitle>
           <CardDescription>These requests have been awarded to you. Fulfill the order and create an invoice.</CardDescription>
