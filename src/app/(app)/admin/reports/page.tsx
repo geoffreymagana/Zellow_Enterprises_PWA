@@ -7,7 +7,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Download, BarChart2, Users, ShoppingCart, DollarSign, Package, AlertTriangle, FilterX, CalendarIcon, UserCheck, Activity } from 'lucide-react';
+import { Loader2, Download, BarChart2, Users, ShoppingCart, DollarSign, Package, AlertTriangle, FilterX, CalendarIcon, UserCheck, Activity, UserCog } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, OrderItem, OrderStatus, Product, StockRequest, StockRequestStatus, User as AppUser, ShippingAddress, UserRole } from '@/types';
@@ -68,6 +68,13 @@ const getStockRequestStatusVariant = (status?: StockRequestStatus | null): Badge
   }
 };
 
+const getAccountStatusVariant = (user: AppUser): BadgeProps['variant'] => {
+    if (user.disabled) return 'statusRed';
+    if (user.status === 'pending') return 'statusYellow';
+    if (user.status === 'rejected') return 'statusRed';
+    return 'statusGreen';
+};
+
 export default function AdminReportsPage() {
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -94,6 +101,7 @@ export default function AdminReportsPage() {
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [userDateRange, setUserDateRange] = useState<DateRange | undefined>(undefined);
   const [userRoleFilter, setUserRoleFilter] = useState<string>("all");
+  const [userStatusFilter, setUserStatusFilter] = useState<string>("all"); // 'all', 'active', 'inactive'
 
   const formatDate = (timestamp: any, includeTime: boolean = false) => {
     if (!timestamp) return 'N/A';
@@ -205,9 +213,17 @@ export default function AdminReportsPage() {
         (!userDateRange.to || joinDate <= userDateRange.to)
       );
       const roleMatch = userRoleFilter === 'all' || usr.role === userRoleFilter;
-      return dateMatch && roleMatch;
+
+      let statusMatch = true;
+      if (userStatusFilter === 'active') {
+          statusMatch = !usr.disabled;
+      } else if (userStatusFilter === 'inactive') {
+          statusMatch = !!usr.disabled;
+      }
+
+      return dateMatch && roleMatch && statusMatch;
     });
-  }, [allUsers, userDateRange, userRoleFilter]);
+  }, [allUsers, userDateRange, userRoleFilter, userStatusFilter]);
 
   const downloadCSV = (data: any[], filename: string, headers: string[]) => {
     if (!data || data.length === 0) {
@@ -266,7 +282,7 @@ export default function AdminReportsPage() {
   const auditHeaders = ["ID", "ProductName", "RequestedQuantity", "RequesterName", "Status", "SupplierName", "SupplierPrice", "ReceivedQuantity", "CreatedAt", "FinanceActionTimestamp", "ReceivedAt"];
   const salesHeaders = ['ID', 'CustomerName', 'CustomerEmail', 'TotalAmount', 'PaymentStatus', 'Status', 'CreatedAt', 'Items', 'ShippingAddress'];
   const orderHeaders = ['ID', 'CustomerName', 'CustomerEmail', 'TotalAmount', 'Status', 'CreatedAt'];
-  const userHeaders = ['uid', 'displayName', 'email', 'role', 'status', 'createdAt'];
+  const userHeaders = ['uid', 'displayName', 'email', 'role', 'status', 'createdAt', 'disabled'];
 
   if (authLoading || (!user && !authLoading)) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -383,7 +399,7 @@ export default function AdminReportsPage() {
       <Card>
         <CardHeader>
             <div className="flex items-center justify-between"><CardTitle className="font-headline text-xl">Sales Summary</CardTitle>
-                 <Button variant="outline" size="sm" onClick={() => downloadCSV(salesSummaryData?.detailedPaidOrders || [], 'sales_summary_details', salesHeaders)} disabled={isLoadingSalesSummary || !salesSummaryData || salesSummaryData.detailedPaidOrders.length === 0}><Download className="mr-2 h-4 w-4" /> Download Paid Orders CSV</Button>
+                 <Button variant="outline" size="sm" onClick={() => downloadCSV(salesSummaryData?.detailedPaidOrders, 'sales_summary_details', salesHeaders)} disabled={isLoadingSalesSummary || !salesSummaryData || !salesSummaryData.detailedPaidOrders || salesSummaryData.detailedPaidOrders.length === 0}><Download className="mr-2 h-4 w-4" /> Download Paid Orders CSV</Button>
             </div><CardDescription>Summary of paid orders and revenue.</CardDescription>
         </CardHeader>
         <CardContent>{isLoadingSalesSummary ? <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : salesSummaryData ? (<div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="p-4 bg-muted/50 rounded-md"><p className="text-sm text-muted-foreground">Total Paid Orders</p><p className="text-2xl font-bold">{salesSummaryData.totalPaidOrders}</p></div><div className="p-4 bg-muted/50 rounded-md"><p className="text-sm text-muted-foreground">Total Revenue from Paid Orders</p><p className="text-2xl font-bold">{formatPrice(salesSummaryData.totalRevenue)}</p></div></div>) : (<p className="text-muted-foreground text-center py-6">No sales data available.</p>)}</CardContent>
@@ -392,10 +408,10 @@ export default function AdminReportsPage() {
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <CardTitle className="font-headline text-xl flex items-center gap-2"><UserCheck /> User Registration Report</CardTitle>
-            <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredUserData, 'user_registrations', userHeaders)} disabled={isLoadingUsers || filteredUserData.length === 0}><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
+            <CardTitle className="font-headline text-xl flex items-center gap-2"><UserCog /> User Management Report</CardTitle>
+            <Button variant="outline" size="sm" onClick={() => downloadCSV(filteredUserData, 'user_report', userHeaders)} disabled={isLoadingUsers || filteredUserData.length === 0}><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
           </div>
-          <CardDescription>View and export user registration data.</CardDescription>
+          <CardDescription>View and export user data with status and role filters.</CardDescription>
         </CardHeader>
         <CardContent>
            <div className="flex flex-col md:flex-row gap-2 p-4 border rounded-lg bg-muted/50 mb-4 items-center">
@@ -407,32 +423,33 @@ export default function AdminReportsPage() {
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start"><Calendar initialFocus mode="range" defaultMonth={userDateRange?.from} selected={userDateRange} onSelect={setUserDateRange} numberOfMonths={2}/></PopoverContent>
             </Popover>
-            <Select value={userRoleFilter} onValueChange={setUserRoleFilter}><SelectTrigger className="w-full md:w-[200px]"><SelectValue placeholder="Filter by role..." /></SelectTrigger>
+            <Select value={userRoleFilter} onValueChange={setUserRoleFilter}><SelectTrigger className="w-full md:w-[160px]"><SelectValue placeholder="Filter by role..." /></SelectTrigger>
                 <SelectContent><SelectItem value="all">All Roles</SelectItem>{allManageableRoles.map(r => r && <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
             </Select>
-            <Button variant="ghost" onClick={() => {setUserDateRange(undefined); setUserRoleFilter("all");}} className="w-full md:w-auto"><FilterX className="mr-2 h-4 w-4" /> Clear</Button>
+            <Select value={userStatusFilter} onValueChange={setUserStatusFilter}><SelectTrigger className="w-full md:w-[160px]"><SelectValue placeholder="Filter by status..." /></SelectTrigger>
+                <SelectContent><SelectItem value="all">All Statuses</SelectItem><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent>
+            </Select>
+            <Button variant="ghost" onClick={() => {setUserDateRange(undefined); setUserRoleFilter("all"); setUserStatusFilter("all");}} className="w-full md:w-auto"><FilterX className="mr-2 h-4 w-4" /> Clear</Button>
           </div>
           {isLoadingUsers ? <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
           : filteredUserData.length === 0 ? <p className="text-muted-foreground text-center py-6">No users match your filters.</p>
           : (<Table><TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead><TableHead>Joined</TableHead></TableRow></TableHeader>
                 <TableBody>
                     {filteredUserData.map(u => (
-                        <TableRow key={u.uid}><TableCell className="font-medium">{u.displayName}</TableCell><TableCell>{u.email}</TableCell><TableCell>{u.role}</TableCell><TableCell className="capitalize">{u.status}</TableCell><TableCell className="text-xs">{formatDate(u.createdAt)}</TableCell></TableRow>
+                        <TableRow key={u.uid}><TableCell className="font-medium">{u.displayName}</TableCell><TableCell>{u.email}</TableCell><TableCell>{u.role}</TableCell>
+                        <TableCell>
+                            <Badge variant={getAccountStatusVariant(u)} className="capitalize">
+                                {u.disabled ? "Inactive" : u.status}
+                            </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs">{formatDate(u.createdAt)}</TableCell></TableRow>
                     ))}
                 </TableBody>
             </Table>)}
         </CardContent>
       </Card>
-      
-       <Card>
-        <CardHeader>
-          <CardTitle className="font-headline text-xl flex items-center gap-2"><Activity /> User Activity Report</CardTitle>
-          <CardDescription>This section is under construction. It will show user activities like logins, major actions, etc.</CardDescription>
-        </CardHeader>
-        <CardContent className="text-center text-muted-foreground py-10">
-            <p>User activity reporting will be available here soon.</p>
-        </CardContent>
-      </Card>
     </div>
   );
 }
+
+    
