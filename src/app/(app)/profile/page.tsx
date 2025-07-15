@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
-import { UserCircle2, Edit3, ShieldCheck, LogOut, Loader2, HelpCircle, Mail, Info, ShoppingCart, MessageSquare, Bell } from "lucide-react";
+import { UserCircle2, Edit3, ShieldCheck, LogOut, Loader2, HelpCircle, Mail, Info, ShoppingCart, MessageSquare, Bell, PackagePlus } from "lucide-react";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -128,11 +128,18 @@ export default function ProfilePage() {
           <Separator className="my-4 !mt-6" />
 
           {role === 'Customer' && (
-            <Button asChild variant="outline" className="w-full justify-start">
-              <Link href="/orders">
-                <ShoppingCart className="mr-2 h-4 w-4" /> My Orders
-              </Link>
-            </Button>
+            <>
+              <Button asChild variant="outline" className="w-full justify-start">
+                <Link href="/orders">
+                  <ShoppingCart className="mr-2 h-4 w-4" /> My Orders
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="w-full justify-start">
+                <Link href="/orders/bulk">
+                  <PackagePlus className="mr-2 h-4 w-4" /> Request a Bulk Order
+                </Link>
+              </Button>
+            </>
           )}
           <Button variant="outline" className="w-full justify-start">
             <ShieldCheck className="mr-2 h-4 w-4" /> Change Password

@@ -3,6 +3,7 @@
 
 
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -190,6 +191,32 @@ export interface Order {
   rating?: OrderRating | null;
   customerNotes?: string | null; 
   isBulkOrder?: boolean;
+  bulkOrderRequestId?: string;
+}
+
+export type BulkOrderStatus = 'pending_review' | 'approved' | 'rejected' | 'fulfilled';
+
+export interface BulkOrderItem {
+  productId: string;
+  name: string;
+  quantity: number;
+  notes?: string;
+}
+
+export interface BulkOrderRequest {
+  id: string;
+  requesterId: string;
+  requesterName: string;
+  requesterEmail: string;
+  requesterPhone: string;
+  companyName?: string;
+  desiredDeliveryDate: any; // Timestamp
+  items: BulkOrderItem[];
+  status: BulkOrderStatus;
+  createdAt: any; // Timestamp
+  updatedAt: any; // Timestamp
+  adminNotes?: string;
+  convertedOrderId?: string;
 }
 
 export interface CartItem {
