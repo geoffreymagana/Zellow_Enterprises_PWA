@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle, RefreshCw, FilePlus2, Gavel, FileQuestion, Hourglass, Check, Send } from 'lucide-react';
-import type { StockRequest, StockRequestStatus, Bid } from '@/types';
+import type { StockRequest, StockRequestStatus, Bid, Invoice, InvoiceStatus } from '@/types';
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
@@ -19,6 +19,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+
 
 const getStockRequestStatusVariant = (status: StockRequestStatus): BadgeProps['variant'] => {
   switch (status) {
@@ -49,6 +51,7 @@ export default function SupplierStockRequestsPage() {
 
   const [openForBiddingRequests, setOpenForBiddingRequests] = useState<StockRequest[]>([]);
   const [awardedToMeRequests, setAwardedToMeRequests] = useState<StockRequest[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]); // New state for invoices
   const [isLoading, setIsLoading] = useState(true);
   
   const [actionableRequest, setActionableRequest] = useState<StockRequest | null>(null);
@@ -78,9 +81,14 @@ export default function SupplierStockRequestsPage() {
       orderBy('updatedAt', 'desc')
     );
 
+    const invoicesQuery = query(
+        collection(db, 'invoices'),
+        where('supplierId', '==', user.uid)
+    );
+
     const unsubOpenBids = onSnapshot(openForBidsQuery, (snapshot) => {
         setOpenForBiddingRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StockRequest)));
-        setIsLoading(false);
+        if(isLoading) setIsLoading(false);
     }, (error) => {
       console.error("Error fetching open stock requests:", error);
       toast({ title: "Error", description: "Could not load open requests.", variant: "destructive" });
@@ -93,12 +101,21 @@ export default function SupplierStockRequestsPage() {
       console.error("Error fetching awarded stock requests:", error);
       toast({ title: "Error", description: "Could not load your awarded requests.", variant: "destructive" });
     });
+    
+    const unsubInvoices = onSnapshot(invoicesQuery, (snapshot) => {
+        setInvoices(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Invoice)));
+    }, (error) => {
+        console.error("Error fetching invoices:", error);
+        toast({ title: "Error", description: "Could not load related invoices.", variant: "destructive" });
+    });
+
 
     return () => {
         unsubOpenBids();
         unsubAwardedToMe();
+        unsubInvoices();
     };
-  }, [db, user, role, toast]);
+  }, [db, user, role, toast, isLoading]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -304,20 +321,42 @@ export default function SupplierStockRequestsPage() {
             <p className="p-6 text-center text-muted-foreground">No requests are awaiting consignment.</p>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Qty</TableHead><TableHead>Invoice ID</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Qty</TableHead><TableHead>Invoice ID</TableHead><TableHead>Invoice Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
-                {myAwaitingFulfillment.map((req) => (
-                  <TableRow key={req.id}>
-                    <TableCell className="font-medium">{req.productName}</TableCell>
-                    <TableCell>{req.requestedQuantity}</TableCell>
-                    <TableCell className="text-xs">{req.invoiceId ? <Link href="/invoices" className="text-primary underline">{req.invoiceId.substring(0,8)}...</Link> : 'N/A'}</TableCell>
-                    <TableCell className="text-right">
-                       <Button variant="default" size="sm" onClick={() => handleSendConsignment(req)} title="Mark as Sent" disabled={!req.invoiceId}>
-                            <Send className="mr-1 h-3 w-3" /> Send Consignment
-                        </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {myAwaitingFulfillment.map((req) => {
+                  const invoice = invoices.find(inv => inv.id === req.invoiceId);
+                  const isApproved = invoice?.status === 'approved_for_payment';
+                  const sendButtonDisabled = !req.invoiceId || !isApproved;
+
+                  return (
+                    <TableRow key={req.id}>
+                      <TableCell className="font-medium">{req.productName}</TableCell>
+                      <TableCell>{req.requestedQuantity}</TableCell>
+                      <TableCell className="text-xs">{req.invoiceId ? <Link href="/invoices" className="text-primary underline">{req.invoiceId.substring(0,8)}...</Link> : 'N/A'}</TableCell>
+                      <TableCell>
+                          {invoice ? <Badge variant={invoice.status === 'approved_for_payment' ? 'statusGreen' : 'statusYellow'}>{invoice.status.replace(/_/g, ' ')}</Badge> : <Badge variant="outline">N/A</Badge>}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <TooltipProvider>
+                           <Tooltip>
+                              <TooltipTrigger asChild>
+                                  <span tabIndex={0}> {/* Wrapper for Tooltip with disabled button */}
+                                      <Button variant="default" size="sm" onClick={() => handleSendConsignment(req)} title="Mark as Sent" disabled={sendButtonDisabled}>
+                                          <Send className="mr-1 h-3 w-3" /> Send Consignment
+                                      </Button>
+                                  </span>
+                              </TooltipTrigger>
+                              {sendButtonDisabled && (
+                                <TooltipContent>
+                                  <p>Invoice must be approved by finance before sending.</p>
+                                </TooltipContent>
+                              )}
+                           </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
