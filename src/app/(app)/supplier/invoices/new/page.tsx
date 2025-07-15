@@ -139,40 +139,39 @@ export default function NewInvoicePage() {
     };
 
     try {
-        const invoiceCollectionRef = collection(db, 'invoices');
-        const invoiceRef = doc(invoiceCollectionRef); // Create a reference with a new ID
+      const invoiceCollectionRef = collection(db, 'invoices');
+      const newInvoiceRef = doc(invoiceCollectionRef);
 
-        if (stockRequestId) {
-            // If linked to a stock request, perform as a transaction
-            await runTransaction(db, async (transaction) => {
-                const stockRequestRef = doc(db, 'stockRequests', stockRequestId);
-                // First, set the invoice document
-                transaction.set(invoiceRef, {
-                    ...newInvoiceData,
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp(),
-                });
-                // Then, update the stock request
-                transaction.update(stockRequestRef, {
-                    status: 'fulfilled',
-                    fulfilledQuantity: Number(fulfilledQty) || 0,
-                    supplierNotes: values.notes,
-                    supplierActionTimestamp: serverTimestamp(),
-                    invoiceId: invoiceRef.id, // Link invoice to request
-                    updatedAt: serverTimestamp(),
-                });
-            });
-        } else {
-            // If not linked, just add the invoice
-            await addDoc(invoiceCollectionRef, {
-                ...newInvoiceData,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-            });
-        }
+      if (stockRequestId) {
+        // If linked, perform a transaction to ensure atomicity
+        await runTransaction(db, async (transaction) => {
+          const stockRequestRef = doc(db, 'stockRequests', stockRequestId);
+          
+          transaction.set(newInvoiceRef, {
+            ...newInvoiceData,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
 
-      toast({ title: "Invoice Sent", description: `Invoice ${invoiceNumber} sent for approval.` });
-      router.push('/supplier/stock-requests'); // Redirect after success
+          // IMPORTANT: Status is NOT changed here. It will be changed when supplier confirms sending consignment.
+          transaction.update(stockRequestRef, {
+            status: 'awaiting_fulfillment', // New status: waiting for supplier to send goods
+            fulfilledQuantity: Number(fulfilledQty) || 0,
+            supplierNotes: values.notes,
+            invoiceId: newInvoiceRef.id,
+            updatedAt: serverTimestamp(),
+          });
+        });
+      } else {
+        await addDoc(invoiceCollectionRef, {
+            ...newInvoiceData,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+      }
+
+      toast({ title: "Invoice Sent", description: `Invoice ${invoiceNumber} sent for approval. Please send the consignment.` });
+      router.push('/supplier/stock-requests');
     } catch (e: any) {
       console.error("Error creating invoice:", e);
       toast({ title: "Error", description: "Could not create invoice.", variant: "destructive" });
@@ -180,6 +179,7 @@ export default function NewInvoicePage() {
       setIsSubmitting(false);
     }
   };
+
 
   if (authLoading || (stockRequestId && !supplierPrice)) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;

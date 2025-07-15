@@ -2,6 +2,7 @@
 
 
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -289,12 +290,12 @@ export type StockRequestStatus =
   | 'pending_award'
   | 'awarded'
   | 'awaiting_fulfillment'
-  | 'fulfilled' // DEPRECATED in favor of awaiting_receipt
-  | 'awaiting_receipt' // NEW: After supplier creates invoice, before inventory manager receives
+  | 'awaiting_receipt'
   | 'received'
   | 'rejected_finance'
   | 'rejected_supplier'
-  | 'cancelled';
+  | 'cancelled'
+  | 'fulfilled'; // Legacy, prefer 'received'
 
 export interface Bid {
   id: string;

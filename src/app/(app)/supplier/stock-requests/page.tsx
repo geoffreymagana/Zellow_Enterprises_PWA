@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle, RefreshCw, FilePlus2, Gavel, FileQuestion, Hourglass, Check } from 'lucide-react';
+import { Loader2, CheckCircle, RefreshCw, FilePlus2, Gavel, FileQuestion, Hourglass, Check, Send } from 'lucide-react';
 import type { StockRequest, StockRequestStatus, Bid } from '@/types';
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -25,10 +25,10 @@ const getStockRequestStatusVariant = (status: StockRequestStatus): BadgeProps['v
     case 'pending_bids': return 'statusYellow';
     case 'pending_award': return 'statusAmber';
     case 'awarded': return 'statusIndigo';
-    case 'awaiting_fulfillment': return 'statusLightBlue'; // Should be same as awarded
+    case 'awaiting_fulfillment': return 'statusLightBlue';
     case 'awaiting_receipt': return 'statusBlue';
-    case 'fulfilled': // This is a legacy/general complete status
-    case 'received': // This is the final complete status
+    case 'received':
+    case 'fulfilled':
       return 'statusGreen';
     case 'rejected_finance':
     case 'cancelled': 
@@ -71,21 +71,20 @@ export default function SupplierStockRequestsPage() {
         orderBy("createdAt", "desc")
     );
     
-    // Corrected Query: Fetch all requests awarded to the supplier, including those they need to fulfill and those already fulfilled.
     const awardedToMeQuery = query(
       collection(db, 'stockRequests'),
       where('supplierId', '==', user.uid),
-      where('status', 'in', ['awarded', 'awaiting_receipt', 'fulfilled', 'received']),
+      where('status', 'in', ['awarded', 'awaiting_fulfillment', 'awaiting_receipt', 'fulfilled', 'received']),
       orderBy('updatedAt', 'desc')
     );
 
     const unsubOpenBids = onSnapshot(openForBidsQuery, (snapshot) => {
         setOpenForBiddingRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StockRequest)));
-        setIsLoading(false); // Set loading to false after first query completes
+        if (isLoading) setIsLoading(false);
     }, (error) => {
       console.error("Error fetching open stock requests:", error);
       toast({ title: "Error", description: "Could not load open requests.", variant: "destructive" });
-      setIsLoading(false);
+      if (isLoading) setIsLoading(false);
     });
 
     const unsubAwardedToMe = onSnapshot(awardedToMeQuery, (snapshot) => {
@@ -99,7 +98,7 @@ export default function SupplierStockRequestsPage() {
         unsubOpenBids();
         unsubAwardedToMe();
     };
-  }, [db, user, role, toast]);
+  }, [db, user, role, toast, isLoading]); // Added isLoading to dependency array
 
   useEffect(() => {
     if (authLoading) return;
@@ -118,34 +117,36 @@ export default function SupplierStockRequestsPage() {
     setBidNotes("");
     setIsBidModalOpen(true);
   };
-  
-  const handleFulfillAndInvoice = async (request: StockRequest) => {
+
+  const handleCreateInvoice = async (request: StockRequest) => {
     if(!request.supplierPrice || !db) {
         toast({ title: "Error", description: "Cannot create invoice, awarded price is missing.", variant: "destructive" });
         return;
     }
+    const queryParams = new URLSearchParams({
+        stockRequestId: request.id,
+        productName: request.productName,
+        fulfilledQty: String(request.requestedQuantity),
+        supplierPrice: String(request.supplierPrice)
+    });
+    router.push(`/supplier/invoices/new?${queryParams.toString()}`);
+  };
+
+  const handleSendConsignment = async (request: StockRequest) => {
+    if (!db || !user) return;
     try {
-        const queryParams = new URLSearchParams({
-            stockRequestId: request.id,
-            productName: request.productName,
-            fulfilledQty: String(request.requestedQuantity),
-            supplierPrice: String(request.supplierPrice)
-        });
-        
-        // Before navigating, update the stock request status to 'awaiting_receipt'
         const requestRef = doc(db, 'stockRequests', request.id);
         await updateDoc(requestRef, {
             status: 'awaiting_receipt',
             supplierActionTimestamp: serverTimestamp(),
             updatedAt: serverTimestamp(),
         });
-
-        router.push(`/supplier/invoices/new?${queryParams.toString()}`);
+        toast({ title: "Consignment Sent", description: "The Inventory Manager has been notified to expect your delivery." });
     } catch (e: any) {
-        console.error("Error updating status or navigating to invoice page:", e);
-        toast({ title: "Error", description: "Could not proceed to invoice creation.", variant: "destructive" });
+        console.error("Error updating status:", e);
+        toast({ title: "Error", description: "Could not mark consignment as sent.", variant: "destructive" });
     }
-  }
+  };
 
   const handleSubmitBid = async () => {
     if (!db || !user || !actionableRequest || pricePerUnit === "") return;
@@ -172,7 +173,7 @@ export default function SupplierStockRequestsPage() {
         pricePerUnit: numPrice,
         taxRate: numTaxRate,
         notes: bidNotes,
-        createdAt: new Date(), // Use client-side date
+        createdAt: new Date(), 
       };
 
       await updateDoc(requestRef, {
@@ -192,7 +193,6 @@ export default function SupplierStockRequestsPage() {
     }
   };
 
-
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'N/A';
     const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -209,8 +209,8 @@ export default function SupplierStockRequestsPage() {
   }
   
   const myAwardedRequests = awardedToMeRequests.filter(req => req.status === 'awarded');
+  const myAwaitingFulfillment = awardedToMeRequests.filter(req => req.status === 'awaiting_fulfillment');
   const myFulfilledRequests = awardedToMeRequests.filter(req => ['awaiting_receipt', 'fulfilled', 'received'].includes(req.status));
-
 
   return (
     <div className="space-y-6">
@@ -228,7 +228,7 @@ export default function SupplierStockRequestsPage() {
           <CardDescription>Place your bid on these open stock requests.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          {isLoading ? (
+          {isLoading && openForBiddingRequests.length === 0 ? (
             <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
           ) : openForBiddingRequests.length === 0 ? (
             <p className="p-6 text-center text-muted-foreground">No stock requests are currently open for bidding.</p>
@@ -259,13 +259,13 @@ export default function SupplierStockRequestsPage() {
         </CardContent>
       </Card>
       
-       <Card className="mb-20">
+       <Card>
         <CardHeader>
           <CardTitle>Awaiting My Fulfillment</CardTitle>
-          <CardDescription>These requests have been awarded to you. Fulfill the order and create an invoice.</CardDescription>
+          <CardDescription>These requests have been awarded to you. Create an invoice to proceed.</CardDescription>
         </CardHeader>
         <CardContent className="p-0 pb-4">
-          {isLoading ? (
+          {isLoading && myAwardedRequests.length === 0 ? (
             <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
           ) : myAwardedRequests.length === 0 ? (
             <p className="p-6 text-center text-muted-foreground">No requests have been awarded to you yet.</p>
@@ -280,8 +280,8 @@ export default function SupplierStockRequestsPage() {
                     <TableCell className="font-semibold text-primary">{formatKsh(req.supplierPrice)}</TableCell>
                     <TableCell className="text-xs">{formatDate(req.financeActionTimestamp)}</TableCell>
                     <TableCell className="text-right">
-                       <Button variant="default" size="sm" onClick={() => handleFulfillAndInvoice(req)} title="Fulfill and Create Invoice">
-                            <FilePlus2 className="mr-1 h-3 w-3" /> Fulfill & Invoice
+                       <Button variant="default" size="sm" onClick={() => handleCreateInvoice(req)} title="Create Invoice">
+                            <FilePlus2 className="mr-1 h-3 w-3" /> Create Invoice
                         </Button>
                     </TableCell>
                   </TableRow>
@@ -292,9 +292,41 @@ export default function SupplierStockRequestsPage() {
         </CardContent>
       </Card>
       
-      <Card>
+       <Card>
         <CardHeader>
-            <CardTitle>My Fulfilled Requests</CardTitle>
+          <CardTitle>Awaiting Consignment</CardTitle>
+          <CardDescription>You have created an invoice for these items. Confirm when you have sent the goods.</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0 pb-4">
+          {isLoading && myAwaitingFulfillment.length === 0 ? (
+            <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
+          ) : myAwaitingFulfillment.length === 0 ? (
+            <p className="p-6 text-center text-muted-foreground">No requests are awaiting consignment.</p>
+          ) : (
+            <Table>
+              <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Qty</TableHead><TableHead>Invoice ID</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {myAwaitingFulfillment.map((req) => (
+                  <TableRow key={req.id}>
+                    <TableCell className="font-medium">{req.productName}</TableCell>
+                    <TableCell>{req.requestedQuantity}</TableCell>
+                    <TableCell className="text-xs">{req.invoiceId ? <Link href="/invoices" className="text-primary underline">{req.invoiceId.substring(0,8)}...</Link> : 'N/A'}</TableCell>
+                    <TableCell className="text-right">
+                       <Button variant="default" size="sm" onClick={() => handleSendConsignment(req)} title="Mark as Sent">
+                            <Send className="mr-1 h-3 w-3" /> Send Consignment
+                        </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+      
+      <Card className="mb-20">
+        <CardHeader>
+            <CardTitle>My Fulfilled Requests History</CardTitle>
             <CardDescription>History of your completed fulfillments.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -316,7 +348,8 @@ export default function SupplierStockRequestsPage() {
                                 <p><strong>Qty Fulfilled:</strong> {req.fulfilledQuantity ?? 'N/A'}</p>
                                 <p><strong>Awarded Price:</strong> {formatKsh(req.supplierPrice)}/unit</p>
                                 <p><strong>Invoice ID:</strong> {req.invoiceId ? <Link href="/invoices" className="text-primary underline">{req.invoiceId.substring(0,8)}...</Link> : 'N/A'}</p>
-                                <p><strong>Fulfilled On:</strong> {formatDate(req.supplierActionTimestamp)}</p>
+                                <p><strong>Sent On:</strong> {formatDate(req.supplierActionTimestamp)}</p>
+                                {req.receivedAt && <p className="text-green-600"><strong>Received On:</strong> {formatDate(req.receivedAt)}</p>}
                             </CardContent>
                         </Card>
                     ))}
