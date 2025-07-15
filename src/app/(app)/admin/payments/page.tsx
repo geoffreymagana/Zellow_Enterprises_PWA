@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Edit, Filter, DollarSign, CheckCircle, PackageOpen, AlertTriangle, RefreshCw, CreditCard, Banknote, Truck, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { Loader2, Search, Edit, Filter, DollarSign, CheckCircle, PackageOpen, AlertTriangle, RefreshCw, CreditCard, Banknote, Truck, ArrowUpRight, ArrowDownLeft, Eye } from 'lucide-react';
 import type { Order, Invoice, PaymentStatus } from '@/types';
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import Link from 'next/link';
@@ -18,6 +18,8 @@ import { collection, getDocs, query, orderBy, where, doc, updateDoc, serverTimes
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 
 type UnifiedTransaction = (Order | Invoice) & { transactionType: 'revenue' | 'expense' };
 
@@ -52,7 +54,7 @@ export default function AdminPaymentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(ALL_STATUSES_SENTINEL);
-  const [orderToUpdatePayment, setOrderToUpdatePayment] = useState<Order | null>(null);
+  const [viewingTransaction, setViewingTransaction] = useState<UnifiedTransaction | null>(null);
   const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
 
   const [summaryStats, setSummaryStats] = useState({
@@ -111,7 +113,7 @@ export default function AdminPaymentsPage() {
       fetchedTransactions.sort((a, b) => {
           const dateA = a.updatedAt?.toDate() || a.createdAt?.toDate() || 0;
           const dateB = b.updatedAt?.toDate() || b.createdAt?.toDate() || 0;
-          return dateB - dateA;
+          return dateB.valueOf() - dateA.valueOf();
       });
       
       setTransactions(fetchedTransactions);
@@ -157,16 +159,16 @@ export default function AdminPaymentsPage() {
   
 
   const handleMarkAsPaid = async () => {
-    if (!orderToUpdatePayment || !db || !user) return;
+    if (!viewingTransaction || viewingTransaction.transactionType !== 'revenue' || !db || !user) return;
     setIsUpdatingPayment(true);
     try {
-      const orderRef = doc(db, 'orders', orderToUpdatePayment.id);
+      const orderRef = doc(db, 'orders', viewingTransaction.id);
       await updateDoc(orderRef, {
         paymentStatus: 'paid',
         updatedAt: serverTimestamp(),
       });
-      toast({ title: "Payment Updated", description: `Order ${orderToUpdatePayment.id} marked as paid.` });
-      setOrderToUpdatePayment(null);
+      toast({ title: "Payment Updated", description: `Order ${viewingTransaction.id} marked as paid.` });
+      setViewingTransaction(null);
       fetchFinancialData(); 
     } catch (error) {
       console.error("Error updating payment status:", error);
@@ -182,6 +184,9 @@ export default function AdminPaymentsPage() {
   if (!user || (role !== 'Admin' && role !== 'FinanceManager')) {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">Access Denied.</div>;
   }
+
+  const canMarkAsPaid = viewingTransaction?.transactionType === 'revenue' && (viewingTransaction as Order).paymentStatus === 'pending' && (viewingTransaction as Order).paymentMethod === 'cod';
+
 
   return (
     <div className="space-y-6">
@@ -304,14 +309,13 @@ export default function AdminPaymentsPage() {
                   const paymentMethod = order?.paymentMethod || 'Bank Transfer';
                   const paymentStatus = order?.paymentStatus || invoice?.status;
                   const amount = order?.totalAmount || invoice?.totalAmount;
-                  const viewLink = order ? `/admin/orders/edit/${order.id}` : (invoice ? `/invoices` : '#');
-
+                  
                   return (
                   <TableRow key={tx.id}>
                     <TableCell className="font-medium whitespace-nowrap">
-                      <Link href={viewLink} className="text-primary hover:underline">
-                        {referenceId.substring(0,8)}...
-                      </Link>
+                        <button onClick={() => setViewingTransaction(tx)} className="text-primary hover:underline">
+                            {referenceId.substring(0,8)}...
+                        </button>
                     </TableCell>
                     <TableCell>
                         <Badge variant={isRevenue ? 'statusGreen' : 'statusRed'} className="capitalize bg-opacity-20 text-opacity-100">
@@ -334,31 +338,9 @@ export default function AdminPaymentsPage() {
                     </TableCell>
                     <TableCell className="text-right font-semibold">{formatPrice(amount)}</TableCell>
                     <TableCell className="text-right">
-                      {order && order.paymentStatus === 'pending' && order.paymentMethod === 'cod' && (
-                        <AlertDialog open={orderToUpdatePayment?.id === order.id} onOpenChange={(isOpen) => { if (!isOpen) setOrderToUpdatePayment(null); }}>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="outline" size="xs" onClick={() => setOrderToUpdatePayment(order)}>Mark Paid</Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Confirm Payment Received</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        Mark order {orderToUpdatePayment?.id.substring(0,8)}... ({formatPrice(orderToUpdatePayment?.totalAmount || 0)}) as paid? This action cannot be easily undone.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel onClick={() => setOrderToUpdatePayment(null)}>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleMarkAsPaid} disabled={isUpdatingPayment}>
-                                        {isUpdatingPayment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Confirm Paid
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                      )}
-                       <Link href={viewLink} passHref>
-                         <Button variant="ghost" size="icon" aria-label="View Details"><Edit className="h-4 w-4"/></Button>
-                       </Link>
+                       <Button variant="ghost" size="icon" aria-label="View Details" onClick={() => setViewingTransaction(tx)}>
+                         <Eye className="h-4 w-4"/>
+                       </Button>
                     </TableCell>
                   </TableRow>
                 )})}
@@ -368,6 +350,53 @@ export default function AdminPaymentsPage() {
         </CardContent>
         {filteredTransactions.length > 0 && <CardFooter className="pt-4"><p className="text-xs text-muted-foreground">Showing {filteredTransactions.length} of {transactions.length} records.</p></CardFooter>}
       </Card>
+
+       <Dialog open={!!viewingTransaction} onOpenChange={() => setViewingTransaction(null)}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Transaction Details</DialogTitle>
+                <DialogDescription>
+                    {viewingTransaction?.transactionType === 'revenue' ? `Order ID: ${(viewingTransaction as Order).id}` : `Invoice #: ${(viewingTransaction as Invoice).invoiceNumber}`}
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2 max-h-[60vh] overflow-y-auto pr-2">
+                {viewingTransaction && viewingTransaction.transactionType === 'revenue' && (
+                  <div className="space-y-2 text-sm">
+                    <p><strong>Type:</strong> Customer Payment (Revenue)</p>
+                    <p><strong>Customer:</strong> {(viewingTransaction as Order).customerName}</p>
+                    <p><strong>Email:</strong> {(viewingTransaction as Order).customerEmail}</p>
+                    <p><strong>Payment Method:</strong> <span className="capitalize">{(viewingTransaction as Order).paymentMethod?.replace(/_/g, ' ')}</span></p>
+                    <p><strong>Payment Status:</strong> <Badge variant={getPaymentStatusBadgeVariant((viewingTransaction as Order).paymentStatus)} className="capitalize">{(viewingTransaction as Order).paymentStatus}</Badge></p>
+                    <p><strong>Date:</strong> {formatDate((viewingTransaction as Order).createdAt)}</p>
+                    <Separator className="my-2"/>
+                    <p className="text-lg font-bold text-right">{formatPrice((viewingTransaction as Order).totalAmount)}</p>
+                  </div>
+                )}
+                 {viewingTransaction && viewingTransaction.transactionType === 'expense' && (
+                  <div className="space-y-2 text-sm">
+                    <p><strong>Type:</strong> Supplier Payment (Expense)</p>
+                    <p><strong>Supplier:</strong> {(viewingTransaction as Invoice).supplierName}</p>
+                    <p><strong>Payment Method:</strong> Bank Transfer</p>
+                    <p><strong>Payment Status:</strong> <Badge variant="statusGreen">Paid</Badge></p>
+                    <p><strong>Date Paid:</strong> {formatDate((viewingTransaction as Invoice).updatedAt)}</p>
+                    <Separator className="my-2"/>
+                     <p className="text-lg font-bold text-right">{formatPrice((viewingTransaction as Invoice).totalAmount)}</p>
+                  </div>
+                )}
+            </div>
+            <DialogFooter>
+                {canMarkAsPaid && (
+                  <Button onClick={handleMarkAsPaid} disabled={isUpdatingPayment}>
+                    {isUpdatingPayment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Mark as Paid
+                  </Button>
+                )}
+                <DialogClose asChild>
+                    <Button type="button" variant="outline">Close</Button>
+                </DialogClose>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
