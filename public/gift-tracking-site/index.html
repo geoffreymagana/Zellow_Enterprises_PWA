@@ -1,93 +1,220 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Track Your Gift - Zellow Enterprises</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
-    <!-- Firebase Libraries -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f8fa; /* Light cyan-gray background */
+        }
+        .font-headline {
+            font-family: 'Poppins', sans-serif;
+        }
+        .z-card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            border: 1px solid #e5e7eb;
+        }
+        .z-button {
+            background-color: #34A7C1; /* Primary color */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        .z-button:hover {
+            background-color: #2a8a9e;
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: 1rem;
+            top: 1.5rem;
+            bottom: -1.5rem;
+            width: 2px;
+            background-color: #e5e7eb;
+        }
+        .timeline-item:last-child::before {
+            display: none;
+        }
+        .timeline-icon {
+            z-index: 10;
+        }
+    </style>
 </head>
-<body>
-    <div class="container">
-        <header>
-            <div class="logo">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-icon"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
-                <h1>Zellow Enterprises</h1>
-            </div>
-        </header>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
 
-        <main id="main-content">
-            <div id="loader" class="loader">
-                <div class="spinner"></div>
-                <p>Loading your gift details...</p>
-            </div>
+    <main id="main-content" class="w-full max-w-2xl">
+        <!-- Loading State -->
+        <div id="loading-state" class="z-card p-8 text-center">
+            <svg class="animate-spin h-10 w-10 text-[#34A7C1] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-4 text-lg font-semibold text-gray-700">Loading your gift details...</p>
+        </div>
 
-            <div id="error-view" class="view hidden">
-                <h2><span class="icon">⚠️</span> Tracking Error</h2>
-                <p id="error-message">Could not find tracking details for this gift. Please check the link or contact the sender.</p>
-            </div>
+        <!-- Error State -->
+        <div id="error-state" class="hidden z-card p-8 text-center">
+             <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#F44336" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+            <h2 class="mt-4 text-2xl font-bold font-headline text-red-600">Tracking Unavailable</h2>
+            <p id="error-message" class="mt-2 text-gray-600">The provided tracking link is invalid or the gift details could not be found.</p>
+        </div>
+        
+        <!-- Success State -->
+        <div id="success-state" class="hidden z-card p-6 md:p-8">
+            <header class="text-center mb-8">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#34A7C1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-3"><path d="M20 12.5a8.5 8.5 0 0 0-16.23.5"/><path d="M12 2.5a8.5 8.5 0 0 1 7.73 11.5"/><path d="M12 12v10"/><path d="m16 21-4-4-4 4"/></svg>
+                <h1 class="text-3xl font-bold font-headline text-[#34A7C1]">A Gift For You!</h1>
+                <p class="text-gray-600">A special surprise from <strong id="sender-name" class="text-gray-800">a friend</strong>.</p>
+            </header>
 
-            <div id="tracking-view" class="view hidden">
-                <div class="recipient-greeting">
-                    <h2>A Special Gift For <span id="recipient-name">You</span>!</h2>
-                    <p>From: <span id="sender-name">A friend</span></p>
+            <section id="gift-message-section" class="mb-8">
+                <div class="bg-gray-50 border-l-4 border-[#34A7C1] p-4 rounded-r-lg">
+                    <p id="gift-message" class="italic text-gray-700">"Hoping this brings a smile to your face!"</p>
                 </div>
-
-                <div id="gift-message-card" class="message-card hidden">
-                    <p id="gift-message-text"></p>
+            </section>
+            
+            <section>
+                <h2 class="text-xl font-headline font-semibold mb-4 text-gray-800">Delivery Status</h2>
+                <div id="status-timeline" class="space-y-6">
+                    <!-- Timeline items will be injected here -->
                 </div>
+            </section>
+        </div>
+    </main>
 
-                <div class="status-card">
-                    <h3>Current Status:</h3>
-                    <p id="current-status" class="status-text">Processing</p>
-                    <p id="status-timestamp" class="timestamp"></p>
-                    <div class="progress-bar-container">
-                        <div id="progress-bar" class="progress-bar"></div>
-                    </div>
-                </div>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
+        import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
 
-                <div class="history-card">
-                    <h3>Tracking History</h3>
-                    <ul id="tracking-history">
-                        <!-- History items will be injected here -->
-                    </ul>
-                </div>
-            </div>
-
-            <div id="delivered-view" class="view hidden">
-                 <div class="delivered-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                </div>
-                <h2>Your Gift Has Been Delivered!</h2>
-                <p>We hope you enjoy your special gift. Thank you for being a part of the Zellow family!</p>
-            </div>
-
-        </main>
-        <footer>
-            <p>&copy; <span id="current-year"></span> Zellow Enterprises. All rights reserved.</p>
-        </footer>
-    </div>
-    
-    <script>
-        // Your web app's Firebase configuration
-        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+        // IMPORTANT: Replace with your actual Firebase project configuration
+        // This should be done via a build script or environment variables in a real production environment
+        // to avoid committing keys to version control.
         const firebaseConfig = {
-          apiKey: "YOUR_API_KEY",
-          authDomain: "YOUR_AUTH_DOMAIN",
-          projectId: "YOUR_PROJECT_ID",
-          storageBucket: "YOUR_STORAGE_BUCKET",
-          messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-          appId: "YOUR_APP_ID",
-          measurementId: "YOUR_MEASUREMENT_ID"
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID",
+            measurementId: "YOUR_MEASUREMENT_ID" // Optional
         };
 
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const loadingState = document.getElementById('loading-state');
+        const successState = document.getElementById('success-state');
+        const errorState = document.getElementById('error-state');
+        const errorMessageEl = document.getElementById('error-message');
+        const senderNameEl = document.getElementById('sender-name');
+        const giftMessageEl = document.getElementById('gift-message');
+        const giftMessageSection = document.getElementById('gift-message-section');
+        const timelineEl = document.getElementById('status-timeline');
+
+        const statusIcons = {
+            pending: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 6v6l4 2"/></svg>`,
+            processing: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 4.97a1 1 0 0 0-1-1.02h-4.03a1 1 0 0 0-1 .98c-.02.55.24 1.34.78 1.8.53.45 1.25.69 1.9.64.65-.05 1.33-.42 1.95-1.04.62-.62 1-1.4 1.03-2.19.03-.8-.3-1.63-1.03-2.36a4.01 4.01 0 0 0-5.66 0c-.73.73-1.06 1.56-1.03 2.36.03.79.41 1.57 1.03 2.19.62.62 1.3.99 1.95 1.04.65.05 1.37-.19 1.9-.64.54-.46.8-1.25.78-1.8a1 1 0 0 0-1-.98h-1.5m-5.06 9.72c.62-.62 1-1.4 1.03-2.19.03-.8-.3-1.63-1.03-2.36a4.01 4.01 0 0 0-5.66 0c-.73.73-1.06 1.56-1.03 2.36.03.79.41 1.57 1.03 2.19.62.62 1.3.99 1.95 1.04.65.05 1.37-.19 1.9-.64.54-.46.8-1.25.78-1.8a1 1 0 0 0-1-.98h-4.03a1 1 0 0 0-1 1.02"/></svg>`,
+            assigned: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 19a6 6 0 0 0-12 0"/><circle cx="8" cy="9" r="4"/><polyline points="16 11 18 13 22 9"/></svg>`,
+            out_for_delivery: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18H3c-.6 0-1-.4-1-1V7c0-.6.4-1 1-1h10c.6 0 1 .4 1 1v11"/><path d="M14 9h4l4 4v4h-8v-4l-4-4Z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>`,
+            delivered: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`,
+            cancelled: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`,
+            default: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+        };
+
+        const getStatusIcon = (status) => statusIcons[status] || statusIcons.default;
+        const formatDate = (timestamp) => {
+            if (!timestamp) return 'N/A';
+            const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+            if (isNaN(date.getTime())) return 'Invalid Date';
+            return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+        };
+
+        function renderTimeline(history) {
+            timelineEl.innerHTML = history.slice().reverse().map(entry => {
+                const statusText = (entry.status || '').replace(/_/g, ' ');
+                const icon = getStatusIcon(entry.status);
+                return `
+                    <div class="relative flex items-start gap-4 timeline-item">
+                        <div class="timeline-icon bg-[#34A7C1] text-white p-2 rounded-full flex-shrink-0">
+                            ${icon}
+                        </div>
+                        <div>
+                            <p class="font-semibold capitalize text-gray-800">${statusText}</p>
+                            <p class="text-xs text-gray-500">${formatDate(entry.timestamp)}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function displayOrderDetails(order) {
+            senderNameEl.textContent = order.senderName || 'A friend';
+            
+            if (order.giftDetails?.giftMessage) {
+                giftMessageEl.textContent = `"${order.giftDetails.giftMessage}"`;
+                giftMessageSection.classList.remove('hidden');
+            } else {
+                giftMessageSection.classList.add('hidden');
+            }
+
+            if (order.deliveryHistory && order.deliveryHistory.length > 0) {
+                renderTimeline(order.deliveryHistory);
+            } else {
+                renderTimeline([{ status: order.status, timestamp: order.createdAt }]);
+            }
+            
+            loadingState.classList.add('hidden');
+            successState.classList.remove('hidden');
+            errorState.classList.add('hidden');
+        }
+
+        function displayError(message) {
+            errorMessageEl.textContent = message;
+            loadingState.classList.add('hidden');
+            successState.classList.add('hidden');
+            errorState.classList.remove('hidden');
+        }
+
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const token = params.get('token');
+
+            if (!token) {
+                throw new Error("No tracking token provided in the URL.");
+            }
+            
+            const orderDocRef = doc(db, 'orders', token);
+            onSnapshot(orderDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const order = docSnap.data();
+                    if (!order.isGift || !order.giftDetails?.recipientCanViewAndTrack) {
+                       displayError("This order is not a trackable gift or tracking has been disabled by the sender.");
+                    } else {
+                       displayOrderDetails(order);
+                    }
+                } else {
+                    displayError("This tracking link is invalid or the order could not be found.");
+                }
+            }, (err) => {
+                console.error("Firestore error:", err);
+                displayError("There was a problem connecting to the tracking service. Please try again later.");
+            });
+
+        } catch (err) {
+            console.error("Initialization error:", err);
+            displayError(err.message || "An unexpected error occurred.");
+        }
+
     </script>
-    <script src="script.js"></script>
 </body>
 </html>
+`
