@@ -312,7 +312,7 @@ export default function SupplierStockRequestsPage() {
                     <TableCell>{req.requestedQuantity}</TableCell>
                     <TableCell className="text-xs">{req.invoiceId ? <Link href="/invoices" className="text-primary underline">{req.invoiceId.substring(0,8)}...</Link> : 'N/A'}</TableCell>
                     <TableCell className="text-right">
-                       <Button variant="default" size="sm" onClick={() => handleSendConsignment(req)} title="Mark as Sent">
+                       <Button variant="default" size="sm" onClick={() => handleSendConsignment(req)} title="Mark as Sent" disabled={!req.invoiceId}>
                             <Send className="mr-1 h-3 w-3" /> Send Consignment
                         </Button>
                     </TableCell>

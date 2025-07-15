@@ -4,7 +4,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart2, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon, BadgeHelp, MailWarning, Banknote, CheckCircle2, Warehouse, ListChecks, PackageX, PackageSearch, FileText, Coins, Hourglass } from 'lucide-react';
+import { BarChart2, DollarSign, Package, ShoppingCart, Truck, Users as UsersIcon, Wrench, UserCog, Settings, FileArchive, ClipboardCheck, AlertTriangle, Layers, Loader2, UsersRound, Route, Component, Ship, Bell, MapIcon, BadgeHelp, MailWarning, Banknote, CheckCircle2, Warehouse, ListChecks, PackageX, PackageSearch, FileText, Coins, Hourglass, FileQuestion } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState, useCallback } from 'react';
@@ -178,13 +178,13 @@ export default function DashboardPage() {
         if (role === 'InventoryManager') { 
             qPendingStockRequests = query(stockRequestsCol, 
                 where("requesterId", "==", user.uid), 
-                where("status", "in", ["pending_finance_approval", "pending_supplier_fulfillment"])
+                where("status", "in", ["pending_bids", "pending_award", "awaiting_fulfillment", "awaiting_receipt"])
             );
         } else if (role === 'FinanceManager') { 
-            qPendingStockRequests = query(stockRequestsCol, where("status", "==", "pending_finance_approval"));
+            qPendingStockRequests = query(stockRequestsCol, where("status", "==", "pending_award"));
         } else { 
              qPendingStockRequests = query(stockRequestsCol, 
-                where("status", "in", ["pending_finance_approval", "pending_supplier_fulfillment", "awaiting_receipt"])
+                where("status", "in", ["pending_bids", "pending_award", "awaiting_fulfillment", "awaiting_receipt"])
             );
         }
         const unsubPendingStockRequests = onSnapshot(qPendingStockRequests, (snapshot) => {
@@ -342,37 +342,43 @@ export default function DashboardPage() {
         setIsLoadingRiderActiveDeliveries(false); setIsLoadingRiderCompletedToday(false);
       }
 
-      if (role === 'Supplier') {
-        setIsLoadingSupplierNewStockRequests(true); setIsLoadingSupplierFulfilled(true); setIsLoadingSupplierPendingInvoices(true);
+      if (role === 'Supplier' || role === 'FinanceManager') {
+        setIsLoadingSupplierNewStockRequests(true);
         const todayStart = Timestamp.fromDate(new Date(new Date().setHours(0,0,0,0)));
         const todayEnd = Timestamp.fromDate(new Date(new Date().setHours(23,59,59,999)));
         const qNewStockRequests = query(stockRequestsCol,
-          where('status', '==', 'pending_supplier_fulfillment'), where('createdAt', '>=', todayStart), where('createdAt', '<=', todayEnd)
+          where('status', '==', 'pending_bids'), where('createdAt', '>=', todayStart), where('createdAt', '<=', todayEnd)
         );
         const unsubNewStockRequests = onSnapshot(qNewStockRequests, (snapshot) => {
-          setSupplierNewStockRequestsToday(snapshot.size); setIsLoadingSupplierNewStockRequests(false);
+          setSupplierNewStockRequestsToday(snapshot.size);
+          setIsLoadingSupplierNewStockRequests(false);
         }, (error) => {
-          console.error("Error fetching new stock requests for supplier:", error); setSupplierNewStockRequestsToday("Error"); setIsLoadingSupplierNewStockRequests(false);
+          console.error("Error fetching new stock requests:", error); setSupplierNewStockRequestsToday("Error"); setIsLoadingSupplierNewStockRequests(false);
         });
         unsubscribers.push(unsubNewStockRequests);
 
-        const qFulfilled = query(stockRequestsCol, where('supplierId', '==', user.uid), where('status', 'in', ['awaiting_receipt', 'received']));
-        const unsubFulfilled = onSnapshot(qFulfilled, (snapshot) => {
-          setSupplierFulfilledRequests(snapshot.size); setIsLoadingSupplierFulfilled(false);
-        }, (error) => {
-          console.error("Error fetching fulfilled requests for supplier:", error); setSupplierFulfilledRequests("Error"); setIsLoadingSupplierFulfilled(false);
-        });
-        unsubscribers.push(unsubFulfilled);
+        if (role === 'Supplier') {
+            setIsLoadingSupplierFulfilled(true); setIsLoadingSupplierPendingInvoices(true);
+            const qFulfilled = query(stockRequestsCol, where('supplierId', '==', user.uid), where('status', 'in', ['awaiting_receipt', 'received', 'fulfilled']));
+            const unsubFulfilled = onSnapshot(qFulfilled, (snapshot) => {
+              setSupplierFulfilledRequests(snapshot.size); setIsLoadingSupplierFulfilled(false);
+            }, (error) => {
+              console.error("Error fetching fulfilled requests for supplier:", error); setSupplierFulfilledRequests("Error"); setIsLoadingSupplierFulfilled(false);
+            });
+            unsubscribers.push(unsubFulfilled);
 
-        const qPendingInvoices = query(invoicesCol, where('supplierId', '==', user.uid), where('status', 'in', ['pending_approval', 'approved_for_payment']));
-        const unsubPendingInvoices = onSnapshot(qPendingInvoices, (snapshot) => {
-          setSupplierPendingInvoices(snapshot.size); setIsLoadingSupplierPendingInvoices(false);
-        }, (error) => {
-          console.error("Error fetching pending invoices for supplier:", error); setSupplierPendingInvoices("Error"); setIsLoadingSupplierPendingInvoices(false);
-        });
-        unsubscribers.push(unsubPendingInvoices);
+            const qPendingInvoices = query(invoicesCol, where('supplierId', '==', user.uid), where('status', 'in', ['pending_approval', 'approved_for_payment']));
+            const unsubPendingInvoices = onSnapshot(qPendingInvoices, (snapshot) => {
+              setSupplierPendingInvoices(snapshot.size); setIsLoadingSupplierPendingInvoices(false);
+            }, (error) => {
+              console.error("Error fetching pending invoices for supplier:", error); setSupplierPendingInvoices("Error"); setIsLoadingSupplierPendingInvoices(false);
+            });
+            unsubscribers.push(unsubPendingInvoices);
+        }
       } else {
-        setIsLoadingSupplierNewStockRequests(false); setIsLoadingSupplierFulfilled(false); setIsLoadingSupplierPendingInvoices(false);
+        setIsLoadingSupplierNewStockRequests(false);
+        setIsLoadingSupplierFulfilled(false);
+        setIsLoadingSupplierPendingInvoices(false);
       }
 
       if (technicianRoles.includes(role as UserRole)) {
@@ -386,11 +392,10 @@ export default function DashboardPage() {
         unsubscribers.push(unsubTechActive);
 
         const todayStart = Timestamp.fromDate(new Date(new Date().setHours(0,0,0,0)));
-        // const todayEnd = Timestamp.fromDate(new Date(new Date().setHours(23,59,59,999))); No need for end with current logic
         const qTechCompleted = query(tasksCol, 
             where('assigneeId', '==', user.uid), 
             where('status', '==', 'completed'),
-            where('updatedAt', '>=', todayStart) // Assuming updatedAt is set when task is completed
+            where('updatedAt', '>=', todayStart)
         );
         const unsubTechCompleted = onSnapshot(qTechCompleted, (snapshot) => {
           setTechnicianCompletedToday(snapshot.size); setIsLoadingTechnicianCompletedToday(false);
@@ -403,7 +408,7 @@ export default function DashboardPage() {
         setIsLoadingTechnicianActiveTasks(false); setIsLoadingTechnicianCompletedToday(false);
       }
       
-      if (role === 'ServiceManager' || role === 'Admin') { // Admin also gets these for completeness
+      if (role === 'ServiceManager' || role === 'Admin') {
         setIsLoadingSmTotalActiveTasks(true); setIsLoadingSmTasksNeedingAction(true); setIsLoadingSmActiveTechnicians(true);
         const qSmActiveTasks = query(tasksCol, where('status', 'in', ['pending', 'in-progress', 'needs_approval']));
         const unsubSmActiveTasks = onSnapshot(qSmActiveTasks, (snapshot) => {
@@ -429,7 +434,6 @@ export default function DashboardPage() {
         });
         unsubscribers.push(unsubSmTechnicians);
         
-        // Fetch technician colleagues list for Service Manager
         setIsLoadingTechnicianColleagues(true);
         const qTechs = query(usersCol, where('role', 'in', technicianRoles), where('disabled', '!=', true), orderBy('displayName'));
         const unsubTechs = onSnapshot(qTechs, (snapshot) => {
@@ -502,6 +506,7 @@ export default function DashboardPage() {
       case 'FinanceManager':
         return (
           <>
+            <DashboardItem title="New Stock Requests Today" value={supplierNewStockRequestsToday} icon={FileQuestion} link="/supplier/stock-requests" description="Requests needing bids." isLoadingValue={isLoadingSupplierNewStockRequests} />
             <DashboardItem title="Payments Today" value={paymentsTodayCount} icon={Banknote} link="/admin/payments" description="Orders marked paid today." isLoadingValue={isLoadingPaymentsToday}/>
             <DashboardItem title="All Payments" icon={DollarSign} link="/admin/payments" />
             <DashboardItem title="Supplier Invoices" value={pendingInvoiceApprovalsCount} icon={FileText} link="/invoices" description="Manage supplier invoices." isLoadingValue={isLoadingPendingInvoiceApprovals} />
@@ -533,7 +538,7 @@ export default function DashboardPage() {
       case 'Supplier':
         return (
           <>
-            <DashboardItem title="New Stock Requests Today" value={supplierNewStockRequestsToday} icon={Warehouse} link="/supplier/stock-requests" description="Requests needing fulfillment action." isLoadingValue={isLoadingSupplierNewStockRequests} />
+            <DashboardItem title="New Stock Requests Today" value={supplierNewStockRequestsToday} icon={FileQuestion} link="/supplier/stock-requests" description="Requests needing fulfillment action." isLoadingValue={isLoadingSupplierNewStockRequests} />
             <DashboardItem title="Fulfilled/Invoiced Orders" value={supplierFulfilledRequests} icon={CheckCircle2} link="/supplier/stock-requests?filter=fulfilled" description="Requests you have invoiced." isLoadingValue={isLoadingSupplierFulfilled} />
             <DashboardItem title="Pending Invoices" value={supplierPendingInvoices} icon={FileText} link="/invoices?filter=pending" description="Your invoices awaiting payment/approval." isLoadingValue={isLoadingSupplierPendingInvoices} />
             <DashboardItem title="All Stock Requests" icon={ListChecks} link="/supplier/stock-requests" description="View all requests assigned to you." />
