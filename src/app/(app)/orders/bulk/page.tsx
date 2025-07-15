@@ -17,12 +17,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Calendar } from '@/components/ui/calendar';
-import { Loader2, PackagePlus, PlusCircle, Trash2, Send, CalendarIcon } from 'lucide-react';
+import { Loader2, PackagePlus, PlusCircle, Trash2, Send, CalendarIcon, Check, ChevronsUpDown, ImageOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
+import Image from 'next/image';
+
+const formatPrice = (price?: number) => {
+    if (price === undefined || price === null) return 'N/A';
+    return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
+};
 
 const bulkOrderItemSchema = z.object({
   productId: z.string().min(1, "Please select a product."),
@@ -160,23 +165,70 @@ export default function BulkOrderRequestPage() {
 
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold border-t pt-4">Requested Items</h3>
-                {fields.map((field, index) => (
-                  <div key={field.id} className="p-4 border rounded-lg space-y-3 relative bg-muted/50">
-                    <FormField control={form.control} name={`items.${index}.productId`} render={({ field }) => (
-                      <FormItem><FormLabel>Product</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl><SelectTrigger disabled={isLoadingProducts}>
-                                <SelectValue placeholder={isLoadingProducts ? "Loading products..." : "Select a product"}/>
-                            </SelectTrigger></FormControl>
-                            <SelectContent>{products.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
-                        </Select><FormMessage/>
-                      </FormItem>
-                    )}/>
-                     <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" {...field} min="1"/></FormControl><FormMessage/></FormItem>)}/>
-                     <FormField control={form.control} name={`items.${index}.notes`} render={({ field }) => (<FormItem><FormLabel>Notes (Optional)</FormLabel><FormControl><Textarea {...field} placeholder="Any specific instructions for this item..." rows={2}/></FormControl><FormMessage/></FormItem>)}/>
-                    <Button type="button" variant="destructive" size="icon" className="absolute -top-3 -right-3 h-7 w-7" onClick={() => remove(index)}><Trash2 className="h-4 w-4"/></Button>
-                  </div>
-                ))}
+                {fields.map((field, index) => {
+                    const selectedProductId = form.watch(`items.${index}.productId`);
+                    const selectedProduct = products.find(p => p.id === selectedProductId);
+                    return (
+                        <div key={field.id} className="p-4 border rounded-lg space-y-3 relative bg-muted/50">
+                            <FormField
+                                control={form.control}
+                                name={`items.${index}.productId`}
+                                render={({ field }) => (
+                                <FormItem className="flex flex-col">
+                                    <FormLabel>Product</FormLabel>
+                                    <Popover>
+                                    <PopoverTrigger asChild>
+                                        <FormControl>
+                                        <Button
+                                            variant="outline"
+                                            role="combobox"
+                                            className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
+                                            disabled={isLoadingProducts}
+                                        >
+                                            {field.value ? products.find((p) => p.id === field.value)?.name : (isLoadingProducts ? "Loading..." : "Select product")}
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                        </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                        <Command>
+                                        <CommandInput placeholder="Search product..." />
+                                        <CommandList>
+                                            <CommandEmpty>No product found.</CommandEmpty>
+                                            <CommandGroup>
+                                            {products.map((p) => (
+                                                <CommandItem
+                                                    value={p.name}
+                                                    key={p.id}
+                                                    onSelect={() => form.setValue(`items.${index}.productId`, p.id)}
+                                                    className="flex items-center gap-2"
+                                                >
+                                                    <div className="relative w-8 h-8 rounded-sm bg-accent overflow-hidden flex-shrink-0">
+                                                        {p.imageUrl ? <Image src={p.imageUrl} alt={p.name} layout="fill" objectFit="cover" data-ai-hint="product"/> : <ImageOff className="h-4 w-4 text-muted-foreground"/>}
+                                                    </div>
+                                                    <span className="flex-grow truncate">{p.name}</span>
+                                                    <span className="text-xs text-muted-foreground">{formatPrice(p.price)}</span>
+                                                    <Check className={cn("mr-2 h-4 w-4", p.id === field.value ? "opacity-100" : "opacity-0")} />
+                                                </CommandItem>
+                                            ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                    </Popover>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
+                            <div className="grid grid-cols-2 gap-4">
+                                <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" {...field} min="1"/></FormControl><FormMessage/></FormItem>)}/>
+                                <div><FormLabel>Price</FormLabel><Input value={selectedProduct ? formatPrice(selectedProduct.price) : 'N/A'} disabled /></div>
+                            </div>
+                            <FormField control={form.control} name={`items.${index}.notes`} render={({ field }) => (<FormItem><FormLabel>Notes (Optional)</FormLabel><FormControl><Textarea {...field} placeholder="Any specific instructions for this item..." rows={2}/></FormControl><FormMessage/></FormItem>)}/>
+                            <Button type="button" variant="destructive" size="icon" className="absolute -top-3 -right-3 h-7 w-7" onClick={() => remove(index)}><Trash2 className="h-4 w-4"/></Button>
+                        </div>
+                    )
+                })}
                  <Button type="button" variant="outline" size="sm" onClick={() => append({ productId: "", quantity: 1, notes: ""})}><PlusCircle className="mr-2 h-4 w-4"/>Add Another Item</Button>
               </div>
 
