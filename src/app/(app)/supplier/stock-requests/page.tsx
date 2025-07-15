@@ -144,7 +144,7 @@ export default function SupplierStockRequestsPage() {
         supplierName: user.displayName || user.email || "Unnamed Supplier",
         pricePerUnit: numPrice,
         notes: bidNotes,
-        createdAt: serverTimestamp(),
+        createdAt: new Date(), // Use client-side timestamp
       };
 
       await updateDoc(requestRef, {
@@ -167,7 +167,10 @@ export default function SupplierStockRequestsPage() {
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'N/A';
-    return timestamp.toDate ? format(timestamp.toDate(), 'PPp') : 'Invalid Date';
+    // Check if it's a Firestore Timestamp and convert, otherwise assume it's a Date object or can be parsed as one
+    const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    return format(date, 'PPp');
   };
   
   const userHasBid = (request: StockRequest) => {
