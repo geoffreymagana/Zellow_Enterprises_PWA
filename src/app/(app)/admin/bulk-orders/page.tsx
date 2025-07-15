@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Loader2, PackagePlus, FileWarning, Eye, CheckCircle, XCircle } from 'lucide-react';
 import type { BulkOrderRequest, BulkOrderStatus, Order, OrderItem, DeliveryHistoryEntry } from '@/types';
-import { collection, query, where, orderBy, onSnapshot, doc, writeBatch, serverTimestamp, getDocs, updateDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, writeBatch, serverTimestamp, getDocs, updateDoc, documentId } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
@@ -96,7 +96,7 @@ export default function AdminBulkOrdersPage() {
         const productIds = viewingRequest.items.map(item => item.productId);
         if(productIds.length === 0) throw new Error("Request has no items.");
         
-        const productsQuery = query(collection(db, 'products'), where('id', 'in', productIds));
+        const productsQuery = query(collection(db, 'products'), where(documentId(), 'in', productIds));
         const productsSnapshot = await getDocs(productsQuery);
         const productsData = new Map(productsSnapshot.docs.map(doc => [doc.id, doc.data()]));
         
