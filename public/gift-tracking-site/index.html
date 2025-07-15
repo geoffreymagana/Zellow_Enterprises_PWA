@@ -4,241 +4,299 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Track Your Zellow Gift</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Use absolute paths for CSS and JS to ensure they are resolved correctly from the root -->
-    <link rel="stylesheet" href="/styles.css" />
+    <title>Track Your Gift | Zellow Enterprises</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #34A7C1; /* HSL(195, 70%, 50%) */
+            --background-color: #F0F8FA; /* HSL(195, 20%, 95%) */
+            --accent-color: #33A67F; /* HSL(165, 50%, 40%) */
+            --text-color: #334155;
+            --muted-color: #64748b;
+            --card-background: #ffffff;
+            --border-color: #e2e8f0;
+            --font-headline: 'Poppins', sans-serif;
+            --font-body: 'Inter', sans-serif;
+        }
+        body {
+            font-family: var(--font-body);
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        header, footer {
+            width: 100%;
+            background-color: var(--card-background);
+            padding: 1rem;
+            box-sizing: border-box;
+            border-bottom: 1px solid var(--border-color);
+        }
+        footer {
+            border-bottom: none;
+            border-top: 1px solid var(--border-color);
+            margin-top: auto;
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--muted-color);
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            box-sizing: border-box;
+        }
+        .card {
+            background-color: var(--card-background);
+            border-radius: 0.75rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 1.5rem;
+        }
+        .logo {
+            font-family: var(--font-headline);
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: var(--primary-color);
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: capitalize;
+        }
+        .status-delivered { background-color: var(--accent-color); color: white; }
+        .status-processing, .status-pending { background-color: #fbbf24; color: white; }
+        .status-shipped, .status-out_for_delivery { background-color: var(--primary-color); color: white; }
+        .loader, .error-state { text-align: center; padding: 2rem 0; }
+        .loader .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border-color);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .item-list { list-style: none; padding: 0; margin: 0; }
+        .item { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border-color); }
+        .item:last-child { border-bottom: none; }
+        .item img { width: 50px; height: 50px; object-fit: cover; border-radius: 0.375rem; background-color: #f1f5f9; }
+        .item-details { flex-grow: 1; }
+        h1, h2, h3 { font-family: var(--font-headline); margin-top: 0; }
+        h1 { font-size: 1.8rem; text-align: center; }
+        h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--primary-color); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }
+        .hidden { display: none; }
+    </style>
 </head>
-<body class="bg-gray-50 font-inter">
-    <div id="app" class="flex flex-col min-h-screen">
-        <!-- Header -->
-        <header class="bg-white border-b border-gray-200">
-            <div class="container mx-auto px-6 py-4 flex justify-between items-center">
-                <div class="flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
-                    <h1 class="font-headline font-bold text-xl text-gray-800">Zellow Enterprises</h1>
-                </div>
-            </div>
-        </header>
+<body>
 
-        <!-- Main Content -->
-        <main class="flex-grow container mx-auto px-6 py-8">
-            <div id="loading-state" class="text-center py-20">
-                <svg class="animate-spin h-10 w-10 text-primary mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                <p class="text-gray-600">Loading your gift details...</p>
-            </div>
+    <header>
+        <div class="logo">Zellow Enterprises</div>
+    </header>
 
-            <div id="error-state" class="hidden text-center py-20">
-                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-4 text-red-500"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" x2="12" y1="9" y2="13"></line><line x1="12" x2="12.01" y1="17" y2="17"></line></svg>
-                <h2 class="text-2xl font-bold mb-2">Tracking Error</h2>
-                <p id="error-message" class="text-gray-600">Could not find tracking details for this gift. Please check the link or contact the sender.</p>
-                 <div id="config-error-help" class="hidden mt-4 text-xs text-left bg-red-50 p-3 rounded-md border border-red-200">
-                    <p class="font-semibold">Developer Notice: Firebase Configuration Error</p>
-                    <p>The gift tracking page cannot connect to Firebase because the configuration is missing. Please ensure you have replaced the placeholder values (like "YOUR_API_KEY") in <strong>public/gift-tracking-site/index.html</strong> with your actual Firebase project credentials as described in the README.md file.</p>
-                </div>
-            </div>
+    <div class="container">
+        <div id="loader" class="loader">
+            <div class="spinner"></div>
+            <p>Loading your gift details...</p>
+        </div>
 
-            <div id="success-state" class="hidden max-w-2xl mx-auto space-y-8">
-                <div class="text-center">
-                    <h2 class="text-3xl font-bold font-headline text-gray-800">A Special Gift For You!</h2>
-                    <p class="text-lg text-gray-600 mt-1">From: <span id="sender-name" class="font-semibold text-primary">A friend</span></p>
+        <div id="error-state" class="error-state card hidden">
+            <h1>⚠️ Tracking Error</h1>
+            <p id="error-message">Could not find tracking details for this gift. Please check the link or contact the sender.</p>
+        </div>
+
+        <div id="content" class="hidden">
+            <div class="card">
+                <h1>A Special Gift For You!</h1>
+                <p style="text-align: center; color: var(--muted-color); margin-top: -0.5rem;">From: <strong id="sender-name" style="color: var(--text-color);">A friend</strong></p>
+                
+                <div id="gift-message-section" class="hidden" style="margin-top: 1.5rem; padding: 1rem; background-color: var(--background-color); border-left: 3px solid var(--primary-color); border-radius: 0.25rem;">
+                    <p style="margin: 0; font-style: italic;">"</p>
+                    <p id="gift-message" style="margin: 0; padding: 0 0.5rem;">Your message here.</p>
+                    <p style="margin: 0; text-align: right; font-style: italic;">"</p>
                 </div>
                 
-                <div id="gift-message-card" class="hidden bg-white p-6 rounded-lg shadow-md border border-gray-200">
-                    <p id="gift-message" class="text-gray-700 italic text-center"></p>
+                <h2 style="margin-top: 2rem;">Order Status</h2>
+                <div style="text-align: center;">
+                    <span id="status-badge" class="status-badge">Processing</span>
+                    <p id="status-notes" style="font-size: 0.9rem; color: var(--muted-color); margin-top: 0.5rem;">Your gift is being prepared.</p>
                 </div>
 
-                <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-                    <h3 class="font-bold text-lg mb-4 text-gray-800">Order Status</h3>
-                    <div class="flex items-center space-x-4">
-                        <div class="bg-primary/10 p-3 rounded-full">
-                           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><path d="M5 18H3c-1.1 0-2-.9-2-2V8c0-1.1.9-2 2-2h3.54a2 2 0 0 1 1.79.88l1.44 2.16a2 2 0 0 0 1.79.88H18c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2h-2"/><path d="M8 18V8"/><path d="M12 18V8"/><path d="M16 18V8"/></svg>
-                        </div>
-                        <div>
-                            <p id="order-status" class="font-semibold text-xl capitalize"></p>
-                            <p id="status-note" class="text-sm text-gray-500"></p>
-                        </div>
-                    </div>
-                </div>
+                <h2 style="margin-top: 2rem;">Estimated Delivery</h2>
+                <p id="delivery-estimate" style="font-size: 0.9rem; color: var(--muted-color);">Calculating...</p>
 
-                <div id="items-card" class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-                    <h3 class="font-bold text-lg mb-4 text-gray-800">Your Gift Contains</h3>
-                    <div id="items-list" class="space-y-4">
-                        <!-- Items will be injected here -->
-                    </div>
-                </div>
-                
-                <div class="grid md:grid-cols-2 gap-6">
-                    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-                        <h3 class="font-bold text-lg mb-2 text-gray-800">Shipping To</h3>
-                        <div id="shipping-address" class="text-sm text-gray-600 space-y-0.5"></div>
-                    </div>
-                    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-                        <h3 class="font-bold text-lg mb-2 text-gray-800">Estimated Delivery</h3>
-                        <p id="shipping-method" class="text-sm text-gray-600"></p>
-                    </div>
+            </div>
+
+            <div class="card" style="margin-top: 1.5rem;">
+                <h2>Your Gift Includes</h2>
+                <ul id="item-list" class="item-list">
+                    <!-- Items will be injected here -->
+                </ul>
+            </div>
+             <div class="card" style="margin-top: 1.5rem;">
+                <h2>Shipping To</h2>
+                <div id="shipping-address" style="font-size: 0.9rem; line-height: 1.5;">
+                    <!-- Shipping address will be injected here -->
                 </div>
             </div>
-        </main>
-        
-        <!-- Footer -->
-        <footer class="bg-white border-t border-gray-200 mt-auto">
-            <div class="container mx-auto px-6 py-4 text-center text-gray-500 text-sm">
-                &copy; <span id="footer-year"></span> Zellow Enterprises. All rights reserved.
-            </div>
-        </footer>
+        </div>
     </div>
     
-    <!-- Firebase SDK -->
+    <footer>
+        &copy; <span id="year"></span> Zellow Enterprises. All rights reserved.
+    </footer>
+    
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         const firebaseConfig = {
-            apiKey: "AIzaSyDzUlYdqqdkTxcHJHChsX6zM-U_7N92xec",
-            authDomain: "zellowlive.firebaseapp.com",
-            projectId: "zellowlive",
-            storageBucket: "zellowlive.appspot.com",
-            messagingSenderId: "943761891650",
-            appId: "1:943761891650:web:e8c12f77ea9d5edf0b68db",
-            measurementId: "G-46MZ5BWTGD"
+          apiKey: "AIzaSyDzUlYdqqdkTxcHJHChsX6zM-U_7N92xec",
+          authDomain: "zellowlive.firebaseapp.com",
+          projectId: "zellowlive",
+          storageBucket: "zellowlive.appspot.com",
+          messagingSenderId: "943761891650",
+          appId: "1:943761891650:web:e8c12f77ea9d5edf0b68db",
+          measurementId: "G-46MZ5BWTGD"
         };
         
-        // UI Elements
-        const loadingState = document.getElementById('loading-state');
+        const loader = document.getElementById('loader');
+        const content = document.getElementById('content');
         const errorState = document.getElementById('error-state');
-        const errorMessageEl = document.getElementById('error-message');
-        const successState = document.getElementById('success-state');
-        const senderNameEl = document.getElementById('sender-name');
-        const giftMessageCardEl = document.getElementById('gift-message-card');
-        const giftMessageEl = document.getElementById('gift-message');
-        const orderStatusEl = document.getElementById('order-status');
-        const statusNoteEl = document.getElementById('status-note');
-        const itemsListEl = document.getElementById('items-list');
-        const shippingAddressEl = document.getElementById('shipping-address');
-        const shippingMethodEl = document.getElementById('shipping-method');
-        const footerYearEl = document.getElementById('footer-year');
-        const configErrorHelpEl = document.getElementById('config-error-help');
-        
-        footerYearEl.textContent = new Date().getFullYear();
+        const errorMessage = document.getElementById('error-message');
 
-        function showError(message, showConfigHelp = false) {
-            loadingState.classList.add('hidden');
-            successState.classList.add('hidden');
-            errorState.classList.remove('hidden');
-            errorMessageEl.textContent = message;
-            if (showConfigHelp) {
-                configErrorHelpEl.classList.remove('hidden');
-            }
-        }
-        
-        function showSuccess() {
-            loadingState.classList.add('hidden');
+        function showLoader() {
+            loader.classList.remove('hidden');
+            content.classList.add('hidden');
             errorState.classList.add('hidden');
-            successState.classList.remove('hidden');
         }
 
-        async function fetchGiftDetails() {
-            // 1. Verify Configuration
-            if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("YOUR_")) {
-                showError("The tracking service is not configured correctly.", true);
-                return;
-            }
+        function showContent() {
+            loader.classList.add('hidden');
+            content.classList.remove('hidden');
+            errorState.classList.add('hidden');
+        }
 
-            // 2. Initialize Firebase
-            let app;
+        function showError(message) {
+            loader.classList.add('hidden');
+            content.classList.add('hidden');
+            errorState.classList.remove('hidden');
+            errorMessage.textContent = message;
+        }
+
+        function formatDate(timestamp, includeTime = false) {
+            if (!timestamp) return 'N/A';
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            if (isNaN(date.getTime())) return 'Invalid Date';
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            if (includeTime) {
+                options.hour = 'numeric';
+                options.minute = 'numeric';
+            }
+            return date.toLocaleDateString(undefined, options);
+        }
+
+        async function main() {
+            showLoader();
             try {
-                app = initializeApp(firebaseConfig);
-            } catch (e) {
-                console.error("Firebase Initialization Error:", e);
-                showError("Could not connect to the tracking service.");
-                return;
-            }
-            const db = getFirestore(app);
+                // Initialize Firebase
+                const app = initializeApp(firebaseConfig);
+                const db = getFirestore(app);
+                
+                // Get order token from URL
+                const params = new URLSearchParams(window.location.search);
+                const token = params.get('token');
 
-            // 3. Get Token (Order ID) from URL
-            const params = new URLSearchParams(window.location.search);
-            const token = params.get('token');
-            if (!token) {
-                showError("No tracking token found in the URL.");
-                return;
-            }
-
-            // 4. Fetch Order from Firestore
-            try {
+                if (!token) {
+                    showError("No tracking token found in the URL. Please check the link.");
+                    return;
+                }
+                
+                // Fetch order data
                 const orderRef = doc(db, "orders", token);
                 const orderSnap = await getDoc(orderRef);
-
+                
                 if (!orderSnap.exists()) {
-                    showError("Could not find tracking details for this gift. Please check the link.");
+                    showError("This gift tracking link is invalid or the order does not exist.");
                     return;
                 }
                 
-                const orderData = orderSnap.data();
+                const order = orderSnap.data();
 
-                // 5. Security and Data Validation
-                if (orderData.isGift !== true) {
-                    showError("This order is not marked as a gift and cannot be tracked this way.");
+                if (!order.isGift) {
+                     showError("This is not a gift order and cannot be tracked using this link.");
                     return;
                 }
-                if (orderData.giftDetails?.recipientCanViewAndTrack === false) {
+
+                if (order.giftDetails && order.giftDetails.recipientCanViewAndTrack === false) {
                      showError("The sender has disabled detailed tracking for this gift.");
-                     return;
+                    return;
                 }
-
-                // 6. Populate UI
-                senderNameEl.textContent = orderData.senderName || "A friend";
                 
-                if (orderData.giftDetails?.giftMessage) {
-                    giftMessageEl.textContent = orderData.giftDetails.giftMessage;
-                    giftMessageCardEl.classList.remove('hidden');
+                // Populate the page
+                document.getElementById('sender-name').textContent = order.giftDetails?.senderName || "A friend";
+                
+                const giftMessageSection = document.getElementById('gift-message-section');
+                const giftMessageEl = document.getElementById('gift-message');
+                if (order.giftDetails?.giftMessage) {
+                    giftMessageEl.textContent = order.giftDetails.giftMessage;
+                    giftMessageSection.classList.remove('hidden');
                 }
+                
+                const statusBadge = document.getElementById('status-badge');
+                statusBadge.textContent = order.status.replace(/_/g, " ");
+                statusBadge.className = `status-badge status-${order.status}`;
+                
+                document.getElementById('status-notes').textContent = order.deliveryHistory?.[order.deliveryHistory.length - 1]?.notes || "Your gift is being prepared.";
+                
+                document.getElementById('delivery-estimate').textContent = `Standard Delivery (${order.shippingMethodName || '1-3 days'})`;
 
-                const lastHistory = orderData.deliveryHistory?.[orderData.deliveryHistory.length - 1];
-                orderStatusEl.textContent = (lastHistory?.status || orderData.status || "Processing").replace(/_/g, ' ');
-                statusNoteEl.textContent = lastHistory?.notes || `Last updated: ${new Date(orderData.updatedAt.seconds * 1000).toLocaleDateString()}`;
-
-                itemsListEl.innerHTML = ''; // Clear previous items
-                orderData.items.forEach(item => {
-                    const itemDiv = document.createElement('div');
-                    itemDiv.className = 'flex items-center space-x-4';
-                    const img = document.createElement('img');
-                    img.src = item.imageUrl || 'https://placehold.co/64x64.png';
-                    img.alt = item.name;
-                    img.className = 'w-16 h-16 rounded-md object-cover bg-gray-100';
-                    itemDiv.appendChild(img);
-                    const nameDiv = document.createElement('div');
-                    nameDiv.textContent = `${item.quantity} x ${item.name}`;
-                    nameDiv.className = 'font-medium text-gray-800';
-                    itemDiv.appendChild(nameDiv);
-                    itemsListEl.appendChild(itemDiv);
+                const itemList = document.getElementById('item-list');
+                itemList.innerHTML = ''; // Clear previous items
+                order.items.forEach(item => {
+                    const li = document.createElement('li');
+                    li.className = 'item';
+                    li.innerHTML = `
+                        <img src="${item.imageUrl || 'https://placehold.co/100x100.png'}" alt="${item.name}">
+                        <div class="item-details">
+                            <p style="font-weight: 500; margin: 0;">${item.name}</p>
+                            <p style="font-size: 0.8rem; color: var(--muted-color); margin: 0;">Quantity: ${item.quantity}</p>
+                        </div>
+                    `;
+                    itemList.appendChild(li);
                 });
 
-                if (orderData.shippingAddress) {
-                    const addr = orderData.shippingAddress;
+                const shippingAddressEl = document.getElementById('shipping-address');
+                 if(order.shippingAddress){
                     shippingAddressEl.innerHTML = `
-                        <p class="font-medium">${addr.fullName}</p>
-                        <p>${addr.addressLine1}</p>
-                        ${addr.addressLine2 ? `<p>${addr.addressLine2}</p>` : ''}
-                        <p>${addr.city}, ${addr.county}</p>
+                        <p style="margin:0;"><strong>${order.shippingAddress.fullName}</strong></p>
+                        <p style="margin:0;">${order.shippingAddress.addressLine1}</p>
+                        ${order.shippingAddress.addressLine2 ? `<p style="margin:0;">${order.shippingAddress.addressLine2}</p>` : ''}
+                        <p style="margin:0;">${order.shippingAddress.city}, ${order.shippingAddress.county}</p>
                     `;
-                }
+                 }
 
-                shippingMethodEl.textContent = orderData.shippingMethodName || 'Standard Delivery';
-
-                showSuccess();
-
-            } catch (err) {
-                console.error("Firestore Fetch Error:", err);
-                showError("An error occurred while fetching your gift details. Please try again later.");
+                showContent();
+            } catch (error) {
+                console.error("Firebase or tracking error:", error);
+                showError("An unexpected error occurred while fetching your gift details. Please try again later.");
             }
         }
 
-        // Run on page load
-        fetchGiftDetails();
+        document.getElementById('year').textContent = new Date().getFullYear();
+        main();
     </script>
 </body>
 </html>
