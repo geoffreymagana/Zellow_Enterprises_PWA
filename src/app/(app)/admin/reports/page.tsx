@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2, Download, BarChart2, Users, ShoppingCart, DollarSign, Package, AlertTriangle, FilterX, CalendarIcon, UserCheck, Activity, UserCog } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order, OrderItem, OrderStatus, Product, StockRequest, StockRequestStatus, User as AppUser, ShippingAddress, UserRole } from '@/types';
+import type { Order, OrderItem as FirestoreOrderItem, OrderStatus, Product, StockRequest, StockRequestStatus, User as AppUser, ShippingAddress, UserRole } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { format, isSameMonth } from 'date-fns';
 import { DateRange } from "react-day-picker";
@@ -246,8 +246,8 @@ export default function AdminReportsPage() {
             // Specifically handle ShippingAddress object
             if ('fullName' in value && 'addressLine1' in value) {
               const addr = value as ShippingAddress;
-              const addressParts = [addr.fullName, addr.addressLine1, addr.addressLine2, addr.city, addr.county].filter(Boolean);
-              return `"${addressParts.join(', ')}"`;
+              const addressParts = [addr.addressLine1, addr.addressLine2, addr.city, addr.county].filter(Boolean);
+              return `"${addressParts.join(', ').replace(/"/g, '""')}"`;
             }
             return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
         }
@@ -441,8 +441,8 @@ export default function AdminReportsPage() {
                     {filteredUserData.map(u => (
                         <TableRow key={u.uid}><TableCell className="font-medium">{u.displayName}</TableCell><TableCell>{u.email}</TableCell><TableCell>{u.role}</TableCell>
                         <TableCell>
-                            <Badge variant={u.disabled ? 'statusRed' : 'statusGreen'} className="capitalize">
-                                {u.disabled ? "Inactive" : "Active"}
+                            <Badge variant={getAccountStatusVariant(u)} className="capitalize">
+                                {u.disabled ? "Inactive" : (u.status === 'pending' ? 'Pending' : 'Active')}
                             </Badge>
                         </TableCell>
                         <TableCell className="text-xs">{formatDate(u.createdAt)}</TableCell></TableRow>
