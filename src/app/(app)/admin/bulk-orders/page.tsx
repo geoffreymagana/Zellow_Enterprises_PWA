@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Loader2, PackagePlus, FileWarning, Eye, CheckCircle, XCircle } from 'lucide-react';
 import type { BulkOrderRequest, BulkOrderStatus, Order, OrderItem, DeliveryHistoryEntry } from '@/types';
-import { collection, query, where, orderBy, onSnapshot, doc, writeBatch, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, writeBatch, serverTimestamp, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import Link from 'next/link';
 
 const getStatusBadgeVariant = (status: BulkOrderStatus): BadgeProps['variant'] => {
   switch (status) {
@@ -67,7 +68,9 @@ export default function AdminBulkOrdersPage() {
 
   useEffect(() => {
     const unsubscribe = fetchRequests();
-    return () => unsubscribe();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [fetchRequests]);
 
   const handleOpenActionModal = (request: BulkOrderRequest, type: 'approve' | 'reject') => {
@@ -128,8 +131,6 @@ export default function AdminBulkOrdersPage() {
           paymentStatus: 'pending',
           isBulkOrder: true,
           bulkOrderRequestId: viewingRequest.id,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
           // Defaulting other required fields
           shippingAddress: { // A placeholder or require this in the form
             fullName: viewingRequest.requesterName,
@@ -141,7 +142,7 @@ export default function AdminBulkOrdersPage() {
           },
           deliveryHistory: [{ status: 'pending', timestamp: serverTimestamp(), notes: 'Bulk order request approved and created.' }],
         };
-        batch.set(newOrderRef, newOrder);
+        batch.set(newOrderRef, { ...newOrder, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
         batch.update(requestRef, { status: newStatus, adminNotes, updatedAt: serverTimestamp(), convertedOrderId: newOrderRef.id });
         await batch.commit();
 
