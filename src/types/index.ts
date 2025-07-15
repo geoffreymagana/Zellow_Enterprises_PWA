@@ -1,4 +1,5 @@
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -287,7 +288,9 @@ export type StockRequestStatus =
   | 'awarded'
   | 'awaiting_fulfillment'
   | 'fulfilled'
+  | 'received'
   | 'rejected_finance'
+  | 'rejected_supplier'
   | 'cancelled';
 
 export interface Bid {
