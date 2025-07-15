@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2, Download, BarChart2, Users, ShoppingCart, DollarSign, Package, AlertTriangle, FilterX, CalendarIcon } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order, OrderStatus, Product, StockRequest, StockRequestStatus, User as AppUser } from '@/types';
+import type { Order, OrderItem, OrderStatus, Product, StockRequest, StockRequestStatus, User as AppUser, ShippingAddress } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { format, isSameMonth } from 'date-fns';
 import { DateRange } from "react-day-picker";
@@ -18,11 +18,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 
 interface OrderStatusDistribution {
   status: OrderStatus;
   count: number;
+  orders: Order[];
 }
 
 interface StockLevelData extends Product {}
@@ -95,20 +97,22 @@ export default function AdminReportsPage() {
     setIsLoadingOrderStatus(true);
     try {
       const ordersSnapshot = await getDocs(collection(db, 'orders'));
-      const counts: Record<OrderStatus, number> = {
-        pending: 0, processing: 0, awaiting_assignment: 0, assigned: 0,
-        out_for_delivery: 0, delivered: 0, delivery_attempted: 0, cancelled: 0, shipped: 0,
-      };
+      const ordersByStatus = new Map<OrderStatus, Order[]>();
+
       ordersSnapshot.forEach(doc => {
-        const order = doc.data() as Order;
-        if (counts[order.status] !== undefined) {
-          counts[order.status]++;
+        const order = { id: doc.id, ...doc.data() } as Order;
+        if (!ordersByStatus.has(order.status)) {
+          ordersByStatus.set(order.status, []);
         }
+        ordersByStatus.get(order.status)!.push(order);
       });
-      const distribution = (Object.keys(counts) as OrderStatus[]).map(status => ({
+      
+      const distribution: OrderStatusDistribution[] = Array.from(ordersByStatus.entries()).map(([status, orders]) => ({
         status,
-        count: counts[status]
-      })).filter(item => item.count > 0);
+        count: orders.length,
+        orders,
+      })).sort((a,b) => b.count - a.count); // Sort by count desc
+
       setOrderStatusData(distribution);
     } catch (error) { toast({ title: "Error", description: "Failed to load order status report.", variant: "destructive" }); }
     setIsLoadingOrderStatus(false);
@@ -137,7 +141,7 @@ export default function AdminReportsPage() {
         totalRevenue += order.totalAmount;
         detailedOrders.push(order);
       });
-      setSalesSummaryData({ totalPaidOrders: paidOrdersSnapshot.size, totalRevenue, detailedPaidOrders: detailedOrders });
+      setSalesSummaryData({ totalPaidOrders: paidOrdersSnapshot.size, totalRevenue, detailedOrders: detailedOrders });
     } catch (error) { toast({ title: "Error", description: "Failed to load sales summary.", variant: "destructive" }); }
     setIsLoadingSalesSummary(false);
   }, [toast]);
@@ -183,29 +187,42 @@ export default function AdminReportsPage() {
     });
   }, [auditTrailData, auditDateRange, auditSupplierFilter, auditStatusFilter]);
 
-  const downloadCSV = (data: any[], filename: string, headers: string[]) => {
-    if (!data || data.length === 0) { toast({ title: "No Data", description: "No data available to download.", variant: "default" }); return; }
-    
-    const formatValueForCSV = (value: any, key: string) => {
-      if (value === null || value === undefined) return '';
-      if (key.toLowerCase().includes('date') || key.toLowerCase().includes('timestamp')) {
-        return formatDate(value);
-      }
-      if (Array.isArray(value)) {
-          return value.map(item => typeof item === 'object' ? JSON.stringify(item) : item).join('; ');
-      }
-      if (typeof value === 'object') return JSON.stringify(value);
-      return String(value).replace(/"/g, '""');
+ const downloadCSV = (data: any[], filename: string, headers: string[]) => {
+    if (!data || data.length === 0) {
+      toast({ title: "No Data", description: "No data available to download.", variant: "default" });
+      return;
+    }
+
+    const formatValueForCSV = (value: any): string => {
+        if (value === null || value === undefined) return '';
+        if (value instanceof Timestamp) return formatDate(value, true);
+        if (value instanceof Date) return format(value, 'yyyy-MM-dd HH:mm:ss');
+        if (Array.isArray(value)) {
+            // For Order 'items' array
+            if (value.every(item => typeof item === 'object' && item !== null && 'name' in item && 'quantity' in item)) {
+              return value.map(item => `${item.quantity}x ${item.name}`).join('; ');
+            }
+            return value.join('; ');
+        }
+        if (typeof value === 'object') {
+            // For ShippingAddress
+            if ('fullName' in value && 'addressLine1' in value) {
+              const addr = value as ShippingAddress;
+              return `${addr.fullName}, ${addr.addressLine1}, ${addr.city}, ${addr.county}`;
+            }
+            return JSON.stringify(value);
+        }
+        return String(value).replace(/"/g, '""');
     };
 
     const csvRows = [headers.join(',')];
     data.forEach(row => {
-        const values = headers.map(header => {
-            const key = Object.keys(row).find(k => k.toLowerCase() === header.toLowerCase().replace(/\s/g, ''));
-            const value = key ? row[key as keyof typeof row] : '';
-            return `"${formatValueForCSV(value, key || '')}"`;
-        });
-        csvRows.push(values.join(','));
+      const values = headers.map(header => {
+        const key = header.toLowerCase().replace(/\s/g, '');
+        const rowValue = Object.entries(row).find(([k,v]) => k.toLowerCase() === key)?.[1];
+        return `"${formatValueForCSV(rowValue)}"`;
+      });
+      csvRows.push(values.join(','));
     });
 
     const csvString = csvRows.join('\n');
@@ -221,6 +238,8 @@ export default function AdminReportsPage() {
   };
 
   const auditHeaders = ["ID", "ProductName", "RequestedQuantity", "RequesterName", "Status", "SupplierName", "SupplierPrice", "ReceivedQuantity", "CreatedAt", "FinanceActionTimestamp", "ReceivedAt"];
+  const salesHeaders = ['ID', 'CustomerName', 'CustomerEmail', 'TotalAmount', 'PaymentStatus', 'Status', 'CreatedAt', 'Items', 'ShippingAddress'];
+  const orderHeaders = ['ID', 'CustomerName', 'CustomerEmail', 'TotalAmount', 'Status', 'CreatedAt'];
 
   if (authLoading || (!user && !authLoading)) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -286,11 +305,43 @@ export default function AdminReportsPage() {
       
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between"><CardTitle className="font-headline text-xl">Order Status Distribution</CardTitle>
-            <Button variant="outline" size="sm" onClick={() => downloadCSV(orderStatusData, 'order_status_distribution', ['Status', 'Count'])} disabled={isLoadingOrderStatus || orderStatusData.length === 0}><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
-          </div><CardDescription>Current count of orders by their status.</CardDescription>
+          <div className="flex items-center justify-between"><CardTitle className="font-headline text-xl">Order Status Distribution</CardTitle></div>
+          <CardDescription>Current count of orders by their status. Expand to view and download.</CardDescription>
         </CardHeader>
-        <CardContent>{isLoadingOrderStatus ? <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : orderStatusData.length === 0 ? <p className="text-muted-foreground text-center py-6">No order data available.</p> : (<Table><TableHeader><TableRow><TableHead>Status</TableHead><TableHead className="text-right">Count</TableHead></TableRow></TableHeader><TableBody>{orderStatusData.map(item => (<TableRow key={item.status}><TableCell className="capitalize">{item.status.replace(/_/g, ' ')}</TableCell><TableCell className="text-right">{item.count}</TableCell></TableRow>))}</TableBody></Table>)}</CardContent>
+        <CardContent>{isLoadingOrderStatus ? <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+        : orderStatusData.length === 0 ? <p className="text-muted-foreground text-center py-6">No order data available.</p> 
+        : (<Accordion type="single" collapsible className="w-full">
+            {orderStatusData.map(item => (
+              <AccordionItem value={item.status} key={item.status}>
+                <AccordionTrigger>
+                  <div className="flex justify-between w-full pr-4">
+                    <span className="capitalize">{item.status.replace(/_/g, ' ')}</span>
+                    <Badge variant="secondary">{item.count} Orders</Badge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="p-2 space-y-3">
+                    <Button variant="outline" size="sm" onClick={() => downloadCSV(item.orders, `orders_${item.status}`, orderHeaders)}><Download className="mr-2 h-4 w-4"/> Download List</Button>
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Order ID</TableHead><TableHead>Customer</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {item.orders.map(order => (
+                          <TableRow key={order.id}>
+                            <TableCell className="font-medium text-primary hover:underline"><Link href={`/admin/orders/edit/${order.id}`}>{order.id.substring(0,8)}...</Link></TableCell>
+                            <TableCell>{order.customerName}</TableCell>
+                            <TableCell className="text-xs">{formatDate(order.createdAt)}</TableCell>
+                            <TableCell className="text-right">{formatPrice(order.totalAmount)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+           </Accordion>
+           )}
+        </CardContent>
       </Card>
 
       <Card>
@@ -305,7 +356,7 @@ export default function AdminReportsPage() {
       <Card>
         <CardHeader>
             <div className="flex items-center justify-between"><CardTitle className="font-headline text-xl">Sales Summary</CardTitle>
-                 <Button variant="outline" size="sm" onClick={() => downloadCSV(salesSummaryData?.detailedPaidOrders || [], 'sales_summary_details', ['ID', 'CustomerName', 'CustomerEmail', 'TotalAmount', 'PaymentStatus', 'Status', 'CreatedAt', 'Items', 'ShippingAddress'])} disabled={isLoadingSalesSummary || !salesSummaryData || !salesSummaryData.detailedPaidOrders || salesSummaryData.detailedPaidOrders.length === 0}><Download className="mr-2 h-4 w-4" /> Download Paid Orders CSV</Button>
+                 <Button variant="outline" size="sm" onClick={() => downloadCSV(salesSummaryData?.detailedPaidOrders || [], 'sales_summary_details', salesHeaders)} disabled={isLoadingSalesSummary || !salesSummaryData || !salesSummaryData.detailedPaidOrders || salesSummaryData.detailedPaidOrders.length === 0}><Download className="mr-2 h-4 w-4" /> Download Paid Orders CSV</Button>
             </div><CardDescription>Summary of paid orders and revenue.</CardDescription>
         </CardHeader>
         <CardContent>{isLoadingSalesSummary ? <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : salesSummaryData ? (<div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="p-4 bg-muted/50 rounded-md"><p className="text-sm text-muted-foreground">Total Paid Orders</p><p className="text-2xl font-bold">{salesSummaryData.totalPaidOrders}</p></div><div className="p-4 bg-muted/50 rounded-md"><p className="text-sm text-muted-foreground">Total Revenue from Paid Orders</p><p className="text-2xl font-bold">{formatPrice(salesSummaryData.totalRevenue)}</p></div></div>) : (<p className="text-muted-foreground text-center py-6">No sales data available.</p>)}</CardContent>
