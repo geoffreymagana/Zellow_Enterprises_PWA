@@ -118,7 +118,7 @@ export default function FinanceApprovalsPage() {
 
     try {
       await updateDoc(requestRef, {
-        status: 'awaiting_fulfillment',
+        status: 'awarded', // Change status to awarded
         winningBidId: winningBid.id,
         supplierPrice: winningBid.pricePerUnit,
         supplierId: winningBid.supplierId,

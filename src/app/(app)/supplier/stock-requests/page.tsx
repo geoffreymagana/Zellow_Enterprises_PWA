@@ -24,8 +24,11 @@ const getStockRequestStatusVariant = (status: StockRequestStatus): BadgeProps['v
     case 'pending_bids': return 'statusYellow';
     case 'pending_award': return 'statusAmber';
     case 'awarded': return 'statusIndigo';
-    case 'awaiting_fulfillment': return 'statusLightBlue';
-    case 'fulfilled': return 'statusGreen';
+    case 'awaiting_fulfillment': return 'statusLightBlue'; // Should be same as awarded
+    case 'awaiting_receipt': return 'statusBlue';
+    case 'fulfilled': // This is a legacy/general complete status
+    case 'received': // This is the final complete status
+      return 'statusGreen';
     case 'rejected_finance':
     case 'cancelled': 
       return 'statusRed';
@@ -66,17 +69,18 @@ export default function SupplierStockRequestsPage() {
         where("status", "in", ["pending_bids", "pending_award"]),
         orderBy("createdAt", "desc")
     );
-
+    
+    // Corrected Query: Fetch all requests awarded to the supplier, including those they need to fulfill and those already fulfilled.
     const awardedToMeQuery = query(
       collection(db, 'stockRequests'),
       where('supplierId', '==', user.uid),
-      where('status', '==', 'awarded'),
-      orderBy('financeActionTimestamp', 'desc')
+      where('status', 'in', ['awarded', 'awaiting_receipt', 'fulfilled', 'received']),
+      orderBy('updatedAt', 'desc')
     );
 
     const unsubOpenBids = onSnapshot(openForBidsQuery, (snapshot) => {
         setOpenForBiddingRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StockRequest)));
-        setIsLoading(false); // Set loading to false after first query completes
+        if(isLoading) setIsLoading(false); // Set loading to false after first query completes
     }, (error) => {
       console.error("Error fetching open stock requests:", error);
       toast({ title: "Error", description: "Could not load open requests.", variant: "destructive" });
@@ -94,7 +98,7 @@ export default function SupplierStockRequestsPage() {
         unsubOpenBids();
         unsubAwardedToMe();
     };
-  }, [db, user, role, toast]);
+  }, [db, user, role, toast, isLoading]); // Added isLoading to dependency array
 
   useEffect(() => {
     if (authLoading) return;
@@ -119,16 +123,7 @@ export default function SupplierStockRequestsPage() {
         toast({ title: "Error", description: "Cannot create invoice, awarded price is missing.", variant: "destructive" });
         return;
     }
-     // First, update the status to awaiting_receipt
     try {
-        const requestRef = doc(db, 'stockRequests', request.id);
-        await updateDoc(requestRef, {
-            status: 'awaiting_receipt',
-            supplierActionTimestamp: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-        });
-        
-        // Then, navigate to the invoice creation page
         const queryParams = new URLSearchParams({
             stockRequestId: request.id,
             productName: request.productName,
@@ -137,8 +132,8 @@ export default function SupplierStockRequestsPage() {
         });
         router.push(`/supplier/invoices/new?${queryParams.toString()}`);
     } catch (e: any) {
-        console.error("Error updating stock request status:", e);
-        toast({ title: "Error", description: "Could not update request status before invoicing.", variant: "destructive" });
+        console.error("Error navigating to invoice page:", e);
+        toast({ title: "Error", description: "Could not navigate to invoice creation page.", variant: "destructive" });
     }
   }
 
@@ -161,18 +156,18 @@ export default function SupplierStockRequestsPage() {
     try {
       const requestRef = doc(db, 'stockRequests', actionableRequest.id);
       const newBid: Bid = {
-        id: doc(collection(db, 'bids')).id, // Generate a unique ID for the bid
+        id: doc(collection(db, 'bids')).id, 
         supplierId: user.uid,
         supplierName: user.displayName || user.email || "Unnamed Supplier",
         pricePerUnit: numPrice,
         taxRate: numTaxRate,
         notes: bidNotes,
-        createdAt: new Date(),
+        createdAt: new Date(), // Use client-side date
       };
 
       await updateDoc(requestRef, {
         bids: arrayUnion(newBid),
-        status: 'pending_award', // Change status to indicate bids are present
+        status: 'pending_award',
         updatedAt: serverTimestamp(),
       });
       
@@ -202,6 +197,10 @@ export default function SupplierStockRequestsPage() {
   if (authLoading || (!user && !authLoading)) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
+  
+  const myAwardedRequests = awardedToMeRequests.filter(req => req.status === 'awarded');
+  const myFulfilledRequests = awardedToMeRequests.filter(req => ['awaiting_receipt', 'fulfilled', 'received'].includes(req.status));
+
 
   return (
     <div className="space-y-6">
@@ -258,13 +257,13 @@ export default function SupplierStockRequestsPage() {
         <CardContent className="p-0 pb-4">
           {isLoading ? (
             <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
-          ) : awardedToMeRequests.length === 0 ? (
+          ) : myAwardedRequests.length === 0 ? (
             <p className="p-6 text-center text-muted-foreground">No requests have been awarded to you yet.</p>
           ) : (
             <Table>
               <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Qty</TableHead><TableHead>Awarded Price/Unit</TableHead><TableHead>Awarded On</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
-                {awardedToMeRequests.map((req) => (
+                {myAwardedRequests.map((req) => (
                   <TableRow key={req.id}>
                     <TableCell className="font-medium">{req.productName}</TableCell>
                     <TableCell>{req.requestedQuantity}</TableCell>
@@ -280,6 +279,39 @@ export default function SupplierStockRequestsPage() {
               </TableBody>
             </Table>
           )}
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+            <CardTitle>My Fulfilled Requests</CardTitle>
+            <CardDescription>History of your completed fulfillments.</CardDescription>
+        </CardHeader>
+        <CardContent>
+             {isLoading ? (
+                <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
+              ) : myFulfilledRequests.length === 0 ? (
+                <p className="p-6 text-center text-muted-foreground">You have not fulfilled any requests yet.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {myFulfilledRequests.map(req => (
+                        <Card key={req.id} className="shadow-md bg-muted/50">
+                            <CardHeader className="pb-3">
+                                <div className="flex justify-between items-start">
+                                    <CardTitle className="text-base font-semibold">{req.productName}</CardTitle>
+                                    <Badge variant={getStockRequestStatusVariant(req.status)} className="capitalize text-xs whitespace-nowrap">{req.status.replace(/_/g, ' ')}</Badge>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="text-xs space-y-1.5 pt-0 pb-3">
+                                <p><strong>Qty Fulfilled:</strong> {req.fulfilledQuantity ?? 'N/A'}</p>
+                                <p><strong>Awarded Price:</strong> {formatKsh(req.supplierPrice)}/unit</p>
+                                <p><strong>Invoice ID:</strong> {req.invoiceId ? <Link href="/invoices" className="text-primary underline">{req.invoiceId.substring(0,8)}...</Link> : 'N/A'}</p>
+                                <p><strong>Fulfilled On:</strong> {formatDate(req.supplierActionTimestamp)}</p>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+              )}
         </CardContent>
       </Card>
 

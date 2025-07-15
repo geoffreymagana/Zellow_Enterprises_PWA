@@ -1,6 +1,7 @@
 
 
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -300,9 +301,9 @@ export interface Bid {
   supplierId: string;
   supplierName: string;
   pricePerUnit: number;
-  taxRate?: number; // Added tax rate
+  taxRate?: number;
   notes?: string;
-  createdAt: any;
+  createdAt: any; // Firestore Timestamp or Date
 }
 
 export interface StockRequest {
