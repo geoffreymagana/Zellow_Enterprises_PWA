@@ -458,7 +458,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   );
 };
 
-function AppLayoutContent({ children }: LayoutProps) {
+const AppLayoutContent = ({ children }: LayoutProps) => {
   const { user, role, loading } = useAuth();
   const pathname = usePathname();
   const router = useRouter(); 
