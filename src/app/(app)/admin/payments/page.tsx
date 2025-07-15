@@ -318,7 +318,7 @@ export default function AdminPaymentsPage() {
                         </button>
                     </TableCell>
                     <TableCell>
-                        <Badge variant={isRevenue ? 'statusGreen' : 'statusRed'} className="capitalize bg-opacity-20 text-opacity-100">
+                        <Badge variant={isRevenue ? 'statusGreen' : 'statusRed'} className="capitalize">
                           {isRevenue ? <ArrowUpRight className="mr-1 h-3 w-3"/> : <ArrowDownLeft className="mr-1 h-3 w-3"/>}
                           {tx.transactionType}
                         </Badge>
