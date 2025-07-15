@@ -284,7 +284,7 @@ export default function ShippingPage() {
                     control={form.control} name="selectedTownRegion"
                     render={({ field }) => (
                       <FormItem className="mb-4"> <FormLabel>City / Town</FormLabel>
-                        <Select onValueChange={(value) => { field.onChange(value); handleTownChange(value); }} value={field.value} defaultValue={field.value}>
+                        <Select onValueChange={(value) => { field.onChange(value); handleTownChange(value); }} value={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select your city/town" /></SelectTrigger></FormControl>
                           <SelectContent>{townOptions.map(opt => (<SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>))}</SelectContent>
                         </Select><FormMessage />
@@ -325,7 +325,7 @@ export default function ShippingPage() {
                         <div className="pl-4 space-y-4 pt-2">
                           <FormField control={form.control} name="giftRecipientContactMethod" render={({ field }) => (
                               <FormItem><FormLabel>Recipient Contact Method</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value || ''} defaultValue={field.value || ''}>
+                                <Select onValueChange={field.onChange} value={field.value || ''}>
                                   <FormControl><SelectTrigger><SelectValue placeholder="Select contact method" /></SelectTrigger></FormControl>
                                   <SelectContent>
                                     <SelectItem value="email">Email</SelectItem>
