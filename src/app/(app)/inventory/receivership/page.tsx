@@ -241,5 +241,4 @@ export default function InventoryReceivershipPage() {
     </div>
   );
 }
-
     

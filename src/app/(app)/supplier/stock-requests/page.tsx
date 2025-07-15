@@ -70,7 +70,7 @@ export default function SupplierStockRequestsPage() {
     const awardedToMeQuery = query(
       collection(db, 'stockRequests'),
       where('supplierId', '==', user.uid),
-      where('status', '==', 'awaiting_fulfillment'),
+      where('status', '==', 'awarded'),
       orderBy('financeActionTimestamp', 'desc')
     );
 
@@ -114,18 +114,32 @@ export default function SupplierStockRequestsPage() {
     setIsBidModalOpen(true);
   };
   
-  const handleFulfillAndInvoice = (request: StockRequest) => {
-    if(!request.supplierPrice) {
-        toast({ title: "Error", description: "Cannot create invoice, supplier price is missing.", variant: "destructive" });
+  const handleFulfillAndInvoice = async (request: StockRequest) => {
+    if(!request.supplierPrice || !db) {
+        toast({ title: "Error", description: "Cannot create invoice, awarded price is missing.", variant: "destructive" });
         return;
     }
-     const queryParams = new URLSearchParams({
-        stockRequestId: request.id,
-        productName: request.productName,
-        fulfilledQty: String(request.requestedQuantity),
-        supplierPrice: String(request.supplierPrice) // Pass the awarded price
-    });
-    router.push(`/supplier/invoices/new?${queryParams.toString()}`);
+     // First, update the status to awaiting_receipt
+    try {
+        const requestRef = doc(db, 'stockRequests', request.id);
+        await updateDoc(requestRef, {
+            status: 'awaiting_receipt',
+            supplierActionTimestamp: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+        
+        // Then, navigate to the invoice creation page
+        const queryParams = new URLSearchParams({
+            stockRequestId: request.id,
+            productName: request.productName,
+            fulfilledQty: String(request.requestedQuantity),
+            supplierPrice: String(request.supplierPrice)
+        });
+        router.push(`/supplier/invoices/new?${queryParams.toString()}`);
+    } catch (e: any) {
+        console.error("Error updating stock request status:", e);
+        toast({ title: "Error", description: "Could not update request status before invoicing.", variant: "destructive" });
+    }
   }
 
   const handleSubmitBid = async () => {
@@ -176,7 +190,6 @@ export default function SupplierStockRequestsPage() {
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'N/A';
-    // Check if it's a Firestore Timestamp and convert, otherwise assume it's a Date object or can be parsed as one
     const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
     if (isNaN(date.getTime())) return 'Invalid Date';
     return format(date, 'PPp');

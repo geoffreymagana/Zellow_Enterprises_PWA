@@ -288,7 +288,8 @@ export type StockRequestStatus =
   | 'pending_award'
   | 'awarded'
   | 'awaiting_fulfillment'
-  | 'fulfilled'
+  | 'fulfilled' // DEPRECATED in favor of awaiting_receipt
+  | 'awaiting_receipt' // NEW: After supplier creates invoice, before inventory manager receives
   | 'received'
   | 'rejected_finance'
   | 'rejected_supplier'
