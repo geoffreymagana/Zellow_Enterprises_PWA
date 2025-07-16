@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PlusCircle, Edit, Trash2, Eye, EyeOff, UserCheck, UserX, Search, CheckCircle, XCircle, AlertTriangle, UserCog, Filter } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Eye, EyeOff, UserCheck, UserX, Search, CheckCircle, XCircle, AlertTriangle, UserCog, Filter, RefreshCcw } from 'lucide-react';
 import type { User, UserRole, UserStatus } from '@/types';
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -46,8 +46,21 @@ const editUserFormSchema = z.object({
 });
 type EditUserFormValues = z.infer<typeof editUserFormSchema>;
 
-const getAccountStatusBadgeVariant = (disabled?: boolean): BadgeProps['variant'] => {
-    return disabled ? 'destructive' : 'statusGreen';
+const getAccountStatusBadgeVariant = (user: User): BadgeProps['variant'] => {
+    if (user.status === 'rejected') return 'destructive';
+    if (user.status === 'pending') return 'statusYellow';
+    if (user.disabled) return 'statusRed';
+    return 'statusGreen';
+};
+
+const getAccountStatusText = (user: User): string => {
+    if (user.status === 'rejected') return 'Rejected';
+    if (user.status === 'pending') return 'Pending Approval';
+    if (user.disabled) {
+        const timeAgo = user.disabledAt ? `since ${formatDistanceToNow(user.disabledAt.toDate(), { addSuffix: true })}` : '';
+        return `Inactive ${timeAgo}`.trim();
+    }
+    return 'Active';
 };
 
 export default function AdminUsersPage() {
@@ -121,9 +134,15 @@ export default function AdminUsersPage() {
 
         const roleMatch = roleFilter === 'all' || user.role === roleFilter;
 
-        const statusMatch = statusFilter === 'all' ||
-            (statusFilter === 'active' && !user.disabled) ||
-            (statusFilter === 'inactive' && user.disabled);
+        let statusMatch = true;
+        if (statusFilter !== 'all') {
+            switch(statusFilter) {
+                case 'active': statusMatch = !user.disabled && user.status === 'approved'; break;
+                case 'inactive': statusMatch = !!user.disabled && user.status !== 'rejected'; break;
+                case 'pending': statusMatch = user.status === 'pending'; break;
+                case 'rejected': statusMatch = user.status === 'rejected'; break;
+            }
+        }
         
         return searchMatch && roleMatch && statusMatch;
     });
@@ -203,6 +222,26 @@ export default function AdminUsersPage() {
       setIsEditUserOpen(false); setUserToEdit(null); fetchUsers();
     } catch (error: any) {
       toast({ title: "Update Failed", description: error.message || "Could not update user.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReinstateUser = async () => {
+    if (!db || !userToEdit) return;
+    setIsSubmitting(true);
+    try {
+      const userRef = doc(db, 'users', userToEdit.uid);
+      await updateDoc(userRef, {
+        status: 'approved',
+        disabled: false,
+        disabledAt: null,
+        rejectionReason: null,
+      });
+      toast({ title: "User Reinstated", description: `${userToEdit.displayName || userToEdit.email} has been approved and enabled.` });
+      setIsEditUserOpen(false); setUserToEdit(null); fetchUsers();
+    } catch (error: any) {
+      toast({ title: "Update Failed", description: "Could not reinstate user.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -289,13 +328,15 @@ export default function AdminUsersPage() {
                 </SelectContent>
               </Select>
                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-[140px] h-9 text-xs sm:text-sm">
+                <SelectTrigger className="w-full sm:w-[160px] h-9 text-xs sm:text-sm">
                     <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
                     <SelectItem value="all">All Statuses</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
                 </SelectContent>
               </Select>
               {(searchTerm || roleFilter !== 'all' || statusFilter !== 'all') && (
@@ -322,8 +363,8 @@ export default function AdminUsersPage() {
                     <TableCell>{user.email || '-'}</TableCell>
                     <TableCell>{user.role || '-'}</TableCell>
                     <TableCell>
-                      <Badge variant={getAccountStatusBadgeVariant(user.disabled)} className="capitalize">
-                        {user.disabled ? `Inactive ${user.disabledAt ? 'since ' + formatDistanceToNow(user.disabledAt.toDate(), { addSuffix: true }) : ''}`.trim() : 'Active'}
+                      <Badge variant={getAccountStatusBadgeVariant(user)} className="capitalize">
+                         {getAccountStatusText(user)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right space-x-1">
@@ -355,13 +396,25 @@ export default function AdminUsersPage() {
             <Form {...editUserForm}>
               <form onSubmit={editUserForm.handleSubmit(handleEditUser)} className="space-y-4 py-4">
                   <FormField control={editUserForm.control} name="role" render={({ field }) => (<FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value as string | undefined}><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger><SelectContent>{allManageableRoles.filter(r => r !== null).map(r => <SelectItem key={r} value={r!}>{r}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                  <FormField control={editUserForm.control} name="disabled" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                      <div className="space-y-0.5"><FormLabel>Account Disabled</FormLabel><p className="text-xs text-muted-foreground">Disabling the account will prevent the user from logging in.</p></div>
-                      <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                  </FormItem>)} />
+                  {userToEdit.status !== 'rejected' && (
+                     <FormField control={editUserForm.control} name="disabled" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5"><FormLabel>Account Disabled</FormLabel><p className="text-xs text-muted-foreground">Disabling the account will prevent the user from logging in.</p></div>
+                        <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                    </FormItem>)} />
+                  )}
+                  {userToEdit.status === 'rejected' && (
+                     <Card className="bg-amber-50 border-amber-200 p-3 text-amber-800">
+                        <p className="text-sm font-semibold">This user was rejected.</p>
+                        <p className="text-xs">Rejection Reason: {userToEdit.rejectionReason || 'N/A'}</p>
+                        <Button type="button" size="sm" onClick={handleReinstateUser} className="mt-2 w-full" disabled={isSubmitting}>
+                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCcw className="mr-2 h-4 w-4" />}
+                            Approve & Enable User
+                        </Button>
+                    </Card>
+                  )}
                   <DialogFooter>
                     <DialogClose asChild><Button type="button" variant="outline" onClick={() => { setIsEditUserOpen(false); setUserToEdit(null); }}>Cancel</Button></DialogClose>
-                    <Button type="submit" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Changes</Button>
+                    <Button type="submit" disabled={isSubmitting || userToEdit.status === 'rejected'}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Changes</Button>
                   </DialogFooter>
               </form>
             </Form>

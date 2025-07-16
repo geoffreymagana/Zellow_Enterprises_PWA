@@ -99,11 +99,20 @@ export default function AdminApprovalsPage() {
       resolutionNotes: actionType === 'reject' ? rejectionReason : `Approved by ${user.displayName || user.email}`,
     });
     
-    // Update user status
-    batch.update(userRef, {
+    // Update user document
+    const userUpdatePayload: any = {
       status: newStatus,
-      rejectionReason: actionType === 'reject' ? rejectionReason : null,
-    });
+    };
+
+    if (actionType === 'reject') {
+        userUpdatePayload.rejectionReason = rejectionReason;
+        userUpdatePayload.disabled = true; // IMPORTANT: Disable the user on rejection
+    } else {
+        userUpdatePayload.rejectionReason = null;
+        userUpdatePayload.disabled = false; // Ensure user is enabled on approval
+    }
+
+    batch.update(userRef, userUpdatePayload);
     
     try {
       await batch.commit();

@@ -7,7 +7,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Download, BarChart2, Users, ShoppingCart, DollarSign, Package, AlertTriangle, FilterX, CalendarIcon, UserCheck, Activity, UserCog } from 'lucide-react';
+import { Loader2, Download, BarChart2, Users, ShoppingCart, DollarSign, Package, AlertTriangle, FilterX, CalendarIcon, UserCog, Activity, CheckCircle, XCircle } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, OrderItem as FirestoreOrderItem, OrderStatus, Product, StockRequest, StockRequestStatus, User as AppUser, ShippingAddress, UserRole } from '@/types';
@@ -69,10 +69,17 @@ const getStockRequestStatusVariant = (status?: StockRequestStatus | null): Badge
 };
 
 const getAccountStatusVariant = (user: AppUser): BadgeProps['variant'] => {
-    if (user.disabled) return 'statusRed';
+    if (user.status === 'rejected') return 'destructive';
     if (user.status === 'pending') return 'statusYellow';
-    if (user.status === 'rejected') return 'statusRed';
+    if (user.disabled) return 'statusRed';
     return 'statusGreen';
+};
+
+const getAccountStatusText = (user: AppUser): string => {
+    if (user.status === 'rejected') return 'Rejected';
+    if (user.status === 'pending') return 'Pending Approval';
+    if (user.disabled) return 'Inactive';
+    return 'Active';
 };
 
 export default function AdminReportsPage() {
@@ -101,7 +108,7 @@ export default function AdminReportsPage() {
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [userDateRange, setUserDateRange] = useState<DateRange | undefined>(undefined);
   const [userRoleFilter, setUserRoleFilter] = useState<string>("all");
-  const [userStatusFilter, setUserStatusFilter] = useState<string>("all"); // 'all', 'active', 'inactive'
+  const [userStatusFilter, setUserStatusFilter] = useState<string>("all"); // 'all', 'active', 'inactive', 'pending', 'rejected'
 
   const formatDate = (timestamp: any, includeTime: boolean = false) => {
     if (!timestamp) return 'N/A';
@@ -215,12 +222,14 @@ export default function AdminReportsPage() {
       const roleMatch = userRoleFilter === 'all' || usr.role === userRoleFilter;
 
       let statusMatch = true;
-      if (userStatusFilter === 'active') {
-          statusMatch = !usr.disabled;
-      } else if (userStatusFilter === 'inactive') {
-          statusMatch = !!usr.disabled;
+      if (userStatusFilter !== 'all') {
+          switch(userStatusFilter) {
+              case 'active': statusMatch = !usr.disabled && usr.status === 'approved'; break;
+              case 'inactive': statusMatch = !!usr.disabled && usr.status !== 'rejected'; break;
+              case 'pending': statusMatch = usr.status === 'pending'; break;
+              case 'rejected': statusMatch = usr.status === 'rejected'; break;
+          }
       }
-
       return dateMatch && roleMatch && statusMatch;
     });
   }, [allUsers, userDateRange, userRoleFilter, userStatusFilter]);
@@ -430,7 +439,13 @@ export default function AdminReportsPage() {
                 <SelectContent><SelectItem value="all">All Roles</SelectItem>{allManageableRoles.map(r => r && <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
             </Select>
             <Select value={userStatusFilter} onValueChange={setUserStatusFilter}><SelectTrigger className="w-full md:w-[160px]"><SelectValue placeholder="Filter by status..." /></SelectTrigger>
-                <SelectContent><SelectItem value="all">All Statuses</SelectItem><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent>
+                <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
             </Select>
             <Button variant="ghost" onClick={() => {setUserDateRange(undefined); setUserRoleFilter("all"); setUserStatusFilter("all");}} className="w-full md:w-auto"><FilterX className="mr-2 h-4 w-4" /> Clear</Button>
           </div>
@@ -442,7 +457,7 @@ export default function AdminReportsPage() {
                         <TableRow key={u.uid}><TableCell className="font-medium">{u.displayName}</TableCell><TableCell>{u.email}</TableCell><TableCell>{u.role}</TableCell>
                         <TableCell>
                             <Badge variant={getAccountStatusVariant(u)} className="capitalize">
-                                {u.disabled ? "Inactive" : (u.status === 'pending' ? 'Pending' : 'Active')}
+                                {getAccountStatusText(u)}
                             </Badge>
                         </TableCell>
                         <TableCell className="text-xs">{formatDate(u.createdAt)}</TableCell></TableRow>
