@@ -6,6 +6,7 @@
 
 
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -30,6 +31,9 @@ export interface User {
   displayName?: string | null;
   firstName?: string | null;
   lastName?: string | null;
+  phone?: string | null;
+  county?: string | null;
+  town?: string | null;
   photoURL?: string | null;
   role: UserRole;
   status?: UserStatus;
@@ -205,6 +209,7 @@ export interface BulkOrderItem {
   name: string;
   quantity: number;
   notes?: string;
+  customizations?: Record<string, any>;
 }
 
 export interface BulkOrderRequest {

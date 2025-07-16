@@ -15,7 +15,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from "zod";
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
-import type { ShippingAddress, ShippingRegion } from '@/types';
+import type { ShippingAddress, ShippingRegion, User as AppUser } from '@/types';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -89,6 +89,7 @@ export default function ShippingPage() {
   const [regions, setRegions] = useState<ShippingRegion[]>([]);
   const [townOptions, setTownOptions] = useState<TownOption[]>([]);
   const [isLoadingRegions, setIsLoadingRegions] = useState(true);
+  const [appUser, setAppUser] = useState<AppUser | null>(null);
 
   const form = useForm<ShippingFormValues>({
     resolver: zodResolver(shippingFormSchema),
@@ -99,7 +100,7 @@ export default function ShippingPage() {
       city: shippingAddress?.city || '',
       county: shippingAddress?.county || '',
       postalCode: shippingAddress?.postalCode || '',
-      phone: shippingAddress?.phone || '',
+      phone: shippingAddress?.phone || appUser?.phone || '',
       email: shippingAddress?.email || user?.email || '',
       selectedTownRegion: shippingAddress?.city && selectedShippingRegionId && shippingAddress.county
         ? `${shippingAddress.city}|${selectedShippingRegionId}|${shippingAddress.county}`
@@ -117,6 +118,18 @@ export default function ShippingPage() {
 
   const isGiftCurrent = form.watch("isGift");
   const notifyRecipientCurrent = form.watch("notifyRecipient");
+
+  const fetchUserData = useCallback(async () => {
+    if (!user || !db) return;
+    const userDocRef = doc(db, 'users', user.uid);
+    const docSnap = await getDoc(userDocRef);
+    if (docSnap.exists()) {
+      const userData = docSnap.data() as AppUser;
+      setAppUser(userData);
+      // Pre-fill form if not already filled by localStorage
+      if (!form.getValues('phone') && userData.phone) form.setValue('phone', userData.phone);
+    }
+  }, [user, form]);
 
   const fetchRegions = useCallback(async () => {
     if (!db) {
@@ -153,7 +166,8 @@ export default function ShippingPage() {
 
   useEffect(() => {
     fetchRegions();
-  }, [fetchRegions]);
+    fetchUserData();
+  }, [fetchRegions, fetchUserData]);
   
   useEffect(() => {
     if (user) {
@@ -168,7 +182,7 @@ export default function ShippingPage() {
       city: shippingAddress?.city || '',
       county: shippingAddress?.county || '',
       postalCode: shippingAddress?.postalCode || '',
-      phone: shippingAddress?.phone || '',
+      phone: shippingAddress?.phone || appUser?.phone || '',
       email: shippingAddress?.email || user?.email || '',
       selectedTownRegion: shippingAddress?.city && selectedShippingRegionId && shippingAddress.county
         ? `${shippingAddress.city}|${selectedShippingRegionId}|${shippingAddress.county}`
@@ -183,7 +197,7 @@ export default function ShippingPage() {
       recipientCanViewAndTrack: giftRecipientCanViewAndTrack === undefined ? true : giftRecipientCanViewAndTrack,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, shippingAddress, isGiftOrder, giftRecipientName, giftRecipientContactMethod, giftRecipientContactValue, giftMessage, notifyRecipient, showPricesToRecipient, giftRecipientCanViewAndTrack, selectedShippingRegionId]);
+  }, [user, shippingAddress, isGiftOrder, giftRecipientName, giftRecipientContactMethod, giftRecipientContactValue, giftMessage, notifyRecipient, showPricesToRecipient, giftRecipientCanViewAndTrack, selectedShippingRegionId, appUser]);
 
 
   const handleTownChange = (value: string) => {

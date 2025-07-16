@@ -9,8 +9,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { addDays, format } from 'date-fns';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
-import type { Product, BulkOrderRequest } from '@/types';
+import { collection, getDocs, query, where, orderBy, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import type { Product, BulkOrderRequest, User as AppUser, ProductCustomizationOption, CustomizationGroupDefinition } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -20,9 +20,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Calendar } from '@/components/ui/calendar';
-import { Loader2, PackagePlus, PlusCircle, Trash2, Send, CalendarIcon, Check, ChevronsUpDown, ImageOff } from 'lucide-react';
+import { Loader2, PackagePlus, PlusCircle, Trash2, Send, CalendarIcon, Check, ChevronsUpDown, ImageOff, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const formatPrice = (price?: number) => {
     if (price === undefined || price === null) return 'N/A';
@@ -33,6 +35,7 @@ const bulkOrderItemSchema = z.object({
   productId: z.string().min(1, "Please select a product."),
   quantity: z.coerce.number().min(1, "Quantity must be at least 1."),
   notes: z.string().optional(),
+  customizations: z.record(z.string(), z.any()).optional(),
 });
 
 const bulkOrderRequestSchema = z.object({
@@ -52,18 +55,17 @@ export default function BulkOrderRequestPage() {
   const { toast } = useToast();
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [productOptions, setProductOptions] = useState<Map<string, ProductCustomizationOption[]>>(new Map());
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
+  const [appUser, setAppUser] = useState<AppUser | null>(null);
 
   const form = useForm<BulkOrderRequestFormValues>({
     resolver: zodResolver(bulkOrderRequestSchema),
     defaultValues: {
       requesterName: user?.displayName || "",
       requesterEmail: user?.email || "",
-      requesterPhone: "",
-      companyName: "",
-      desiredDeliveryDate: addDays(new Date(), 14),
       items: [{ productId: "", quantity: 1, notes: "" }],
     },
   });
@@ -78,35 +80,53 @@ export default function BulkOrderRequestPage() {
         form.setValue('requesterName', user.displayName || '');
         form.setValue('requesterEmail', user.email || '');
     }
-  }, [user, form]);
+    if (appUser) {
+        if (!form.getValues('requesterPhone') && appUser.phone) form.setValue('requesterPhone', appUser.phone);
+    }
+  }, [user, appUser, form]);
 
-  const fetchProducts = useCallback(async () => {
+  const fetchUserData = useCallback(async () => {
+    if (!user || !db) return;
+    const userDocRef = doc(db, 'users', user.uid);
+    const docSnap = await getDoc(userDocRef);
+    if (docSnap.exists()) {
+      setAppUser(docSnap.data() as AppUser);
+    }
+  }, [user]);
+
+  const fetchProductsAndOptions = useCallback(async () => {
     if (!db) return;
     setIsLoadingProducts(true);
     try {
-      const q = query(
-        collection(db, 'products'), 
-        where("published", "==", true), 
-        orderBy("name", "asc")
-      );
+      const q = query(collection(db, 'products'), where("published", "==", true), orderBy("name", "asc"));
       const snapshot = await getDocs(q);
-      const productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+      const productsData: Product[] = [];
+      const optionsMap = new Map<string, ProductCustomizationOption[]>();
+
+      for (const productDoc of snapshot.docs) {
+        const productData = { id: productDoc.id, ...productDoc.data() } as Product;
+        productsData.push(productData);
+
+        if (productData.customizationGroupId) {
+          const groupDoc = await getDoc(doc(db, 'customizationGroupDefinitions', productData.customizationGroupId));
+          if (groupDoc.exists()) {
+            optionsMap.set(productData.id, (groupDoc.data() as CustomizationGroupDefinition).options || []);
+          }
+        }
+      }
       setProducts(productsData);
+      setProductOptions(optionsMap);
     } catch (e: any) {
-      console.error('Fetch products error:', e);
-      toast({ 
-        title: "Error", 
-        description: `Could not load product list: ${e.message}`, 
-        variant: "destructive" 
-      });
+      toast({ title: "Error", description: `Could not load product list: ${e.message}`, variant: "destructive" });
     } finally {
       setIsLoadingProducts(false);
     }
   }, [toast]);
 
   useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+    fetchProductsAndOptions();
+    fetchUserData();
+  }, [fetchProductsAndOptions, fetchUserData]);
   
   const onSubmit = async (values: BulkOrderRequestFormValues) => {
     if (!db || !user) return;
@@ -180,6 +200,7 @@ export default function BulkOrderRequestPage() {
                     const selectedProductId = form.watch(`items.${index}.productId`);
                     const quantity = form.watch(`items.${index}.quantity`);
                     const selectedProduct = products.find(p => p.id === selectedProductId);
+                    const optionsForProduct = selectedProductId ? productOptions.get(selectedProductId) : [];
                     const rowTotal = selectedProduct ? selectedProduct.price * (quantity || 0) : 0;
 
                     return (
@@ -239,9 +260,31 @@ export default function BulkOrderRequestPage() {
                             />
                             <div className="grid grid-cols-2 gap-4">
                                 <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" {...field} min="1"/></FormControl><FormMessage/></FormItem>)}/>
-                                <div><FormLabel>Row Total</FormLabel><Input value={formatPrice(rowTotal)} disabled /></div>
+                                <div><FormLabel>Total Price</FormLabel><Input value={formatPrice(rowTotal)} disabled /></div>
                             </div>
                             <FormField control={form.control} name={`items.${index}.notes`} render={({ field }) => (<FormItem><FormLabel>Notes (Optional)</FormLabel><FormControl><Textarea {...field} placeholder="Any specific instructions for this item..." rows={2}/></FormControl><FormMessage/></FormItem>)}/>
+                        
+                            {optionsForProduct && optionsForProduct.length > 0 && (
+                                <div className="pt-2 border-t mt-3 space-y-3">
+                                <h4 className="text-sm font-medium flex items-center gap-1"><Settings className="h-4 w-4"/> Customizations</h4>
+                                {optionsForProduct.map(option => (
+                                    <FormField
+                                    key={option.id}
+                                    control={form.control}
+                                    name={`items.${index}.customizations.${option.id}`}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs">{option.label}</FormLabel>
+                                            {option.type === 'text' && <FormControl><Input {...field} placeholder={option.placeholder || ''} /></FormControl>}
+                                            {option.type === 'checkbox' && <div className="flex items-center gap-2"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="text-xs font-normal">{option.checkboxLabel}</FormLabel></div>}
+                                            {option.type === 'dropdown' && <Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder={`Select ${option.label.toLowerCase()}`} /></SelectTrigger></FormControl><SelectContent>{option.choices?.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent></Select>}
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                    />
+                                ))}
+                                </div>
+                            )}
                         </div>
                     )
                 })}
