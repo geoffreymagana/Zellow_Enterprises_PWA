@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { FeedbackThread, UserRole, User as AppUser } from "@/types";
 import { collection, addDoc, serverTimestamp, runTransaction, doc, query, where, onSnapshot, orderBy, getDocs } from 'firebase/firestore';
