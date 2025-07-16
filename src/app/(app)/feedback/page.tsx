@@ -17,14 +17,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { FeedbackThread, UserRole, User as AppUser } from "@/types";
-import { collection, addDoc, serverTimestamp, runTransaction, doc, query, where, onSnapshot, orderBy, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, runTransaction, doc, query, where, onSnapshot, orderBy, getDocs, or } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { FeedbackThreadModal } from '@/components/common/FeedbackThreadModal';
 import { Badge, BadgeProps } from "@/components/ui/badge";
 
 const feedbackFormSchema = z.object({
-  targetRole: z.string().min(1, "Please select a recipient."), // This will now store the recipient's UID
+  targetRole: z.string().min(1, "Please select a recipient."), // This will now store the recipient's UID or a broadcast key
   subject: z.string().min(5, "Subject must be at least 5 characters long.").max(100, "Subject is too long."),
   message: z.string().min(10, "Message must be at least 10 characters long.").max(1000, "Message is too long."),
 });
@@ -40,7 +40,7 @@ const getStatusVariant = (status: FeedbackThread['status']): BadgeProps['variant
 };
 
 
-export default function FeedbackPage() {
+export default function MessagesPage() {
   const { user, role, loading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -52,8 +52,8 @@ export default function FeedbackPage() {
   const [broadcastThreads, setBroadcastThreads] = useState<FeedbackThread[]>([]); 
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   
-  const [employees, setEmployees] = useState<AppUser[]>([]);
-  const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
+  const [recipients, setRecipients] = useState<AppUser[]>([]);
+  const [isLoadingRecipients, setIsLoadingRecipients] = useState(true);
 
   const history = useMemo(() => {
     const allThreads = new Map<string, FeedbackThread>();
@@ -79,12 +79,10 @@ export default function FeedbackPage() {
     }
     setIsSubmitting(true);
     
-    // The 'targetRole' from the form is now the recipient's UID.
     const recipientId = values.targetRole;
-    const recipient = employees.find(e => e.uid === recipientId);
-    
-    // We still need the role for the thread document for querying purposes.
-    const recipientRole = recipient ? recipient.role : null;
+    const isBroadcast = recipientId === "Customer Broadcast";
+    const recipient = !isBroadcast ? recipients.find(e => e.uid === recipientId) : null;
+    const recipientRole = isBroadcast ? "Customer Broadcast" : recipient?.role;
 
     if (!recipientRole) {
         toast({ title: "Error", description: "Could not find the recipient's role.", variant: "destructive" });
@@ -103,8 +101,8 @@ export default function FeedbackPage() {
           senderId: user.uid,
           senderName: user.displayName || "N/A",
           senderEmail: user.email || "N/A",
-          targetRole: recipientRole, // Store the ROLE for querying
-          targetUserId: recipientId, // Store the specific user ID
+          targetRole: recipientRole, 
+          targetUserId: isBroadcast ? null : recipientId,
           status: 'open',
           lastMessageSnippet: values.message.substring(0, 50),
           createdAt: serverTimestamp(),
@@ -132,26 +130,38 @@ export default function FeedbackPage() {
     }
   };
   
-  const fetchEmployees = useCallback(async () => {
-    if (!db) return;
-    setIsLoadingEmployees(true);
-    const employeeRoles: UserRole[] = ['Admin', 'ServiceManager', 'FinanceManager', 'DispatchManager', 'InventoryManager'];
+  const fetchRecipients = useCallback(async () => {
+    if (!db || !role) return;
+    setIsLoadingRecipients(true);
     const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('role', 'in', employeeRoles), where('disabled', '!=', true), orderBy('displayName', 'asc'));
+    let q;
+
+    if (role === 'Customer') {
+      // Customers can message any non-customer (staff/admin)
+      q = query(usersRef, where('role', '!=', 'Customer'), where('disabled', '!=', true), orderBy('displayName', 'asc'));
+    } else {
+      // Staff/Admins can message anyone who is not disabled
+      q = query(usersRef, where('disabled', '!=', true), orderBy('displayName', 'asc'));
+    }
+
     try {
         const snapshot = await getDocs(q);
-        setEmployees(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser)));
+        const allUsers = snapshot.docs
+          .map(doc => ({ uid: doc.id, ...doc.data() } as AppUser))
+          .filter(u => u.uid !== user?.uid); // Filter out the current user
+        setRecipients(allUsers);
     } catch (error) {
-        toast({ title: "Error", description: "Could not fetch employee list.", variant: "destructive" });
+        console.error("Error fetching recipients:", error);
+        toast({ title: "Error", description: "Could not fetch recipient list.", variant: "destructive" });
     } finally {
-        setIsLoadingEmployees(false);
+        setIsLoadingRecipients(false);
     }
-  }, [toast]);
+  }, [toast, role, user?.uid]);
 
 
   useEffect(() => {
-    fetchEmployees();
-  }, [fetchEmployees]);
+    fetchRecipients();
+  }, [fetchRecipients]);
 
 
   useEffect(() => {
@@ -163,45 +173,36 @@ export default function FeedbackPage() {
     setIsLoadingHistory(true);
     const unsubscribers: (() => void)[] = [];
   
-    // Listener 1: Threads SENT BY the current user (for everyone).
     const sentQuery = query(collection(db, 'feedbackThreads'), where("senderId", "==", user.uid), orderBy('updatedAt', 'desc'));
-    const unsubSent = onSnapshot(sentQuery, (snapshot) => {
+    unsubscribers.push(onSnapshot(sentQuery, (snapshot) => {
         setSentThreads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedbackThread)));
-    }, (error) => {
-        console.error("Error fetching sent threads:", error);
-        toast({ title: "Error", description: "Could not load your sent messages.", variant: "destructive" });
-    });
-    unsubscribers.push(unsubSent);
+    }));
   
-    // Listener 2: Threads RECEIVED BY the current user's specific role (managers/admins).
     if (role && role !== 'Customer') {
-        const receivedQuery = query(collection(db, 'feedbackThreads'), where("targetRole", "==", role), orderBy('updatedAt', 'desc'));
-        const unsubReceived = onSnapshot(receivedQuery, (snapshot) => {
+        const receivedQuery = query(
+            collection(db, 'feedbackThreads'), 
+            or(
+                where("targetRole", "==", role),
+                where("targetUserId", "==", user.uid)
+            ),
+            orderBy('updatedAt', 'desc')
+        );
+        unsubscribers.push(onSnapshot(receivedQuery, (snapshot) => {
             setReceivedThreads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedbackThread)));
-        }, (error) => {
-            console.error("Error fetching received threads:", error);
-            toast({ title: "Error", description: "Could not load messages for your role.", variant: "destructive" });
-        });
-        unsubscribers.push(unsubReceived);
+        }));
     } else {
         setReceivedThreads([]);
     }
       
-    // Listener 3: BROADCASTS visible to Customers.
     if (role === 'Customer') {
         const broadcastQuery = query(collection(db, 'feedbackThreads'), where("targetRole", "==", "Customer Broadcast"), orderBy('updatedAt', 'desc'));
-        const unsubBroadcast = onSnapshot(broadcastQuery, (snapshot) => {
+        unsubscribers.push(onSnapshot(broadcastQuery, (snapshot) => {
             setBroadcastThreads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedbackThread)));
-        }, (error) => {
-            console.error("Error fetching broadcast threads:", error);
-            toast({ title: "Error", description: "Could not load broadcast messages.", variant: "destructive" });
-        });
-        unsubscribers.push(unsubBroadcast);
+        }));
     } else {
         setBroadcastThreads([]);
     }
 
-    // Set loading to false once initial listeners are setup. They will manage their own state.
     setIsLoadingHistory(false);
   
     return () => {
@@ -238,15 +239,15 @@ export default function FeedbackPage() {
                     <FormField control={form.control} name="targetRole" render={({ field }) => (
                       <FormItem>
                         <FormLabel>To</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoadingEmployees}>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoadingRecipients}>
                           <FormControl><SelectTrigger>
-                            <SelectValue placeholder={isLoadingEmployees ? "Loading employees..." : "Select a person or department..."} />
+                            <SelectValue placeholder={isLoadingRecipients ? "Loading recipients..." : "Select a recipient..."} />
                           </SelectTrigger></FormControl>
                           <SelectContent>
-                            {role === 'Admin' && <SelectItem value="Customer Broadcast">All Customers (Broadcast)</SelectItem>}
-                            {employees.map(e => e.displayName && e.role && (
+                            {role !== 'Customer' && <SelectItem value="Customer Broadcast">All Customers (Broadcast)</SelectItem>}
+                            {recipients.map(e => e.displayName && e.role && (
                                 <SelectItem key={e.uid} value={e.uid}>
-                                    {e.displayName} - {e.role.replace('Manager', ' Mngr')}
+                                    {e.displayName} - {e.role}
                                 </SelectItem>
                             ))}
                           </SelectContent>
@@ -286,7 +287,7 @@ export default function FeedbackPage() {
                                     <div className="flex justify-between items-start">
                                         <div className="flex-grow min-w-0">
                                             <p className="font-semibold text-primary truncate" title={thread.subject}>{thread.subject}</p>
-                                            <p className="text-xs text-muted-foreground truncate">To: {typeof thread.targetRole === 'string' ? thread.targetRole.replace('Manager', ' Manager').replace('Customer Broadcast', 'All Customers') : 'N/A'}</p>
+                                            <p className="text-xs text-muted-foreground truncate">To: {typeof thread.targetRole === 'string' ? thread.targetRole.replace('Customer Broadcast', 'All Customers') : 'N/A'}</p>
                                         </div>
                                         <Badge variant={getStatusVariant(thread.status)}>{thread.status}</Badge>
                                     </div>
