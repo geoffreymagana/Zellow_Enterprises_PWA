@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from 'zod';
 import { addDays, format } from 'date-fns';
 import { db } from '@/lib/firebase';
@@ -162,7 +162,7 @@ export default function BulkOrderRequestPage() {
       if (!response.ok) throw new Error((await response.json()).error?.message || 'Upload failed');
       
       const data = await response.json();
-      form.setValue(`items.${index}.customizations.${optionId}`, data.secure_url);
+      form.setValue(`items.${itemIndex}.customizations.${optionId}`, data.secure_url);
       setUploadStates(prev => ({ ...prev, [uploadKey]: { progress: 100, error: undefined, uploading: false, url: data.secure_url }}));
       toast({ title: "Image Uploaded", description: "Image added to your item."});
     } catch (err: any) {
@@ -203,12 +203,14 @@ export default function BulkOrderRequestPage() {
   const handleProductSelection = (index: number, productId: string) => {
     form.setValue(`items.${index}.productId`, productId);
     const optionsForProduct = productOptions.get(productId) || [];
-    const existingCustomizations = form.getValues(`items.${index}.customizations`) || {};
-    const newCustomizations = { ...existingCustomizations };
+    const newCustomizations: Record<string, any> = {};
 
     optionsForProduct.forEach(option => {
-        // IMPORTANT: Initialize text fields to empty string to prevent controlled/uncontrolled error
-        if (option.type === 'text' && newCustomizations[option.id] === undefined) {
+        if (option.type === 'text') {
+            newCustomizations[option.id] = '';
+        } else if (option.type === 'checkbox') {
+            newCustomizations[option.id] = false;
+        } else if (option.type === 'image_upload') {
             newCustomizations[option.id] = '';
         }
     });
@@ -328,7 +330,11 @@ export default function BulkOrderRequestPage() {
                                                         <Input id={uploadKey} type="file" onChange={(e) => handleImageUpload(e, index, option.id)} disabled={currentUploadState?.uploading} className="text-xs"/>
                                                         {currentUploadState?.uploading && <div className="flex items-center text-xs text-muted-foreground gap-1"><Loader2 className="h-3 w-3 animate-spin"/> Uploading...</div>}
                                                         {currentUploadState?.error && <p className="text-xs text-destructive">{currentUploadState.error}</p>}
-                                                        {currentUploadState?.url && <a href={currentUploadState.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">View Uploaded Image</a>}
+                                                        {currentUploadState?.url && (
+                                                           <div className="relative w-24 h-24 mt-2 border rounded-md overflow-hidden">
+                                                               <Image src={currentUploadState.url} alt="Upload preview" layout="fill" objectFit="cover"/>
+                                                           </div>
+                                                        )}
                                                     </div>
                                                 )}
                                                 <FormMessage />

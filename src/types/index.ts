@@ -65,13 +65,13 @@ export interface CustomizationChoiceOption {
 export interface ProductCustomizationOption {
   id: string;
   label: string;
-  type: 'dropdown' | 'text' | 'checkbox' | 'image_upload' | 'color_picker';
+  type: 'dropdown' | 'text' | 'checkbox' | 'image_upload' | 'color_picker' | 'checkbox_group';
   required?: boolean;
   showToCustomerByDefault?: boolean;
   choices?: CustomizationChoiceOption[];
   maxLength?: number;
   placeholder?: string;
-  defaultValue?: string | boolean;
+  defaultValue?: string | boolean | string[];
   checkboxLabel?: string;
   priceAdjustmentIfChecked?: number;
   acceptedFileTypes?: string;
@@ -292,7 +292,7 @@ export interface CustomizationGroupChoiceDefinition {
 export interface CustomizationGroupOptionDefinition {
   id: string;
   label: string;
-  type: 'dropdown' | 'text' | 'checkbox' | 'image_upload' | 'color_picker';
+  type: 'dropdown' | 'text' | 'checkbox' | 'image_upload' | 'color_picker' | 'checkbox_group';
   required?: boolean;
   showToCustomerByDefault?: boolean;
   choices?: CustomizationGroupChoiceDefinition[];
@@ -302,7 +302,7 @@ export interface CustomizationGroupOptionDefinition {
   priceAdjustmentIfChecked?: number;
   acceptedFileTypes?: string;
   maxFileSizeMB?: number;
-  defaultValue?: string | boolean;
+  defaultValue?: string | boolean | string[];
 }
 
 export interface CustomizationGroupDefinition {

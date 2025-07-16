@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PlusCircle, Edit, Trash2, GripVertical, MinusCircle, Palette } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, GripVertical, MinusCircle, Palette, CheckSquare } from 'lucide-react';
 import type { CustomizationGroupDefinition, CustomizationGroupOptionDefinition, CustomizationGroupChoiceDefinition } from '@/types';
 import { useForm, Controller, SubmitHandler, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,20 +28,20 @@ const hexColorRegex = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
 
 const choiceDefinitionSchema = z.object({
   value: z.string().min(1, "Value is required"),
-  label: z.string().min(1, "Label is required for dropdown choices"),
+  label: z.string().min(1, "Label is required"),
   priceAdjustment: z.coerce.number().optional().default(0),
 });
 
 const colorChoiceDefinitionSchema = z.object({
   value: z.string().regex(hexColorRegex, "Must be a valid hex color (e.g., #RGB or #RRGGBB)"),
   label: z.string().optional(),
-  priceAdjustment: z.coerce.number().optional().default(0), // Not currently used in UI for color choices, but good to have in schema
+  priceAdjustment: z.coerce.number().optional().default(0),
 });
 
 const optionDefinitionSchema = z.object({
   id: z.string().min(1, "Option ID is required (e.g., color_option)").regex(/^[a-zA-Z0-9_]+$/, "ID can only contain letters, numbers, and underscores"),
   label: z.string().min(1, "Option label is required"),
-  type: z.enum(['dropdown', 'text', 'checkbox', 'image_upload', 'color_picker'], { required_error: "Option type is required." }),
+  type: z.enum(['dropdown', 'text', 'checkbox', 'image_upload', 'color_picker', 'checkbox_group'], { required_error: "Option type is required." }),
   required: z.boolean().optional().default(false),
   showToCustomerByDefault: z.boolean().optional().default(true),
   choices: z.array(z.union([choiceDefinitionSchema, colorChoiceDefinitionSchema])).optional(),
@@ -52,9 +52,9 @@ const optionDefinitionSchema = z.object({
   acceptedFileTypes: z.string().optional(),
   maxFileSizeMB: z.coerce.number().positive("Max file size must be positive").optional().nullable(),
 }).superRefine((data, ctx) => {
-    if (data.type === 'dropdown') {
+    if (data.type === 'dropdown' || data.type === 'checkbox_group') {
         if (!data.choices || data.choices.length === 0) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "At least one choice is required for 'Dropdown' type.", path: ["choices"] });
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: `At least one choice is required for '${data.type.replace('_',' ')}' type.`, path: ["choices"] });
         } else {
           data.choices.forEach((choice, index) => {
             if (!choice.value || choice.value.trim() === '') {
@@ -89,18 +89,18 @@ const groupDefinitionFormSchema = z.object({
 
 type GroupDefinitionFormValues = z.infer<typeof groupDefinitionFormSchema>;
 
-const defaultNewOptionValue: Omit<CustomizationGroupOptionDefinition, 'id'> = {
+const defaultNewOptionValue: Omit<CustomizationGroupOptionDefinition, 'id' | 'defaultValue'> = {
   label: '',
   type: 'text',
   required: false,
   showToCustomerByDefault: true,
   choices: [],
   placeholder: '',
-  maxLength: null, // Use null for optional numbers if input is type="number"
+  maxLength: null, 
   checkboxLabel: '',
   priceAdjustmentIfChecked: 0,
   acceptedFileTypes: '',
-  maxFileSizeMB: null, // Use null for optional numbers
+  maxFileSizeMB: null, 
 };
 
 
@@ -153,8 +153,8 @@ export default function AdminCustomizationsPage() {
       ...group,
       options: group.options.map(opt => ({
         ...opt,
-        maxLength: opt.maxLength ?? null, // Ensure undefined becomes null for form control
-        maxFileSizeMB: opt.maxFileSizeMB ?? null, // Ensure undefined becomes null
+        maxLength: opt.maxLength ?? null, 
+        maxFileSizeMB: opt.maxFileSizeMB ?? null, 
         placeholder: opt.placeholder ?? '',
         checkboxLabel: opt.checkboxLabel ?? '',
         acceptedFileTypes: opt.acceptedFileTypes ?? '',
@@ -171,7 +171,6 @@ export default function AdminCustomizationsPage() {
       ...values,
       options: values.options.map(opt => ({
         ...opt,
-        // Convert empty strings from number inputs back to null if they were optional numbers
         maxLength: opt.maxLength === null || (typeof opt.maxLength === 'string' && opt.maxLength.trim() === '') ? null : Number(opt.maxLength),
         maxFileSizeMB: opt.maxFileSizeMB === null || (typeof opt.maxFileSizeMB === 'string' && opt.maxFileSizeMB.trim() === '') ? null : Number(opt.maxFileSizeMB),
       })),
@@ -315,8 +314,9 @@ function RenderOptionField({ control, index, removeOption }: { control: any, ind
             <FormControl><SelectTrigger><SelectValue placeholder="Select option type" /></SelectTrigger></FormControl>
             <SelectContent>
               <SelectItem value="dropdown">Dropdown</SelectItem>
+              <SelectItem value="checkbox_group">Checkbox Group</SelectItem>
               <SelectItem value="text">Text Input</SelectItem>
-              <SelectItem value="checkbox">Checkbox (Yes/No)</SelectItem>
+              <SelectItem value="checkbox">Single Checkbox (Yes/No)</SelectItem>
               <SelectItem value="image_upload">Image Upload</SelectItem>
               <SelectItem value="color_picker">Color Picker</SelectItem>
             </SelectContent>
@@ -325,6 +325,7 @@ function RenderOptionField({ control, index, removeOption }: { control: any, ind
       )} />
 
       {optionType === 'dropdown' && <RenderSelectChoicesConfig control={control} optionIndex={index} />}
+      {optionType === 'checkbox_group' && <RenderCheckboxGroupChoicesConfig control={control} optionIndex={index} />}
       {optionType === 'color_picker' && <RenderColorChoicesConfig control={control} optionIndex={index} />}
       {optionType === 'text' && <RenderTextConfig control={control} optionIndex={index} />}
       {optionType === 'checkbox' && <RenderCheckboxConfig control={control} optionIndex={index} />}
@@ -350,6 +351,25 @@ function RenderSelectChoicesConfig({ control, optionIndex }: { control: any, opt
         <div key={choiceField.id} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end p-2 border rounded bg-muted/20">
           <FormField control={control} name={`options.${optionIndex}.choices.${choiceIndex}.label`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Display Label</FormLabel><FormControl><Input {...field} placeholder="e.g., Red, Small"/></FormControl><FormMessage className="text-xs"/></FormItem>)} />
           <FormField control={control} name={`options.${optionIndex}.choices.${choiceIndex}.value`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Value (Unique)</FormLabel><FormControl><Input {...field} placeholder="e.g., red_option, size_sm"/></FormControl><FormMessage className="text-xs"/></FormItem>)} />
+          <FormField control={control} name={`options.${optionIndex}.choices.${choiceIndex}.priceAdjustment`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Price Adj. (KES)</FormLabel><FormControl><Input type="number" step="0.01" {...field} placeholder="0.00" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl><FormMessage className="text-xs"/></FormItem>)} />
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => remove(choiceIndex)} aria-label="Remove choice"><MinusCircle className="h-4 w-4 text-destructive"/></Button>
+        </div>
+      ))}
+       <FormMessage>{(control.getFieldState(`options.${optionIndex}.choices`)?.error as any)?.message}</FormMessage>
+    </div>
+  );
+}
+
+function RenderCheckboxGroupChoicesConfig({ control, optionIndex }: { control: any, optionIndex: number }) {
+  const { fields, append, remove } = useFieldArray({ control, name: `options.${optionIndex}.choices` });
+  return (
+    <div className="mt-3 space-y-3 p-3 border rounded-md bg-background">
+      <div className="flex justify-between items-center"><h5 className="text-sm font-medium">Choices for Checkbox Group</h5><Button type="button" size="sm" variant="outline" onClick={() => append({ value: '', label: '', priceAdjustment: 0 })}><CheckSquare className="mr-1 h-3 w-3"/> Add Choice</Button></div>
+      {fields.length === 0 && <p className="text-xs text-muted-foreground">No choices added yet.</p>}
+      {fields.map((choiceField, choiceIndex) => (
+        <div key={choiceField.id} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end p-2 border rounded bg-muted/20">
+          <FormField control={control} name={`options.${optionIndex}.choices.${choiceIndex}.label`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Display Label</FormLabel><FormControl><Input {...field} placeholder="e.g., Gift Wrap, Add Card"/></FormControl><FormMessage className="text-xs"/></FormItem>)} />
+          <FormField control={control} name={`options.${optionIndex}.choices.${choiceIndex}.value`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Value (Unique)</FormLabel><FormControl><Input {...field} placeholder="e.g., gift_wrap, with_card"/></FormControl><FormMessage className="text-xs"/></FormItem>)} />
           <FormField control={control} name={`options.${optionIndex}.choices.${choiceIndex}.priceAdjustment`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Price Adj. (KES)</FormLabel><FormControl><Input type="number" step="0.01" {...field} placeholder="0.00" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl><FormMessage className="text-xs"/></FormItem>)} />
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => remove(choiceIndex)} aria-label="Remove choice"><MinusCircle className="h-4 w-4 text-destructive"/></Button>
         </div>
@@ -426,5 +446,3 @@ function RenderImageUploadConfig({ control, optionIndex }: { control: any, optio
     </div>
   );
 }
-
-    
