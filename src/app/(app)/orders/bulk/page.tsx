@@ -20,11 +20,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Calendar } from '@/components/ui/calendar';
-import { Loader2, PackagePlus, PlusCircle, Trash2, Send, CalendarIcon, Check, ChevronsUpDown, ImageOff, Settings, UploadCloud } from 'lucide-react';
+import { Loader2, PackagePlus, PlusCircle, Trash2, Send, CalendarIcon, Check, ChevronsUpDown, ImageOff, Settings, UploadCloud, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
@@ -89,6 +91,9 @@ export default function BulkOrderRequestPage() {
     }
     if (appUser) {
         if (!form.getValues('requesterPhone') && appUser.phone) form.setValue('requesterPhone', appUser.phone);
+        if (!form.getValues('companyName') && appUser.town && appUser.county) {
+            form.setValue('companyName', `${appUser.town}, ${appUser.county}`);
+        }
     }
   }, [user, appUser, form]);
 
@@ -258,6 +263,7 @@ export default function BulkOrderRequestPage() {
 
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold border-t pt-4">Requested Items</h3>
+                <TooltipProvider>
                 {fields.map((field, index) => {
                     const selectedProductId = form.watch(`items.${index}.productId`);
                     const quantity = form.watch(`items.${index}.quantity`);
@@ -332,10 +338,72 @@ export default function BulkOrderRequestPage() {
                                                         {currentUploadState?.error && <p className="text-xs text-destructive">{currentUploadState.error}</p>}
                                                         {currentUploadState?.url && (
                                                            <div className="relative w-24 h-24 mt-2 border rounded-md overflow-hidden">
-                                                               <Image src={currentUploadState.url} alt="Upload preview" layout="fill" objectFit="cover"/>
+                                                               <Image src={currentUploadState.url} alt="Upload preview" layout="fill" objectFit="cover" data-ai-hint="image upload"/>
                                                            </div>
                                                         )}
                                                     </div>
+                                                )}
+                                                {option.type === 'color_picker' && (
+                                                  <div className="flex flex-wrap gap-2 items-center pt-1">
+                                                    {option.choices && option.choices.length > 0 ? (
+                                                      option.choices.map(choice => (
+                                                        <Tooltip key={choice.value}>
+                                                          <TooltipTrigger asChild>
+                                                            <button
+                                                              type="button"
+                                                              className={cn(
+                                                                "h-8 w-8 rounded-full border-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 flex items-center justify-center transition-all",
+                                                                field.value === choice.value ? 'ring-2 ring-offset-2 ring-primary border-primary scale-110 shadow-md' : 'border-muted hover:border-muted-foreground'
+                                                              )}
+                                                              style={{ backgroundColor: choice.value }}
+                                                              onClick={() => field.onChange(choice.value)}
+                                                              aria-label={choice.label || choice.value}
+                                                            >
+                                                              {field.value === choice.value && <Check className="h-4 w-4 text-white mix-blend-difference" />}
+                                                            </button>
+                                                          </TooltipTrigger>
+                                                          {choice.label && (
+                                                            <TooltipContent side="bottom">
+                                                              <p>{choice.label}</p>
+                                                            </TooltipContent>
+                                                          )}
+                                                        </Tooltip>
+                                                      ))
+                                                    ) : (
+                                                      <p className="text-xs text-muted-foreground">No color options defined.</p>
+                                                    )}
+                                                  </div>
+                                                )}
+                                                {option.type === 'checkbox_group' && option.choices && (
+                                                  <div className="space-y-2">
+                                                    {option.choices.map(choice => (
+                                                      <FormField
+                                                        key={choice.value}
+                                                        control={form.control}
+                                                        name={`items.${index}.customizations.${option.id}`}
+                                                        render={({ field: checkboxGroupField }) => {
+                                                          const currentValue = Array.isArray(checkboxGroupField.value) ? checkboxGroupField.value : [];
+                                                          return (
+                                                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                                                              <FormControl>
+                                                                <Checkbox
+                                                                  checked={currentValue.includes(choice.value)}
+                                                                  onCheckedChange={(checked) => {
+                                                                    if (checked) {
+                                                                      checkboxGroupField.onChange([...currentValue, choice.value]);
+                                                                    } else {
+                                                                      checkboxGroupField.onChange(currentValue.filter((v: string) => v !== choice.value));
+                                                                    }
+                                                                  }}
+                                                                />
+                                                              </FormControl>
+                                                              <FormLabel className="font-normal text-xs">{choice.label}</FormLabel>
+                                                            </FormItem>
+                                                          );
+                                                        }}
+                                                      />
+                                                    ))}
+                                                  </div>
                                                 )}
                                                 <FormMessage />
                                             </FormItem>
@@ -347,6 +415,7 @@ export default function BulkOrderRequestPage() {
                         </div>
                     )
                 })}
+                </TooltipProvider>
                  <Button type="button" variant="outline" size="sm" onClick={() => append({ productId: "", quantity: 1, notes: "", customizations: {} })}><PlusCircle className="mr-2 h-4 w-4"/>Add Another Item</Button>
               </div>
 
