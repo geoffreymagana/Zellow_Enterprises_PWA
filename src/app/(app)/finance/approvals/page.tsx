@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle, XCircle, Eye, RefreshCw, Coins, Trophy, ArrowRight, FilePlus2, Hourglass, TrendingUp, TrendingDown, Minus, ShoppingCart, Info } from 'lucide-react';
-import type { StockRequest, StockRequestStatus, Bid, Product, Order, OrderStatus } from '@/types';
+import type { StockRequest, StockRequestStatus, Bid, Product, Order, OrderStatus, DeliveryHistoryEntry } from '@/types';
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, writeBatch, getDocs, Timestamp, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
@@ -173,7 +173,7 @@ export default function FinanceApprovalsPage() {
         ? `Order approved by ${user.displayName || user.email}.`
         : `Order rejected by ${user.displayName || user.email}. Reason: ${orderRejectionReason}`;
 
-    const newHistoryEntry = {
+    const newHistoryEntry: DeliveryHistoryEntry = {
         status: newStatus,
         timestamp: Timestamp.now(),
         notes: notes,
@@ -187,6 +187,24 @@ export default function FinanceApprovalsPage() {
             deliveryHistory: arrayUnion(newHistoryEntry),
             updatedAt: serverTimestamp(),
         });
+        
+        if (orderActionType === 'approve') {
+            try {
+                await fetch('/api/push/send-notification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: viewingOrder.customerId,
+                        title: "Your Order is Confirmed!",
+                        body: `Your order #${viewingOrder.id.substring(0,8)} has been approved and is now being processed.`,
+                        data: { url: `/track/order/${viewingOrder.id}` }
+                    }),
+                });
+            } catch (notificationError) {
+                console.error("Failed to send push notification:", notificationError);
+            }
+        }
+
         toast({ title: `Order ${newStatus}`, description: `Order ${viewingOrder.id.substring(0,8)}... has been ${newStatus}.` });
         setIsOrderActionModalOpen(false);
         setViewingOrder(null);

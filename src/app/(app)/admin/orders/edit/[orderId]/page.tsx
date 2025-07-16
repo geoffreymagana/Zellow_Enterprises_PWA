@@ -256,6 +256,21 @@ export default function AdminOrderDetailPage() {
         deliveryHistory: arrayUnion(newHistoryEntry) 
       });
       
+      try {
+        await fetch('/api/push/send-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: order.customerId,
+                title: "Your Order Has Been Updated!",
+                body: `Your order #${order.id.substring(0,8)} is now: ${data.status.replace(/_/g, ' ')}`,
+                data: { url: `/track/order/${order.id}` }
+            }),
+        });
+      } catch (notificationError) {
+        console.error("Failed to send push notification:", notificationError);
+      }
+      
       setOrder(prev => prev ? { 
           ...prev, 
           status: data.status as OrderStatus, 
@@ -646,4 +661,3 @@ export default function AdminOrderDetailPage() {
     </div>
   );
 }
-    

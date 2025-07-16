@@ -9,7 +9,7 @@ import type { Order, OrderStatus } from "@/types";
 import { MapPin, Navigation, CheckCircle, PackageSearch, UserPlus, Filter, Loader2, AlertTriangle, Edit, Truck, PackagePlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, Unsubscribe, Timestamp } from 'firebase/firestore'; // Added Timestamp
+import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, Unsubscribe, Timestamp, arrayUnion } from 'firebase/firestore'; 
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -97,31 +97,45 @@ export default function DeliveriesPage() {
 
   }, [authLoading, user, role, router, fetchDeliveries]);
 
-  const handleUpdateStatus = async (deliveryId: string, newStatus: OrderStatus, notes?: string) => {
+  const handleUpdateStatus = async (order: Order, newStatus: OrderStatus, notes?: string) => {
     if (!db || !user) return;
     try {
-      const orderRef = doc(db, 'orders', deliveryId);
+      const orderRef = doc(db, 'orders', order.id);
       const newHistoryEntry = {
         status: newStatus,
-        timestamp: Timestamp.now(), // Changed from serverTimestamp()
+        timestamp: Timestamp.now(), 
         notes: notes || `Status updated to ${newStatus} by ${role}`,
         actorId: user.uid,
       };
       
-      // Firestore update with new status and history
-      const currentOrder = deliveries.find(d => d.id === deliveryId);
-      // Create a new history array. Firestore's arrayUnion is an alternative if newHistoryEntry contains no serverTimestamps.
-      // Since we are using Timestamp.now(), constructing the array manually is fine.
-      const updatedHistory = [...(currentOrder?.deliveryHistory || []), newHistoryEntry];
-
-      await updateDoc(orderRef, { 
+      const updatePayload: any = { 
         status: newStatus,
-        updatedAt: serverTimestamp(), // This top-level serverTimestamp is fine
-        deliveryHistory: updatedHistory,
-        ...(newStatus === 'delivered' && { actualDeliveryTime: serverTimestamp() })
-      });
+        updatedAt: serverTimestamp(),
+        deliveryHistory: arrayUnion(newHistoryEntry)
+      };
 
-      toast({ title: "Status Updated", description: `Delivery ${deliveryId} marked as ${newStatus}.` });
+      if (newStatus === 'delivered') {
+        updatePayload.actualDeliveryTime = serverTimestamp();
+      }
+
+      await updateDoc(orderRef, updatePayload);
+
+      try {
+        await fetch('/api/push/send-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: order.customerId,
+                title: "Your Order Has Been Updated!",
+                body: `Your order #${order.id.substring(0,8)} is now: ${newStatus.replace(/_/g, ' ')}`,
+                data: { url: `/track/order/${order.id}` }
+            }),
+        });
+      } catch (notificationError) {
+        console.error("Failed to send push notification:", notificationError);
+      }
+
+      toast({ title: "Status Updated", description: `Delivery ${order.id} marked as ${newStatus}.` });
     } catch (error) {
       console.error("Error updating status: ", error);
       toast({ title: "Error", description: "Could not update delivery status.", variant: "destructive" });
@@ -164,12 +178,11 @@ export default function DeliveriesPage() {
             <Card key={delivery.id} className="flex flex-col">
               <CardHeader>
                 <div className="flex justify-between items-start">
-                    <CardTitle className="font-headline text-lg">Order ID: {delivery.id}</CardTitle>
+                    <CardTitle className="font-headline text-lg">Order ID: {delivery.id.substring(0,8)}...</CardTitle>
                     <Badge variant={getDeliveryStatusBadgeVariant(delivery.status)} className="capitalize">{delivery.status.replace(/_/g, ' ')}</Badge>
                 </div>
                 <CardDescription>
-                  Customer: {delivery.customerName || delivery.customerId} <br />
-                  Address: {delivery.shippingAddress?.addressLine1 || "Not specified"}
+                  Customer: {delivery.customerName || delivery.customerId}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-2">
@@ -183,16 +196,16 @@ export default function DeliveriesPage() {
                   <Button variant="outline" size="sm"><Navigation className="mr-2 h-4 w-4" /> View on Map</Button>
                 </Link>
                 {role === 'Rider' && delivery.status === 'assigned' && (
-                  <Button size="sm" onClick={() => handleUpdateStatus(delivery.id, 'out_for_delivery')}>
+                  <Button size="sm" onClick={() => handleUpdateStatus(delivery, 'out_for_delivery')}>
                     <Truck className="mr-2 h-4 w-4" /> Start Delivery
                   </Button>
                 )}
                 {role === 'Rider' && delivery.status === 'out_for_delivery' && (
                   <>
-                    <Button size="sm" onClick={() => handleUpdateStatus(delivery.id, 'delivered')}>
+                    <Button size="sm" onClick={() => handleUpdateStatus(delivery, 'delivered')}>
                       <CheckCircle className="mr-2 h-4 w-4" /> Mark Delivered
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleUpdateStatus(delivery.id, 'delivery_attempted')}>
+                    <Button size="sm" variant="outline" onClick={() => handleUpdateStatus(delivery, 'delivery_attempted')}>
                       <AlertTriangle className="mr-2 h-4 w-4" /> Attempt Failed
                     </Button>
                   </>
