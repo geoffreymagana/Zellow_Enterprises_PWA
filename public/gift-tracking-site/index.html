@@ -276,7 +276,7 @@
                     
                     <div class="summary-row">
                         <span class="summary-label">Order ID</span>
-                        <span class="summary-value" id="order-id">Loading...</span>
+                        <span class="summary-value" id="order-id" style="color: #2196F3;">Loading...</span>
                     </div>
                     
                     <div class="summary-row">
@@ -289,9 +289,9 @@
                         <span class="summary-value" id="expected-delivery-date">Calculating...</span>
                     </div>
                     
-                    <div class="summary-row" id="message-row" style="display: none;">
-                        <span class="summary-label">Message</span>
-                        <span class="summary-value" id="message-from-sender" style="max-width: 200px; text-align: right; word-wrap: break-word;"></span>
+                    <div id="message-row" style="display: none; flex-direction: column; align-items: center; text-align: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0;">
+                        <span style="color: #666; font-size: 14px; margin-bottom: 8px;">Message</span>
+                        <span id="message-from-sender" style="color: #1a1a1a; font-size: 14px; font-weight: 400; font-style: italic; text-align: center; word-wrap: break-word; max-width: 100%;"></span>
                     </div>
                 </div>
             </div>
@@ -411,7 +411,7 @@
                                 year: 'numeric'
                             });
                         } else {
-                            expectedDeliveryEl.textContent = 'To be updated';
+                            expectedDeliveryEl.textContent = '3-5 Business Days';
                         }
                     }
 
