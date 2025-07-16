@@ -43,13 +43,12 @@ interface NotificationPayload {
   };
 }
 
-// This is an internal function to be triggered by Firestore triggers or other server logic
-// For demonstration, we'll create an API route. In production, secure this endpoint.
-export async function sendPushNotification(userId: string, payload: NotificationPayload) {
+async function sendNotification(userId: string, payload: NotificationPayload) {
     const isWebPushInitialized = initializeWebPush();
     if (!isWebPushInitialized) {
         console.log("Cannot send notification: VAPID keys not configured.");
-        return;
+        // Consider throwing an error or returning a status
+        throw new Error("VAPID keys not configured on the server.");
     }
     
     initializeFirebaseAdmin();
@@ -72,30 +71,34 @@ export async function sendPushNotification(userId: string, payload: Notification
             console.log(`Subscription for user ${userId} is invalid. Deleting.`);
             await db.collection('pushSubscriptions').doc(userId).delete();
         }
+        // Re-throw the error to be handled by the caller
+        throw error;
     }
 }
 
-
-// Example usage via an API route (for testing/demonstration)
-// In a real app, you would call `sendPushNotification` from a server-side event handler
-// (e.g., when an order status changes via a Firestore Function).
 export async function POST(request: Request) {
-    const { userId, title, body } = await request.json();
-    if (!userId || !title || !body) {
-        return NextResponse.json({ success: false, error: 'Missing userId, title, or body' }, { status: 400 });
-    }
-
-    const payload: NotificationPayload = {
-        title: title,
-        options: {
-            body: body,
-            icon: '/icons/Zellow-icon-192.png',
-            badge: '/icons/Zellow-icon-72.png',
-            data: { url: `/track/order/${userId}` } // Just an example, maybe link to an order
+    try {
+        const { userId, title, body, data } = await request.json();
+        
+        if (!userId || !title || !body) {
+            return NextResponse.json({ success: false, error: 'Missing userId, title, or body' }, { status: 400 });
         }
-    };
-    
-    await sendPushNotification(userId, payload);
 
-    return NextResponse.json({ success: true, message: `Notification sent to ${userId}`});
+        const payload: NotificationPayload = {
+            title: title,
+            options: {
+                body: body,
+                icon: '/icons/Zellow-icon-192.png',
+                badge: '/icons/Zellow-icon-72.png',
+                data: data || { url: '/' } 
+            }
+        };
+        
+        await sendNotification(userId, payload);
+
+        return NextResponse.json({ success: true, message: `Notification sent to ${userId}`});
+    } catch (error: any) {
+        console.error("[API/push/send-notification] Error:", error);
+        return NextResponse.json({ success: false, error: "Failed to send notification", details: error.message }, { status: 500 });
+    }
 }

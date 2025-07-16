@@ -16,7 +16,6 @@ import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter } from "@/components/ui/alert-dialog";
-import { sendPushNotification } from '@/app/api/push/send-notification/route';
 
 const defaultOrderColors = ['#FF6347', '#4682B4', '#32CD32', '#FFD700', '#DA70D6', '#6A5ACD', '#FFA500', '#8A2BE2'];
 
@@ -131,16 +130,17 @@ export default function DispatchCenterPage() {
       });
       toast({ title: "Success", description: `Order ${selectedOrder.id} assigned to ${riderToAssign.displayName || riderToAssign.email}.` });
       
-      // Send Push Notification
+      // Send Push Notification via API endpoint
       try {
-        await sendPushNotification(selectedRiderForAssignment, {
-          title: "New Delivery Assignment",
-          options: {
-            body: `Order for ${selectedOrder.customerName} is ready for delivery.`,
-            icon: '/icons/Zellow-icon-192.png',
-            badge: '/icons/Zellow-icon-72.png',
-            data: { url: `/rider/map?orderId=${selectedOrder.id}` }
-          }
+        await fetch('/api/push/send-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: selectedRiderForAssignment,
+                title: "New Delivery Assignment",
+                body: `Order for ${selectedOrder.customerName} is ready for delivery.`,
+                data: { url: `/rider/map?orderId=${selectedOrder.id}` }
+            }),
         });
         toast({ title: "Notification Sent", description: `Push notification sent to ${riderToAssign.displayName || riderToAssign.email}.` });
       } catch (notificationError) {
