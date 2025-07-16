@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import type { Order, OrderStatus } from "@/types";
-import { MapPin, Navigation, CheckCircle, PackageSearch, UserPlus, Filter, Loader2, AlertTriangle, Edit, Truck } from "lucide-react";
+import { MapPin, Navigation, CheckCircle, PackageSearch, UserPlus, Filter, Loader2, AlertTriangle, Edit, Truck, PackagePlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, Unsubscribe, Timestamp } from 'firebase/firestore'; // Added Timestamp
@@ -176,6 +176,7 @@ export default function DeliveriesPage() {
                 <p className="text-sm flex items-center"><MapPin className="h-4 w-4 mr-2 text-muted-foreground" /> {delivery.shippingAddress?.addressLine1}, {delivery.shippingAddress?.city}</p>
                 {delivery.deliveryNotes && <p className="text-sm text-muted-foreground">Notes: {delivery.deliveryNotes}</p>}
                  {delivery.estimatedDeliveryTime && <p className="text-sm">ETA: {new Date(delivery.estimatedDeliveryTime.seconds * 1000).toLocaleString()}</p>}
+                 {delivery.isBulkOrder && <Badge variant="outline" className="text-xs mt-2"><PackagePlus className="h-3 w-3 mr-1"/>Bulk Order</Badge>}
               </CardContent>
               <CardFooter className="flex flex-col sm:flex-row gap-2 justify-end items-center">
                 <Link href={`/rider/map?orderId=${delivery.id}`} passHref>

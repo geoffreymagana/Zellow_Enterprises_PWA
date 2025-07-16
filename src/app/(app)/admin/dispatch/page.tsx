@@ -4,7 +4,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState, useCallback } from 'react';
-import { Loader2, Package, UsersRound, Palette, XCircle, MapPin, Phone, Info, User, MessageSquare } from 'lucide-react';
+import { Loader2, Package, UsersRound, Palette, XCircle, MapPin, Phone, Info, User, MessageSquare, PackagePlus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,6 +16,7 @@ import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter } from "@/components/ui/alert-dialog";
+import { format } from 'date-fns';
 
 const defaultOrderColors = ['#FF6347', '#4682B4', '#32CD32', '#FFD700', '#DA70D6', '#6A5ACD', '#FFA500', '#8A2BE2'];
 
@@ -239,13 +240,18 @@ export default function DispatchCenterPage() {
               const displayAddress = constructDisplayAddress(order.shippingAddress);
               return (
               <div key={order.id} 
-                   className={`p-2 rounded-md border cursor-pointer hover:bg-muted ${selectedOrder?.id === order.id ? 'ring-2 ring-primary bg-muted' : ''}`}
+                   className={`p-3 space-y-1 rounded-md border cursor-pointer hover:bg-muted ${selectedOrder?.id === order.id ? 'ring-2 ring-primary bg-muted' : ''}`}
                    onClick={() => {
                       setSelectedOrder(order);
                       setAssignmentNotes("");
                    }}>
-                <p className="font-semibold text-sm">ID: {order.id.substring(0,8)}... ({order.customerName})</p>
+                <div className="flex justify-between items-center">
+                    <p className="font-semibold text-sm">ID: {order.id.substring(0,8)}...</p>
+                    {order.isBulkOrder && <Badge variant="outline" className="text-xs"><PackagePlus className="h-3 w-3 mr-1"/>Bulk</Badge>}
+                </div>
+                <p className="text-sm text-muted-foreground">{order.customerName}</p>
                 <p className="text-xs text-muted-foreground truncate" title={displayAddress}>{displayAddress}</p>
+                <p className="text-xs text-muted-foreground">Placed: {order.createdAt ? format(order.createdAt.toDate(), 'PP') : 'N/A'}</p>
                 <Badge variant={getOrderStatusBadgeVariant(order.status)} className="capitalize text-xs mt-1">{order.status.replace(/_/g, " ")}</Badge>
                 {order.riderName && <p className="text-xs mt-1">Rider: {order.riderName}</p>}
               </div>
