@@ -5,6 +5,7 @@
 
 
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -101,6 +102,7 @@ export interface Product {
 
 export type OrderStatus =
   | 'pending'
+  | 'pending_finance_approval'
   | 'processing'
   | 'awaiting_assignment'
   | 'assigned'

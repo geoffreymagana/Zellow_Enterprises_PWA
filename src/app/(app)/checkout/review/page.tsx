@@ -178,9 +178,9 @@ export default function ReviewOrderPage() {
     }));
 
     const initialDeliveryHistoryEntry: DeliveryHistoryEntry = {
-      status: 'pending',
+      status: 'pending_finance_approval',
       timestamp: Timestamp.now(),
-      notes: 'Order placed by customer.',
+      notes: 'Order placed by customer and awaits finance approval.',
       actorId: user.uid,
     };
     
@@ -195,7 +195,7 @@ export default function ReviewOrderPage() {
       subTotal: cartSubtotal,
       shippingCost: selectedShippingMethodInfo.cost,
       totalAmount: orderTotal,
-      status: 'pending' as OrderStatus,
+      status: 'pending_finance_approval' as OrderStatus,
       shippingAddress: shippingAddress,
       paymentMethod: paymentMethod,
       paymentStatus: currentPaymentStatus,
@@ -420,6 +420,3 @@ export default function ReviewOrderPage() {
     </>
   );
 }
-
-
-    
