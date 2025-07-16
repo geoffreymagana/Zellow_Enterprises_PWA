@@ -122,8 +122,6 @@ export default function ReviewOrderPage() {
       } else if (!selectedShippingMethodInfo || !paymentMethod) {
         router.replace('/checkout/payment');
       }
-      // Removed the "Missing Information" toast here to avoid it firing when cart is legitimately cleared after order success.
-      // The individual pages should handle their own validation toasts if a user tries to proceed without filling details.
     }
   }, [shippingAddress, paymentMethod, selectedShippingMethodInfo, cartItems, router, isSuccessModalOpen]);
 
@@ -253,7 +251,6 @@ export default function ReviewOrderPage() {
         }
       }
 
-      // Critical: Set modal state BEFORE clearing cart
       setConfirmedOrderId(newOrderRef.id);
       setIsSuccessModalOpen(true);       
       clearCart(); 

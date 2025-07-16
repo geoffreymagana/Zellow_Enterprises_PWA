@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter, useParams } from 'next/navigation';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, Timestamp, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, ShippingAddress, ShippingMethod, ShippingRate, DeliveryHistoryEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -168,9 +168,9 @@ export default function ConfirmBulkOrderPage() {
             email: values.email,
         };
         const historyEntry: DeliveryHistoryEntry = {
-            status: 'processing',
-            timestamp: Timestamp.now(), // Use client-side timestamp
-            notes: 'Customer confirmed details and placed order.',
+            status: 'pending_finance_approval',
+            timestamp: Timestamp.now(), 
+            notes: 'Customer confirmed details and placed order. Awaiting finance approval.',
             actorId: user.uid,
         };
         await updateDoc(orderRef, {
@@ -181,15 +181,12 @@ export default function ConfirmBulkOrderPage() {
             totalAmount: finalTotal,
             paymentMethod: values.paymentMethod,
             paymentStatus: (values.paymentMethod === 'mpesa' || values.paymentMethod === 'card') ? 'paid' : 'pending',
-            status: 'processing',
-            deliveryHistory: [
-                ...(order?.deliveryHistory || []),
-                historyEntry
-            ],
+            status: 'pending_finance_approval',
+            deliveryHistory: arrayUnion(historyEntry),
             updatedAt: serverTimestamp(),
         });
-        toast({ title: "Order Confirmed!", description: "Your bulk order has been placed and is now processing." });
-        router.push(`/track/order/${orderId}`);
+        toast({ title: "Order Confirmed!", description: "Your bulk order has been sent for final approval." });
+        router.push(`/orders`);
     } catch (e: any) {
         toast({ title: "Error", description: `Could not confirm order: ${e.message}`, variant: "destructive" });
     } finally {
