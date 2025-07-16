@@ -137,19 +137,21 @@ export default function MessagesPage() {
     if (!db || !role) return;
     setIsLoadingRecipients(true);
     const usersRef = collection(db, 'users');
-    let q;
-
-    if (role === 'Customer') {
-      q = query(usersRef, where('role', '!=', 'Customer'), where('disabled', '!=', true), orderBy('displayName', 'asc'));
-    } else {
-      q = query(usersRef, where('disabled', '!=', true), orderBy('displayName', 'asc'));
-    }
+    // Base query for all active users
+    const q = query(usersRef, where('disabled', '!=', true), orderBy('displayName', 'asc'));
 
     try {
         const snapshot = await getDocs(q);
-        const allUsers = snapshot.docs
-          .map(doc => ({ uid: doc.id, ...doc.data() } as AppUser))
-          .filter(u => u.uid !== user?.uid); 
+        let allUsers = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
+
+        if (role === 'Customer') {
+            // Filter out other customers on the client-side
+            allUsers = allUsers.filter(u => u.role !== 'Customer' && u.uid !== user?.uid);
+        } else {
+            // Filter out self for staff/admin
+            allUsers = allUsers.filter(u => u.uid !== user?.uid);
+        }
+        
         setRecipients(allUsers);
     } catch (error) {
         console.error("Error fetching recipients:", error);
