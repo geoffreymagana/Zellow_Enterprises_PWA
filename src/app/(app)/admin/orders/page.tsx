@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Edit, Filter, PackageOpen, Layers } from 'lucide-react';
+import { Loader2, Search, Edit, Filter, PackageOpen, Layers, PackagePlus } from 'lucide-react';
 import type { Order, OrderStatus } from '@/types';
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import Link from 'next/link';
@@ -204,36 +204,54 @@ export default function AdminOrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium whitespace-nowrap">{order.id.substring(0,8)}...</TableCell>
-                    <TableCell>
-                      <div className="font-medium">{order.customerName || "N/A"}</div>
-                      <div className="text-xs text-muted-foreground">{order.customerEmail || "N/A"}</div>
-                    </TableCell>
-                    <TableCell>{formatDate(order.createdAt)}</TableCell>
-                    <TableCell>
-                        {order.items.some(item => item.customizations && Object.keys(item.customizations).length > 0) && (
-                            <Badge variant="outline" className="text-xs">
-                                <Layers className="mr-1 h-3 w-3"/> Custom
-                            </Badge>
-                        )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getOrderStatusBadgeVariant(order.status)} className="capitalize">
-                        {order.status.replace(/_/g, " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">{formatPrice(order.totalAmount)}</TableCell>
-                    <TableCell className="text-right">
-                      <Link href={`/admin/orders/edit/${order.id}`} passHref>
-                        <Button variant="ghost" size="sm">
-                           <Edit className="mr-0 sm:mr-2 h-4 w-4" /> <span className="hidden sm:inline">Details</span>
-                        </Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filteredOrders.map((order) => {
+                  const isCustom = order.items.some(item => item.customizations && Object.keys(item.customizations).length > 0);
+                  const isBulk = order.isBulkOrder === true;
+                  const isRegular = !isCustom && !isBulk;
+
+                  return (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium whitespace-nowrap">{order.id.substring(0,8)}...</TableCell>
+                      <TableCell>
+                        <div className="font-medium">{order.customerName || "N/A"}</div>
+                        <div className="text-xs text-muted-foreground">{order.customerEmail || "N/A"}</div>
+                      </TableCell>
+                      <TableCell>{formatDate(order.createdAt)}</TableCell>
+                      <TableCell>
+                          <div className="flex flex-col gap-1 items-start">
+                            {isCustom && (
+                                <Badge variant="outline" className="text-xs">
+                                    <Layers className="mr-1 h-3 w-3"/> Custom
+                                </Badge>
+                            )}
+                            {isBulk && (
+                                <Badge variant="outline" className="text-xs">
+                                    <PackagePlus className="mr-1 h-3 w-3"/> Bulk
+                                </Badge>
+                            )}
+                            {isRegular && (
+                                <Badge variant="secondary" className="text-xs">
+                                    Regular
+                                </Badge>
+                            )}
+                          </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getOrderStatusBadgeVariant(order.status)} className="capitalize">
+                          {order.status.replace(/_/g, " ")}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">{formatPrice(order.totalAmount)}</TableCell>
+                      <TableCell className="text-right">
+                        <Link href={`/admin/orders/edit/${order.id}`} passHref>
+                          <Button variant="ghost" size="sm">
+                            <Edit className="mr-0 sm:mr-2 h-4 w-4" /> <span className="hidden sm:inline">Details</span>
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           )}
