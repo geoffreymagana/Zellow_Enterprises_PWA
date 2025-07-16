@@ -180,7 +180,7 @@ export default function ConfirmBulkOrderPage() {
             shippingCost: chosenShippingMethod.calculatedPrice,
             totalAmount: finalTotal,
             paymentMethod: values.paymentMethod,
-            paymentStatus: (values.paymentMethod === 'mpesa' || values.paymentMethod === 'card') ? 'paid' : 'pending',
+            paymentStatus: 'pending', // Always pending until finance confirms
             status: 'pending_finance_approval',
             deliveryHistory: arrayUnion(historyEntry),
             updatedAt: serverTimestamp(),

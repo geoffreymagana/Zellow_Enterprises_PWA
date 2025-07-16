@@ -60,7 +60,7 @@ export default function AdminPaymentsPage() {
   const [summaryStats, setSummaryStats] = useState({
     totalRevenue: 0,
     totalExpenses: 0,
-    pendingCodPayments: 0,
+    pendingPayments: 0, // Changed from pendingCodPayments
     transactionsToday: 0,
   });
 
@@ -81,7 +81,7 @@ export default function AdminPaymentsPage() {
 
       let revenue = 0;
       let expenses = 0;
-      let pendingCod = 0;
+      let pending = 0; // Changed from pendingCod
       let todayTx = 0;
       const todayStart = new Date(); todayStart.setHours(0,0,0,0);
       const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
@@ -98,8 +98,8 @@ export default function AdminPaymentsPage() {
           if (paymentDate >= todayStart && paymentDate <= todayEnd) {
             todayTx++;
           }
-        } else if (order.paymentStatus === 'pending' && order.paymentMethod === 'cod') {
-          pendingCod += order.totalAmount;
+        } else if (order.paymentStatus === 'pending') {
+          pending += order.totalAmount;
         }
       });
       
@@ -117,7 +117,7 @@ export default function AdminPaymentsPage() {
       });
       
       setTransactions(fetchedTransactions);
-      setSummaryStats({ totalRevenue: revenue, totalExpenses: expenses, pendingCodPayments: pendingCod, transactionsToday: todayTx });
+      setSummaryStats({ totalRevenue: revenue, totalExpenses: expenses, pendingPayments: pending, transactionsToday: todayTx });
 
     } catch (error) {
       console.error("Failed to fetch financial data:", error);
@@ -158,16 +158,17 @@ export default function AdminPaymentsPage() {
   }, [transactions, searchTerm, statusFilter]);
   
 
-  const handleMarkAsPaid = async () => {
-    if (!viewingTransaction || viewingTransaction.transactionType !== 'revenue' || !db || !user) return;
+  const handleMarkAsPaid = async (orderId?: string) => {
+    const targetId = orderId || viewingTransaction?.id;
+    if (!targetId || !db || !user) return;
     setIsUpdatingPayment(true);
     try {
-      const orderRef = doc(db, 'orders', viewingTransaction.id);
+      const orderRef = doc(db, 'orders', targetId);
       await updateDoc(orderRef, {
         paymentStatus: 'paid',
         updatedAt: serverTimestamp(),
       });
-      toast({ title: "Payment Updated", description: `Order ${viewingTransaction.id} marked as paid.` });
+      toast({ title: "Payment Updated", description: `Order ${targetId} marked as paid.` });
       setViewingTransaction(null);
       fetchFinancialData(); 
     } catch (error) {
@@ -184,9 +185,6 @@ export default function AdminPaymentsPage() {
   if (!user || (role !== 'Admin' && role !== 'FinanceManager')) {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]">Access Denied.</div>;
   }
-
-  const canMarkAsPaid = viewingTransaction?.transactionType === 'revenue' && (viewingTransaction as Order).paymentStatus === 'pending' && (viewingTransaction as Order).paymentMethod === 'cod';
-
 
   return (
     <div className="space-y-6">
@@ -223,12 +221,12 @@ export default function AdminPaymentsPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending COD Payments</CardTitle>
+            <CardTitle className="text-sm font-medium">Pending Payments</CardTitle>
             <Truck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {isLoading ? <Loader2 className="h-6 w-6 animate-spin"/> : <div className="text-2xl font-bold">{formatPrice(summaryStats.pendingCodPayments)}</div>}
-            <p className="text-xs text-muted-foreground">From 'Cash on Delivery' orders.</p>
+            {isLoading ? <Loader2 className="h-6 w-6 animate-spin"/> : <div className="text-2xl font-bold">{formatPrice(summaryStats.pendingPayments)}</div>}
+            <p className="text-xs text-muted-foreground">From orders awaiting payment confirmation.</p>
           </CardContent>
         </Card>
         <Card>
@@ -338,9 +336,16 @@ export default function AdminPaymentsPage() {
                     </TableCell>
                     <TableCell className="text-right font-semibold">{formatPrice(amount)}</TableCell>
                     <TableCell className="text-right">
-                       <Button variant="ghost" size="icon" aria-label="View Details" onClick={() => setViewingTransaction(tx)}>
-                         <Eye className="h-4 w-4"/>
-                       </Button>
+                       <div className="flex justify-end items-center gap-1">
+                          {isRevenue && paymentStatus === 'pending' && (
+                            <Button size="sm" onClick={() => handleMarkAsPaid(order?.id)} disabled={isUpdatingPayment}>
+                              {isUpdatingPayment ? <Loader2 className="h-4 w-4 animate-spin"/> : <CheckCircle className="h-4 w-4"/>}
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" aria-label="View Details" onClick={() => setViewingTransaction(tx)}>
+                            <Eye className="h-4 w-4"/>
+                          </Button>
+                       </div>
                     </TableCell>
                   </TableRow>
                 )})}
@@ -385,10 +390,10 @@ export default function AdminPaymentsPage() {
                 )}
             </div>
             <DialogFooter>
-                {canMarkAsPaid && (
-                  <Button onClick={handleMarkAsPaid} disabled={isUpdatingPayment}>
+                {viewingTransaction?.transactionType === 'revenue' && (viewingTransaction as Order).paymentStatus === 'pending' && (
+                  <Button onClick={() => handleMarkAsPaid(viewingTransaction?.id)} disabled={isUpdatingPayment}>
                     {isUpdatingPayment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Mark as Paid
+                    Confirm Payment Received
                   </Button>
                 )}
                 <DialogClose asChild>

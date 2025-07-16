@@ -81,7 +81,7 @@ export default function ReviewOrderPage() {
     }
     setIsLoadingOptions(true);
     const newMap = new Map<string, ProductCustomizationOption[]>();
-    const promises = cartItems.map(async (item) => {
+    const promises = cartItems.map(async (item, index) => {
       if (item.customizations && Object.keys(item.customizations).length > 0) {
         try {
           const productDocRef = doc(db, 'products', item.productId);
@@ -182,7 +182,8 @@ export default function ReviewOrderPage() {
       actorId: user.uid,
     };
     
-    const currentPaymentStatus = (paymentMethod === 'mpesa' || paymentMethod === 'card') ? 'paid' : 'pending';
+    // Set all payment statuses to pending initially
+    const currentPaymentStatus = 'pending';
 
     const newOrderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> = {
       customerId: user.uid,
