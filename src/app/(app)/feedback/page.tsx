@@ -2,7 +2,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { History, MessageSquarePlus, Send, Loader2 } from "lucide-react";
+import { History, MessageSquarePlus, Send, Loader2, ChevronsUpDown, Check } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,7 +11,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -22,9 +23,10 @@ import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { FeedbackThreadModal } from '@/components/common/FeedbackThreadModal';
 import { Badge, BadgeProps } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 const feedbackFormSchema = z.object({
-  targetRole: z.string().min(1, "Please select a recipient."), // This will now store the recipient's UID or a broadcast key
+  targetRole: z.string().min(1, "Please select a recipient."),
   subject: z.string().min(5, "Subject must be at least 5 characters long.").max(100, "Subject is too long."),
   message: z.string().min(10, "Message must be at least 10 characters long.").max(1000, "Message is too long."),
 });
@@ -54,6 +56,7 @@ export default function MessagesPage() {
   
   const [recipients, setRecipients] = useState<AppUser[]>([]);
   const [isLoadingRecipients, setIsLoadingRecipients] = useState(true);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   const history = useMemo(() => {
     const allThreads = new Map<string, FeedbackThread>();
@@ -137,10 +140,8 @@ export default function MessagesPage() {
     let q;
 
     if (role === 'Customer') {
-      // Customers can message any non-customer (staff/admin)
       q = query(usersRef, where('role', '!=', 'Customer'), where('disabled', '!=', true), orderBy('displayName', 'asc'));
     } else {
-      // Staff/Admins can message anyone who is not disabled
       q = query(usersRef, where('disabled', '!=', true), orderBy('displayName', 'asc'));
     }
 
@@ -148,7 +149,7 @@ export default function MessagesPage() {
         const snapshot = await getDocs(q);
         const allUsers = snapshot.docs
           .map(doc => ({ uid: doc.id, ...doc.data() } as AppUser))
-          .filter(u => u.uid !== user?.uid); // Filter out the current user
+          .filter(u => u.uid !== user?.uid); 
         setRecipients(allUsers);
     } catch (error) {
         console.error("Error fetching recipients:", error);
@@ -237,21 +238,65 @@ export default function MessagesPage() {
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                     <FormField control={form.control} name="targetRole" render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="flex flex-col">
                         <FormLabel>To</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoadingRecipients}>
-                          <FormControl><SelectTrigger>
-                            <SelectValue placeholder={isLoadingRecipients ? "Loading recipients..." : "Select a recipient..."} />
-                          </SelectTrigger></FormControl>
-                          <SelectContent>
-                            {role !== 'Customer' && <SelectItem value="Customer Broadcast">All Customers (Broadcast)</SelectItem>}
-                            {recipients.map(e => e.displayName && e.role && (
-                                <SelectItem key={e.uid} value={e.uid}>
-                                    {e.displayName} - {e.role}
-                                </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select><FormMessage />
+                        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className={cn(
+                                  "w-full justify-between",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {isLoadingRecipients ? "Loading..." : (
+                                  field.value
+                                    ? (field.value === "Customer Broadcast" ? "All Customers (Broadcast)" : recipients.find(e => e.uid === field.value)?.displayName)
+                                    : "Select a recipient..."
+                                )}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                            <Command>
+                              <CommandInput placeholder="Search recipients..." />
+                              <CommandList>
+                                <CommandEmpty>No recipient found.</CommandEmpty>
+                                <CommandGroup>
+                                  {role !== 'Customer' && (
+                                     <CommandItem
+                                      value="Customer Broadcast"
+                                      onSelect={() => {
+                                        form.setValue("targetRole", "Customer Broadcast");
+                                        setIsPopoverOpen(false);
+                                      }}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4", field.value === "Customer Broadcast" ? "opacity-100" : "opacity-0")}/>
+                                      All Customers (Broadcast)
+                                    </CommandItem>
+                                  )}
+                                  {recipients.map(e => (
+                                    <CommandItem
+                                      value={e.displayName || e.email || e.uid}
+                                      key={e.uid}
+                                      onSelect={() => {
+                                        form.setValue("targetRole", e.uid);
+                                        setIsPopoverOpen(false);
+                                      }}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4", field.value === e.uid ? "opacity-100" : "opacity-0")}/>
+                                      {e.displayName} - {e.role}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
                       </FormItem>
                     )} />
                     <FormField control={form.control} name="subject" render={({ field }) => (
