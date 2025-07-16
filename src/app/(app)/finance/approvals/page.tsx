@@ -168,8 +168,10 @@ export default function FinanceApprovalsPage() {
     }
     setIsSubmittingOrderAction(true);
     
-    const newStatus: OrderStatus = orderActionType === 'approve' ? 'processing' : 'cancelled';
-    const notes = orderActionType === 'approve' 
+    const isApproval = orderActionType === 'approve';
+    const newStatus: OrderStatus = isApproval ? 'processing' : 'cancelled';
+    const newPaymentStatus: Order['paymentStatus'] = isApproval ? 'paid' : 'failed';
+    const notes = isApproval 
         ? `Order approved by ${user.displayName || user.email}.`
         : `Order rejected by ${user.displayName || user.email}. Reason: ${orderRejectionReason}`;
 
@@ -184,11 +186,12 @@ export default function FinanceApprovalsPage() {
         const orderRef = doc(db, 'orders', viewingOrder.id);
         await updateDoc(orderRef, {
             status: newStatus,
+            paymentStatus: newPaymentStatus,
             deliveryHistory: arrayUnion(newHistoryEntry),
             updatedAt: serverTimestamp(),
         });
         
-        if (orderActionType === 'approve') {
+        if (isApproval) {
             try {
                 await fetch('/api/push/send-notification', {
                     method: 'POST',
@@ -205,7 +208,7 @@ export default function FinanceApprovalsPage() {
             }
         }
 
-        toast({ title: `Order ${newStatus}`, description: `Order ${viewingOrder.id.substring(0,8)}... has been ${newStatus}.` });
+        toast({ title: `Order ${isApproval ? 'Approved' : 'Rejected'}`, description: `Order ${viewingOrder.id.substring(0,8)}... has been updated.` });
         setIsOrderActionModalOpen(false);
         setViewingOrder(null);
     } catch (e: any) {

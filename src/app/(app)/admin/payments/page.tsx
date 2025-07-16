@@ -55,12 +55,11 @@ export default function AdminPaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(ALL_STATUSES_SENTINEL);
   const [viewingTransaction, setViewingTransaction] = useState<UnifiedTransaction | null>(null);
-  const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
 
   const [summaryStats, setSummaryStats] = useState({
     totalRevenue: 0,
     totalExpenses: 0,
-    pendingPayments: 0, // Changed from pendingCodPayments
+    pendingPayments: 0,
     transactionsToday: 0,
   });
 
@@ -81,7 +80,7 @@ export default function AdminPaymentsPage() {
 
       let revenue = 0;
       let expenses = 0;
-      let pending = 0; // Changed from pendingCod
+      let pending = 0;
       let todayTx = 0;
       const todayStart = new Date(); todayStart.setHours(0,0,0,0);
       const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
@@ -109,7 +108,6 @@ export default function AdminPaymentsPage() {
         expenses += invoice.totalAmount;
       });
 
-      // Sort all transactions by date after merging
       fetchedTransactions.sort((a, b) => {
           const dateA = a.updatedAt?.toDate() || a.createdAt?.toDate() || 0;
           const dateB = b.updatedAt?.toDate() || b.createdAt?.toDate() || 0;
@@ -158,27 +156,6 @@ export default function AdminPaymentsPage() {
   }, [transactions, searchTerm, statusFilter]);
   
 
-  const handleMarkAsPaid = async (orderId?: string) => {
-    const targetId = orderId || viewingTransaction?.id;
-    if (!targetId || !db || !user) return;
-    setIsUpdatingPayment(true);
-    try {
-      const orderRef = doc(db, 'orders', targetId);
-      await updateDoc(orderRef, {
-        paymentStatus: 'paid',
-        updatedAt: serverTimestamp(),
-      });
-      toast({ title: "Payment Updated", description: `Order ${targetId} marked as paid.` });
-      setViewingTransaction(null);
-      fetchFinancialData(); 
-    } catch (error) {
-      console.error("Error updating payment status:", error);
-      toast({ title: "Error", description: "Failed to update payment status.", variant: "destructive" });
-    } finally {
-      setIsUpdatingPayment(false);
-    }
-  };
-
   if (authLoading || (!user && !authLoading)) {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
@@ -190,7 +167,7 @@ export default function AdminPaymentsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-headline font-semibold">Payment Records & Administration</h1>
+          <h1 className="text-3xl font-headline font-semibold">Payment Records</h1>
           <p className="text-muted-foreground">View all incoming and outgoing transactions.</p>
         </div>
         <Button onClick={fetchFinancialData} variant="outline" size="sm" disabled={isLoading}>
@@ -337,11 +314,6 @@ export default function AdminPaymentsPage() {
                     <TableCell className="text-right font-semibold">{formatPrice(amount)}</TableCell>
                     <TableCell className="text-right">
                        <div className="flex justify-end items-center gap-1">
-                          {isRevenue && paymentStatus === 'pending' && (
-                            <Button size="sm" onClick={() => handleMarkAsPaid(order?.id)} disabled={isUpdatingPayment}>
-                              {isUpdatingPayment ? <Loader2 className="h-4 w-4 animate-spin"/> : <CheckCircle className="h-4 w-4"/>}
-                            </Button>
-                          )}
                           <Button variant="ghost" size="icon" aria-label="View Details" onClick={() => setViewingTransaction(tx)}>
                             <Eye className="h-4 w-4"/>
                           </Button>
@@ -390,12 +362,6 @@ export default function AdminPaymentsPage() {
                 )}
             </div>
             <DialogFooter>
-                {viewingTransaction?.transactionType === 'revenue' && (viewingTransaction as Order).paymentStatus === 'pending' && (
-                  <Button onClick={() => handleMarkAsPaid(viewingTransaction?.id)} disabled={isUpdatingPayment}>
-                    {isUpdatingPayment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Confirm Payment Received
-                  </Button>
-                )}
                 <DialogClose asChild>
                     <Button type="button" variant="outline">Close</Button>
                 </DialogClose>
