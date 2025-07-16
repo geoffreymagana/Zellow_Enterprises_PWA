@@ -16,21 +16,19 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
-import type { FeedbackThread, UserRole } from "@/types";
-import { collection, addDoc, serverTimestamp, runTransaction, doc, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import type { FeedbackThread, UserRole, User as AppUser } from "@/types";
+import { collection, addDoc, serverTimestamp, runTransaction, doc, query, where, onSnapshot, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { FeedbackThreadModal } from '@/components/common/FeedbackThreadModal';
 import { Badge, BadgeProps } from "@/components/ui/badge";
 
 const feedbackFormSchema = z.object({
-  targetRole: z.string().min(1, "Please select a recipient department."),
+  targetRole: z.string().min(1, "Please select a recipient."), // This will now store the recipient's UID
   subject: z.string().min(5, "Subject must be at least 5 characters long.").max(100, "Subject is too long."),
   message: z.string().min(10, "Message must be at least 10 characters long.").max(1000, "Message is too long."),
 });
 type FeedbackFormValues = z.infer<typeof feedbackFormSchema>;
-
-const contactableRoles: UserRole[] = ['Admin', 'ServiceManager', 'FinanceManager', 'DispatchManager', 'InventoryManager'];
 
 const getStatusVariant = (status: FeedbackThread['status']): BadgeProps['variant'] => {
   switch (status) {
@@ -54,6 +52,9 @@ export default function FeedbackPage() {
   const [broadcastThreads, setBroadcastThreads] = useState<FeedbackThread[]>([]); 
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   
+  const [employees, setEmployees] = useState<AppUser[]>([]);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
+
   const history = useMemo(() => {
     const allThreads = new Map<string, FeedbackThread>();
     [...sentThreads, ...receivedThreads, ...broadcastThreads].forEach(thread => {
@@ -73,10 +74,24 @@ export default function FeedbackPage() {
 
   const onSubmit = async (values: FeedbackFormValues) => {
     if (!user || !db || !role) {
-      toast({ title: "Error", description: "You must be logged in to send feedback.", variant: "destructive" });
+      toast({ title: "Error", description: "You must be logged in to send a message.", variant: "destructive" });
       return;
     }
     setIsSubmitting(true);
+    
+    // The 'targetRole' from the form is now the recipient's UID.
+    const recipientId = values.targetRole;
+    const recipient = employees.find(e => e.uid === recipientId);
+    
+    // We still need the role for the thread document for querying purposes.
+    const recipientRole = recipient ? recipient.role : null;
+
+    if (!recipientRole) {
+        toast({ title: "Error", description: "Could not find the recipient's role.", variant: "destructive" });
+        setIsSubmitting(false);
+        return;
+    }
+
     try {
       const threadCollection = collection(db, 'feedbackThreads');
       const newThreadRef = doc(threadCollection); 
@@ -88,7 +103,8 @@ export default function FeedbackPage() {
           senderId: user.uid,
           senderName: user.displayName || "N/A",
           senderEmail: user.email || "N/A",
-          targetRole: values.targetRole,
+          targetRole: recipientRole, // Store the ROLE for querying
+          targetUserId: recipientId, // Store the specific user ID
           status: 'open',
           lastMessageSnippet: values.message.substring(0, 50),
           createdAt: serverTimestamp(),
@@ -109,12 +125,34 @@ export default function FeedbackPage() {
       toast({ title: "Message Sent!", description: "Thank you, we've received your message and will get back to you soon." });
       form.reset();
     } catch (e: any) {
-      console.error("Error sending feedback:", e);
+      console.error("Error sending message:", e);
       toast({ title: "Submission Failed", description: "Could not send your message. Please try again.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
+  
+  const fetchEmployees = useCallback(async () => {
+    if (!db) return;
+    setIsLoadingEmployees(true);
+    const employeeRoles: UserRole[] = ['Admin', 'ServiceManager', 'FinanceManager', 'DispatchManager', 'InventoryManager'];
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('role', 'in', employeeRoles), where('disabled', '!=', true), orderBy('displayName', 'asc'));
+    try {
+        const snapshot = await getDocs(q);
+        setEmployees(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser)));
+    } catch (error) {
+        toast({ title: "Error", description: "Could not fetch employee list.", variant: "destructive" });
+    } finally {
+        setIsLoadingEmployees(false);
+    }
+  }, [toast]);
+
+
+  useEffect(() => {
+    fetchEmployees();
+  }, [fetchEmployees]);
+
 
   useEffect(() => {
     if (loading || !user || !db || !role) {
@@ -191,8 +229,8 @@ export default function FeedbackPage() {
           <TabsContent value="submit" className="mt-6">
             <Card className="shadow-lg">
               <CardHeader>
-                <CardTitle className="text-2xl font-headline font-bold text-primary">Submit Feedback or Ask a Question</CardTitle>
-                <CardDescription>We value your input. Let us know how we can help or improve.</CardDescription>
+                <CardTitle className="text-2xl font-headline font-bold text-primary">Submit a Message or Ask a Question</CardTitle>
+                <CardDescription>We value your input. Let us know how we can help.</CardDescription>
               </CardHeader>
               <CardContent>
                 <Form {...form}>
@@ -200,11 +238,17 @@ export default function FeedbackPage() {
                     <FormField control={form.control} name="targetRole" render={({ field }) => (
                       <FormItem>
                         <FormLabel>To</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Select a department or recipient..." /></SelectTrigger></FormControl>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoadingEmployees}>
+                          <FormControl><SelectTrigger>
+                            <SelectValue placeholder={isLoadingEmployees ? "Loading employees..." : "Select a person or department..."} />
+                          </SelectTrigger></FormControl>
                           <SelectContent>
                             {role === 'Admin' && <SelectItem value="Customer Broadcast">All Customers (Broadcast)</SelectItem>}
-                            {contactableRoles.map(r => r && <SelectItem key={r} value={r}>{r.replace('Manager', ' Manager')}</SelectItem>)}
+                            {employees.map(e => e.displayName && e.role && (
+                                <SelectItem key={e.uid} value={e.uid}>
+                                    {e.displayName} - {e.role.replace('Manager', ' Mngr')}
+                                </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select><FormMessage />
                       </FormItem>
@@ -228,7 +272,7 @@ export default function FeedbackPage() {
           <TabsContent value="history" className="mt-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-2xl font-headline font-bold text-primary">My Feedback History</CardTitle>
+                <CardTitle className="text-2xl font-headline font-bold text-primary">My Message History</CardTitle>
                 <CardDescription>View your past conversations with our team.</CardDescription>
               </CardHeader>
               <CardContent>

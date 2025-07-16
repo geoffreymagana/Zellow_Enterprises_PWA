@@ -34,7 +34,7 @@ export default function SupportPage() {
           <div className="text-center pt-4">
               <p className="mb-3 text-muted-foreground">Have a specific question or want to track your messages?</p>
               <Button asChild>
-                <Link href="/feedback">Go to Feedback</Link>
+                <Link href="/feedback">Go to Messages</Link>
               </Button>
           </div>
         </CardContent>

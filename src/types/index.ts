@@ -425,6 +425,7 @@ export interface FeedbackThread {
   senderName: string;
   senderEmail: string;
   targetRole: UserRole | 'Customer Broadcast';
+  targetUserId?: string; // New field for specific user targeting
   status: 'open' | 'replied' | 'closed';
   lastMessageSnippet: string;
   createdAt: any;
