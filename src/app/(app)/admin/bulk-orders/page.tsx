@@ -112,7 +112,7 @@ export default function AdminBulkOrdersPage() {
             price: product.price,
             quantity: item.quantity,
             imageUrl: product.imageUrl || null,
-            customizations: null, 
+            customizations: item.customizations || null, 
           };
         });
 
@@ -127,7 +127,7 @@ export default function AdminBulkOrdersPage() {
           totalAmount: subTotal, 
           subTotal,
           shippingCost: 0,
-          status: 'awaiting_customer_confirmation', // New status
+          status: 'awaiting_customer_confirmation',
           paymentStatus: 'pending',
           isBulkOrder: true,
           bulkOrderRequestId: viewingRequest.id,
