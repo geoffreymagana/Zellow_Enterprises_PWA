@@ -105,6 +105,11 @@ export default function CartPage() {
       case 'checkbox':
         displayValue = selectedValue ? (optionDef.checkboxLabel || 'Selected') : 'Not selected';
         break;
+      case 'checkbox_group':
+        if (Array.isArray(selectedValue) && optionDef.choices) {
+            displayValue = selectedValue.map(val => optionDef.choices?.find(c => c.value === val)?.label || val).join(', ');
+        }
+        break;
       default: // text
         displayValue = String(selectedValue);
     }

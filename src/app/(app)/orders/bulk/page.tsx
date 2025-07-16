@@ -40,7 +40,7 @@ const bulkOrderItemSchema = z.object({
   productId: z.string().min(1, "Please select a product."),
   quantity: z.coerce.number().min(1, "Quantity must be at least 1."),
   notes: z.string().optional(),
-  customizations: z.record(z.string(), z.any()).optional(),
+  customizations: z.record(z.any()).optional(),
 });
 
 const bulkOrderRequestSchema = z.object({
@@ -217,6 +217,8 @@ export default function BulkOrderRequestPage() {
             newCustomizations[option.id] = false;
         } else if (option.type === 'image_upload') {
             newCustomizations[option.id] = '';
+        } else if (option.type === 'checkbox_group') {
+            newCustomizations[option.id] = [];
         }
     });
 

@@ -71,6 +71,13 @@ export default function CustomizeProductPage() {
         if (choice && choice.priceAdjustment) {
           calculatedPrice += choice.priceAdjustment;
         }
+      } else if (opt.type === 'checkbox_group' && opt.choices && Array.isArray(selectedValue)) {
+          selectedValue.forEach(val => {
+              const choice = opt.choices?.find(c => c.value === val);
+              if(choice && choice.priceAdjustment) {
+                  calculatedPrice += choice.priceAdjustment;
+              }
+          });
       } else if (opt.type === 'checkbox' && selectedValue === true && opt.priceAdjustmentIfChecked) {
         calculatedPrice += opt.priceAdjustmentIfChecked;
       } else if (opt.type === 'color_picker' && opt.choices) {
@@ -136,6 +143,10 @@ export default function CustomizeProductPage() {
                 if (opt.required) fieldSchema = fieldSchema.min(1, `${opt.label} is required.`);
                 else fieldSchema = fieldSchema.optional().nullable();
                 defaultValue = defaultValue ?? (opt.choices?.[0]?.value || null);
+                break;
+              case 'checkbox_group':
+                fieldSchema = z.array(z.string()).optional();
+                defaultValue = defaultValue ?? [];
                 break;
               case 'text':
                 let textSchemaBase = z.string();
@@ -283,9 +294,9 @@ export default function CustomizeProductPage() {
     
     const customizationsToSave: Record<string, any> = {};
     resolvedOptions.forEach(opt => {
-      if (data[opt.id] !== undefined && data[opt.id] !== '' && data[opt.id] !== false && data[opt.id] !== null) {
+      if (data[opt.id] !== undefined && data[opt.id] !== '' && data[opt.id] !== false && (!Array.isArray(data[opt.id]) || data[opt.id].length > 0) && data[opt.id] !== null) {
         customizationsToSave[opt.id] = data[opt.id];
-      } else if (opt.required && (data[opt.id] === undefined || data[opt.id] === '' || data[opt.id] === false || data[opt.id] === null)) {
+      } else if (opt.required && (data[opt.id] === undefined || data[opt.id] === '' || data[opt.id] === false || (Array.isArray(data[opt.id]) && data[opt.id].length === 0) || data[opt.id] === null)) {
         console.warn(`Required field ${opt.id} missing value during submission attempt.`);
       }
     });
@@ -412,6 +423,43 @@ export default function CustomizeProductPage() {
                                     ))}
                                   </SelectContent>
                                 </Select>
+                              )}
+                              {option.type === 'checkbox_group' && option.choices && (
+                                <div className="space-y-2 pt-1">
+                                  {option.choices.map((choice) => (
+                                    <FormField
+                                      key={choice.value}
+                                      control={form.control}
+                                      name={option.id}
+                                      render={({ field: checkboxGroupField }) => {
+                                        const currentValue = Array.isArray(checkboxGroupField.value) ? checkboxGroupField.value : [];
+                                        return (
+                                          <FormItem className="flex flex-row items-center space-x-3 space-y-0 p-3 border rounded-md hover:border-primary transition-colors">
+                                            <FormControl>
+                                              <Checkbox
+                                                checked={currentValue.includes(choice.value)}
+                                                onCheckedChange={(checked) => {
+                                                  let newValue;
+                                                  if (checked) {
+                                                    newValue = [...currentValue, choice.value];
+                                                  } else {
+                                                    newValue = currentValue.filter((v: string) => v !== choice.value);
+                                                  }
+                                                  checkboxGroupField.onChange(newValue);
+                                                  calculatePrice();
+                                                }}
+                                              />
+                                            </FormControl>
+                                            <FormLabel className="font-normal flex-grow cursor-pointer">
+                                              {choice.label}
+                                              {choice.priceAdjustment && choice.priceAdjustment !== 0 ? ` (+${formatPrice(choice.priceAdjustment)})` : ''}
+                                            </FormLabel>
+                                          </FormItem>
+                                        );
+                                      }}
+                                    />
+                                  ))}
+                                </div>
                               )}
                               {option.type === 'text' && (
                                 <Textarea 
