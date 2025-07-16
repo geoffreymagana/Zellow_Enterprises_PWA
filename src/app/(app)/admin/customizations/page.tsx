@@ -142,8 +142,11 @@ export default function AdminCustomizationsPage() {
 
   useEffect(() => {
     if (!authLoading) {
-      if (!user || role !== 'Admin') router.replace('/dashboard');
-      else fetchGroups();
+      if (!user || !['Admin', 'ServiceManager'].includes(role || '')) {
+        router.replace('/dashboard');
+      } else {
+        fetchGroups();
+      }
     }
   }, [user, role, authLoading, router, fetchGroups]);
 

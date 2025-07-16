@@ -134,7 +134,7 @@ export default function AdminShippingPage() {
 
   useEffect(() => {
     if (!authLoading) {
-      if (!user || role !== 'Admin') {
+      if (!user || !['Admin', 'DispatchManager'].includes(role || '')) {
         router.replace('/dashboard');
       } else {
         fetchRegions();
@@ -247,7 +247,7 @@ export default function AdminShippingPage() {
     (filterMethod ? rate.methodId === filterMethod : true)
   );
 
-  if (authLoading || (!user && !authLoading) || (role && role !== 'Admin' && !authLoading)) {
+  if (authLoading || (!user && !authLoading) || (role && !['Admin', 'DispatchManager'].includes(role) && !authLoading)) {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   
