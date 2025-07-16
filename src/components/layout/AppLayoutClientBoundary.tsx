@@ -24,7 +24,7 @@ import {
   LayoutDashboard, Users, Package, ShoppingCart, Layers, DollarSign,
   Truck, Settings as SettingsIcon, UserCircle, LogOutIcon, Menu, Bell,
   FileArchive, ClipboardCheck, MapIcon, Ship, Home,
-  Aperture, Coins, Warehouse, PackageSearch, BarChart2, FileText, Wrench, PackagePlus
+  Aperture, Coins, Warehouse, PackageSearch, BarChart2, FileText, Wrench, PackagePlus, ListChecks
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
