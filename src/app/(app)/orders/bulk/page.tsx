@@ -162,7 +162,7 @@ export default function BulkOrderRequestPage() {
       if (!response.ok) throw new Error((await response.json()).error?.message || 'Upload failed');
       
       const data = await response.json();
-      form.setValue(`items.${itemIndex}.customizations.${optionId}`, data.secure_url);
+      form.setValue(`items.${index}.customizations.${optionId}`, data.secure_url);
       setUploadStates(prev => ({ ...prev, [uploadKey]: { progress: 100, error: undefined, uploading: false, url: data.secure_url }}));
       toast({ title: "Image Uploaded", description: "Image added to your item."});
     } catch (err: any) {
@@ -198,6 +198,23 @@ export default function BulkOrderRequestPage() {
     } finally {
         setIsSubmitting(false);
     }
+  };
+
+  const handleProductSelection = (index: number, productId: string) => {
+    form.setValue(`items.${index}.productId`, productId);
+    const optionsForProduct = productOptions.get(productId) || [];
+    const existingCustomizations = form.getValues(`items.${index}.customizations`) || {};
+    const newCustomizations = { ...existingCustomizations };
+
+    optionsForProduct.forEach(option => {
+        // IMPORTANT: Initialize text fields to empty string to prevent controlled/uncontrolled error
+        if (option.type === 'text' && newCustomizations[option.id] === undefined) {
+            newCustomizations[option.id] = '';
+        }
+    });
+
+    form.setValue(`items.${index}.customizations`, newCustomizations);
+    setOpenPopoverIndex(null);
   };
 
   if (authLoading) {
@@ -270,7 +287,7 @@ export default function BulkOrderRequestPage() {
                                             </FormControl>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Search product..." /><CommandList><CommandEmpty>No product found.</CommandEmpty><CommandGroup>
-                                            {products.map((p) => (<CommandItem value={p.name} key={p.id} onSelect={() => { form.setValue(`items.${index}.productId`, p.id); setOpenPopoverIndex(null);}} className="flex items-center gap-2">
+                                            {products.map((p) => (<CommandItem value={p.name} key={p.id} onSelect={() => handleProductSelection(index, p.id)} className="flex items-center gap-2">
                                                 <div className="relative w-8 h-8 rounded-sm bg-accent overflow-hidden flex-shrink-0">
                                                     {p.imageUrl ? <Image src={p.imageUrl} alt={p.name} layout="fill" objectFit="cover" data-ai-hint="product"/> : <ImageOff className="h-4 w-4 text-muted-foreground"/>}
                                                 </div>
@@ -303,7 +320,7 @@ export default function BulkOrderRequestPage() {
                                         render={({ field }) => (
                                             <FormItem>
                                                 <FormLabel className="text-xs">{option.label}</FormLabel>
-                                                {option.type === 'text' && <FormControl><Input {...field} placeholder={option.placeholder || ''} /></FormControl>}
+                                                {option.type === 'text' && <FormControl><Input {...field} value={field.value || ''} placeholder={option.placeholder || ''} /></FormControl>}
                                                 {option.type === 'checkbox' && <div className="flex items-center gap-2"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="text-xs font-normal">{option.checkboxLabel}</FormLabel></div>}
                                                 {option.type === 'dropdown' && <Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder={`Select ${option.label.toLowerCase()}`} /></SelectTrigger></FormControl><SelectContent>{option.choices?.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent></Select>}
                                                 {option.type === 'image_upload' && (
@@ -324,7 +341,7 @@ export default function BulkOrderRequestPage() {
                         </div>
                     )
                 })}
-                 <Button type="button" variant="outline" size="sm" onClick={() => append({ productId: "", quantity: 1, notes: ""})}><PlusCircle className="mr-2 h-4 w-4"/>Add Another Item</Button>
+                 <Button type="button" variant="outline" size="sm" onClick={() => append({ productId: "", quantity: 1, notes: "", customizations: {} })}><PlusCircle className="mr-2 h-4 w-4"/>Add Another Item</Button>
               </div>
 
               <CardFooter className="p-0 pt-6">
