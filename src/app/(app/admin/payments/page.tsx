@@ -104,7 +104,7 @@ export default function AdminPaymentsPage() {
         if (order.paymentStatus === 'paid') {
           revenue += order.totalAmount;
           const paymentDate = order.updatedAt?.toDate() || order.createdAt?.toDate();
-          if (paymentDate >= todayStart && paymentDate <= todayEnd) {
+          if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
             todayTx++;
           }
         } else if (order.paymentStatus === 'pending') {
@@ -119,8 +119,8 @@ export default function AdminPaymentsPage() {
       });
 
       fetchedTransactions.sort((a, b) => {
-          const dateA = a.updatedAt?.toDate() || a.createdAt?.toDate() || 0;
-          const dateB = b.updatedAt?.toDate() || b.createdAt?.toDate() || 0;
+          const dateA = a.updatedAt?.toDate() || a.createdAt?.toDate() || new Date(0);
+          const dateB = b.updatedAt?.toDate() || b.createdAt?.toDate() || new Date(0);
           return dateB.valueOf() - dateA.valueOf();
       });
       
@@ -497,4 +497,3 @@ export default function AdminPaymentsPage() {
     </div>
   );
 }
-
