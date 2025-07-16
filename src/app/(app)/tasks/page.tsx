@@ -411,7 +411,10 @@ export default function TasksPage() {
 
       <Dialog open={isModalOpen} onOpenChange={(open) => { if(!open) setSelectedTask(null); setIsModalOpen(open); }}>
         <DialogContent className="sm:max-w-lg md:max-w-xl lg:max-w-2xl">
-          <DialogHeader><DialogTitle className="font-headline text-xl">{selectedTask?.taskType || "Task Details"}</DialogTitle><DialogDescription>Item: {selectedTask?.itemName || "N/A"} | Order: {selectedTask?.orderId ? selectedTask.orderId.substring(0,10)+'...' : 'N/A'}</DialogDescription></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="font-headline text-xl">{selectedTask?.taskType || "Task Details"}</DialogTitle>
+            <DialogDescription>Item: {selectedTask?.itemName || "N/A"} (Qty: {modalOrderItem?.quantity || '...'}) | Order: {selectedTask?.orderId ? selectedTask.orderId.substring(0,10)+'...' : 'N/A'}</DialogDescription>
+          </DialogHeader>
           {isLoadingModalDetails ? <div className="flex justify-center items-center h-40"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div> : (
           <ScrollArea className="max-h-[calc(100vh-22rem)] md:max-h-[calc(70vh-10rem)] pr-3"><div className="space-y-4 py-2">
               <div><p className="text-sm font-medium">Status:</p> <Badge variant={getStatusBadgeVariant(selectedTask?.status || 'pending')} className="capitalize">{selectedTask?.status.replace(/_/g, ' ')}</Badge></div>
@@ -459,3 +462,4 @@ export default function TasksPage() {
     </>
   );
 }
+
