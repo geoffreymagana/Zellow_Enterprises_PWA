@@ -1,0 +1,126 @@
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: #f0f8fa; /* Light cyan-blue, similar to globals.css background */
+    color: #334155; /* Dark grayish blue, similar to globals.css foreground */
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+}
+
+.container {
+    background-color: #ffffff;
+    padding: 20px 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 500px;
+    text-align: center;
+}
+
+header {
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e2e8f0; /* Light border */
+}
+
+header #logo {
+    max-height: 40px;
+    margin-bottom: 10px;
+}
+
+header h1 {
+    color: #34A7C1; /* Primary color from globals.css */
+    font-size: 1.8em;
+    margin: 0;
+}
+
+.loader {
+    padding: 20px;
+    font-size: 1.1em;
+    color: #555;
+}
+
+.error-message {
+    padding: 20px;
+    background-color: #ffebee; /* Light red for errors */
+    color: #c62828; /* Darker red text */
+    border: 1px solid #ef9a9a;
+    border-radius: 6px;
+    margin-bottom: 20px;
+}
+
+#order-details p {
+    font-size: 1.1em;
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+.status-card {
+    background-color: #e0f7fa; /* Light cyan background */
+    border: 1px solid #b2ebf2; /* Cyan border */
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: 20px;
+    margin-bottom: 25px;
+}
+
+.status-card h2 {
+    font-size: 1em;
+    color: #00796b; /* Darker cyan */
+    margin-top: 0;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-text {
+    font-size: 1.4em !important;
+    font-weight: bold;
+    color: #004d40; /* Very dark cyan */
+    margin-bottom: 0 !important;
+    text-transform: capitalize;
+}
+
+.detail-card {
+    background-color: #f9fafb; /* Very light gray */
+    border: 1px solid #f0f0f0;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+.detail-card h3 {
+    font-size: 0.9em;
+    color: #34A7C1; /* Primary color */
+    margin-top: 0;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.detail-card p {
+    font-size: 1em !important;
+    margin-bottom: 0 !important;
+    color: #4a5568; /* Medium gray text */
+}
+
+.gift-message {
+    font-style: italic;
+    background-color: #fffde7; /* Light yellow for message */
+    padding: 10px;
+    border-left: 3px solid #ffc107; /* Amber border */
+    border-radius: 0 4px 4px 0;
+}
+
+footer {
+    margin-top: 30px;
+    padding-top: 15px;
+    border-top: 1px solid #e2e8f0;
+    font-size: 0.85em;
+    color: #718096; /* Gray text for footer */
+}
