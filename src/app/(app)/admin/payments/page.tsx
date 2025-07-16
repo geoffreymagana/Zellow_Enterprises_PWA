@@ -10,18 +10,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Edit, Filter, DollarSign, CheckCircle, PackageOpen, AlertTriangle, RefreshCw, CreditCard, Banknote, Truck, ArrowUpRight, ArrowDownLeft, Eye } from 'lucide-react';
-import type { Order, Invoice, PaymentStatus } from '@/types';
+import { Loader2, Search, Edit, Filter, DollarSign, CheckCircle, PackageOpen, AlertTriangle, RefreshCw, CreditCard, Banknote, Truck, ArrowUpRight, ArrowDownLeft, Eye, XCircle, Undo2 } from 'lucide-react';
+import type { Order, Invoice, PaymentStatus, OrderStatus, DeliveryHistoryEntry } from '@/types';
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import Link from 'next/link';
-import { collection, getDocs, query, orderBy, where, doc, updateDoc, serverTimestamp, Timestamp, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, where, doc, updateDoc, serverTimestamp, Timestamp, writeBatch, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+
 
 type UnifiedTransaction = (Order | Invoice) & { transactionType: 'revenue' | 'expense' };
+type PaymentAction = 'confirm' | 'reject' | 'refund';
 
 const paymentStatuses: (PaymentStatus | "all")[] = ['all', 'pending', 'paid', 'failed', 'refunded'];
 const ALL_STATUSES_SENTINEL = "all";
@@ -55,6 +59,12 @@ export default function AdminPaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(ALL_STATUSES_SENTINEL);
   const [viewingTransaction, setViewingTransaction] = useState<UnifiedTransaction | null>(null);
+  
+  const [actionableOrder, setActionableOrder] = useState<Order | null>(null);
+  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+  const [actionType, setActionType] = useState<PaymentAction | null>(null);
+  const [actionReason, setActionReason] = useState("");
+  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
 
   const [summaryStats, setSummaryStats] = useState({
     totalRevenue: 0,
@@ -94,7 +104,7 @@ export default function AdminPaymentsPage() {
         if (order.paymentStatus === 'paid') {
           revenue += order.totalAmount;
           const paymentDate = order.updatedAt?.toDate() || order.createdAt?.toDate();
-          if (paymentDate >= todayStart && paymentDate <= todayEnd) {
+          if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
             todayTx++;
           }
         } else if (order.paymentStatus === 'pending') {
@@ -109,8 +119,8 @@ export default function AdminPaymentsPage() {
       });
 
       fetchedTransactions.sort((a, b) => {
-          const dateA = a.updatedAt?.toDate() || a.createdAt?.toDate() || 0;
-          const dateB = b.updatedAt?.toDate() || b.createdAt?.toDate() || 0;
+          const dateA = a.updatedAt?.toDate() || a.createdAt?.toDate() || new Date(0);
+          const dateB = b.updatedAt?.toDate() || b.createdAt?.toDate() || new Date(0);
           return dateB.valueOf() - dateA.valueOf();
       });
       
@@ -155,6 +165,71 @@ export default function AdminPaymentsPage() {
     });
   }, [transactions, searchTerm, statusFilter]);
   
+  const handleOpenActionModal = (order: Order, type: PaymentAction) => {
+    setActionableOrder(order);
+    setActionType(type);
+    setActionReason("");
+    setIsActionModalOpen(true);
+  };
+  
+  const handleConfirmAction = async () => {
+    if (!user || !db || !actionableOrder || !actionType) return;
+
+    if ((actionType === 'reject' || actionType === 'refund') && !actionReason.trim()) {
+      toast({ title: "Reason Required", description: `Please provide a reason for ${actionType}ing.`, variant: "destructive" });
+      return;
+    }
+    
+    setIsSubmittingAction(true);
+    const orderRef = doc(db, 'orders', actionableOrder.id);
+    const updatePayload: any = { updatedAt: serverTimestamp() };
+    let newOrderStatus: OrderStatus | null = null;
+    let newPaymentStatus: PaymentStatus | null = null;
+    let historyNotes = "";
+
+    switch (actionType) {
+      case 'confirm':
+        newPaymentStatus = 'paid';
+        newOrderStatus = 'processing';
+        historyNotes = `Payment confirmed by ${user.displayName || user.email}. Order is now processing.`;
+        updatePayload.paymentStatus = newPaymentStatus;
+        updatePayload.status = newOrderStatus;
+        break;
+      case 'reject':
+        newPaymentStatus = 'failed';
+        newOrderStatus = 'cancelled';
+        historyNotes = `Payment rejected by ${user.displayName || user.email}. Reason: ${actionReason}`;
+        updatePayload.paymentStatus = newPaymentStatus;
+        updatePayload.status = newOrderStatus;
+        break;
+      case 'refund':
+        newPaymentStatus = 'refunded';
+        historyNotes = `Payment refunded by ${user.displayName || user.email}. Reason: ${actionReason}`;
+        updatePayload.paymentStatus = newPaymentStatus;
+        break;
+    }
+
+    const newHistoryEntry: DeliveryHistoryEntry = {
+      status: newOrderStatus || actionableOrder.status,
+      timestamp: Timestamp.now(),
+      notes: historyNotes,
+      actorId: user.uid,
+    };
+    updatePayload.deliveryHistory = arrayUnion(newHistoryEntry);
+    
+    try {
+      await updateDoc(orderRef, updatePayload);
+      toast({ title: `Action Successful`, description: `Order payment has been ${newPaymentStatus || 'updated'}.` });
+      fetchFinancialData(); // Refresh data after action
+      setIsActionModalOpen(false);
+      setActionableOrder(null);
+    } catch (e: any) {
+      toast({ title: "Action Failed", description: `Could not update order: ${e.message}`, variant: "destructive" });
+    } finally {
+      setIsSubmittingAction(false);
+    }
+  };
+
 
   if (authLoading || (!user && !authLoading)) {
     return <div className="flex items-center justify-center min-h-[calc(100vh-var(--header-height,8rem))]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -167,7 +242,7 @@ export default function AdminPaymentsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-headline font-semibold">Payment Records</h1>
+          <h1 className="text-3xl font-headline font-semibold">Payment Records & Administration</h1>
           <p className="text-muted-foreground">View all incoming and outgoing transactions.</p>
         </div>
         <Button onClick={fetchFinancialData} variant="outline" size="sm" disabled={isLoading}>
@@ -314,6 +389,15 @@ export default function AdminPaymentsPage() {
                     <TableCell className="text-right font-semibold">{formatPrice(amount)}</TableCell>
                     <TableCell className="text-right">
                        <div className="flex justify-end items-center gap-1">
+                          {isRevenue && paymentStatus === 'pending' && (
+                            <>
+                              <Button size="sm" variant="destructive" onClick={() => handleOpenActionModal(order!, 'reject')} disabled={isSubmittingAction}><XCircle className="h-4 w-4"/></Button>
+                              <Button size="sm" onClick={() => handleOpenActionModal(order!, 'confirm')} disabled={isSubmittingAction}><CheckCircle className="h-4 w-4"/></Button>
+                            </>
+                          )}
+                           {isRevenue && paymentStatus === 'paid' && (
+                            <Button size="sm" variant="outline" onClick={() => handleOpenActionModal(order!, 'refund')} disabled={isSubmittingAction}><Undo2 className="h-4 w-4"/></Button>
+                          )}
                           <Button variant="ghost" size="icon" aria-label="View Details" onClick={() => setViewingTransaction(tx)}>
                             <Eye className="h-4 w-4"/>
                           </Button>
@@ -362,10 +446,52 @@ export default function AdminPaymentsPage() {
                 )}
             </div>
             <DialogFooter>
+                {viewingTransaction?.transactionType === 'revenue' && (viewingTransaction as Order).paymentStatus === 'pending' && (
+                  <Button onClick={() => handleOpenActionModal(viewingTransaction as Order, 'confirm')} disabled={isSubmittingAction}>
+                    {isSubmittingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Confirm Payment Received
+                  </Button>
+                )}
                 <DialogClose asChild>
                     <Button type="button" variant="outline">Close</Button>
                 </DialogClose>
             </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Universal Action Modal */}
+       <Dialog open={isActionModalOpen} onOpenChange={setIsActionModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="capitalize">{actionType} Payment</DialogTitle>
+            <DialogDescription>
+              Order: {actionableOrder?.id.substring(0, 8)}... <br/>
+              Amount: {formatPrice(actionableOrder?.totalAmount || 0)}
+            </DialogDescription>
+          </DialogHeader>
+          {(actionType === 'reject' || actionType === 'refund') && (
+            <div className="py-2 space-y-2">
+              <Label htmlFor="action-reason">Reason for {actionType}</Label>
+              <Textarea id="action-reason" value={actionReason} onChange={(e) => setActionReason(e.target.value)} placeholder={`Provide a brief reason for ${actionType}ing...`} />
+            </div>
+          )}
+          {actionType === 'confirm' && (
+            <div className="py-2 text-sm">
+              <p>You are about to confirm that payment has been received for this order. This will move the order to the 'Processing' stage.</p>
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+            <Button 
+                type="button" 
+                onClick={handleConfirmAction} 
+                disabled={isSubmittingAction || ((actionType === 'reject' || actionType === 'refund') && !actionReason.trim())}
+                variant={actionType === 'reject' ? 'destructive' : 'default'}
+            >
+                {isSubmittingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                Confirm {actionType}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
