@@ -30,7 +30,9 @@ const formatDate = (timestamp: any, includeTime: boolean = true) => {
 
 const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] => {
   switch (status) {
-    case 'pending': return 'statusYellow';
+    case 'pending':
+    case 'pending_finance_approval':
+       return 'statusYellow';
     case 'processing': return 'statusAmber';
     case 'awaiting_assignment': return 'statusOrange';
     case 'assigned': return 'statusOrderAssigned';

@@ -1,12 +1,4 @@
 
-
-
-
-
-
-
-
-
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -115,7 +107,7 @@ export type OrderStatus =
   | 'delivery_attempted'
   | 'cancelled'
   | 'shipped'
-  | 'awaiting_customer_confirmation'; // New status for bulk orders
+  | 'awaiting_customer_confirmation';
 
 export interface DeliveryHistoryEntry {
   status: OrderStatus | string;

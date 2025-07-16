@@ -20,11 +20,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Calendar } from '@/components/ui/calendar';
-import { Loader2, PackagePlus, PlusCircle, Trash2, Send, CalendarIcon, Check, ChevronsUpDown, ImageOff, Settings } from 'lucide-react';
+import { Loader2, PackagePlus, PlusCircle, Trash2, Send, CalendarIcon, Check, ChevronsUpDown, ImageOff, Settings, UploadCloud } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
 const formatPrice = (price?: number) => {
     if (price === undefined || price === null) return 'N/A';
@@ -60,15 +63,17 @@ export default function BulkOrderRequestPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
   const [appUser, setAppUser] = useState<AppUser | null>(null);
+  const [uploadStates, setUploadStates] = useState<Record<string, { progress: number; error?: string; uploading: boolean; url?: string }>>({});
+
 
   const form = useForm<BulkOrderRequestFormValues>({
     resolver: zodResolver(bulkOrderRequestSchema),
     defaultValues: {
-      requesterName: user?.displayName || "",
-      requesterEmail: user?.email || "",
+      requesterName: "",
+      requesterEmail: "",
       requesterPhone: "",
       companyName: "",
-      items: [{ productId: "", quantity: 1, notes: "" }],
+      items: [{ productId: "", quantity: 1, notes: "", customizations: {} }],
     },
   });
 
@@ -94,8 +99,9 @@ export default function BulkOrderRequestPage() {
     if (docSnap.exists()) {
       const userData = docSnap.data() as AppUser;
       setAppUser(userData);
-      // Pre-fill form if not already filled
       if (!form.getValues('requesterPhone') && userData.phone) form.setValue('requesterPhone', userData.phone);
+      if (!form.getValues('requesterName')) form.setValue('requesterName', userData.displayName || '');
+      if (!form.getValues('requesterEmail')) form.setValue('requesterEmail', userData.email || '');
     }
   }, [user, form]);
 
@@ -133,6 +139,37 @@ export default function BulkOrderRequestPage() {
     fetchProductsAndOptions();
     fetchUserData();
   }, [fetchProductsAndOptions, fetchUserData]);
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>, itemIndex: number, optionId: string) => {
+    if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+      toast({ title: "Upload Error", description: "Cloudinary environment variables not configured.", variant: "destructive" });
+      return;
+    }
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const uploadKey = `${itemIndex}-${optionId}`;
+    setUploadStates(prev => ({ ...prev, [uploadKey]: { progress: 0, error: undefined, uploading: true }}));
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+    try {
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+        method: 'POST', body: formData,
+      });
+      if (!response.ok) throw new Error((await response.json()).error?.message || 'Upload failed');
+      
+      const data = await response.json();
+      form.setValue(`items.${itemIndex}.customizations.${optionId}`, data.secure_url);
+      setUploadStates(prev => ({ ...prev, [uploadKey]: { progress: 100, error: undefined, uploading: false, url: data.secure_url }}));
+      toast({ title: "Image Uploaded", description: "Image added to your item."});
+    } catch (err: any) {
+      setUploadStates(prev => ({ ...prev, [uploadKey]: { progress: 0, error: err.message, uploading: false }}));
+      toast({ title: "Upload Failed", description: err.message, variant: "destructive"});
+    }
+  };
   
   const onSubmit = async (values: BulkOrderRequestFormValues) => {
     if (!db || !user) return;
@@ -212,58 +249,40 @@ export default function BulkOrderRequestPage() {
                     return (
                         <div key={field.id} className="p-4 border rounded-lg space-y-3 relative bg-muted/50">
                             <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-7 w-7" onClick={() => remove(index)}><Trash2 className="h-4 w-4"/></Button>
-                            <FormField
-                                control={form.control}
-                                name={`items.${index}.productId`}
-                                render={({ field }) => (
-                                <FormItem className="flex flex-col">
-                                    <FormLabel>Product</FormLabel>
-                                    <Popover open={openPopoverIndex === index} onOpenChange={(open) => setOpenPopoverIndex(open ? index : null)}>
-                                    <PopoverTrigger asChild>
-                                        <FormControl>
-                                        <Button
-                                            variant="outline"
-                                            role="combobox"
-                                            className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
-                                            disabled={isLoadingProducts}
-                                        >
-                                            {field.value ? products.find((p) => p.id === field.value)?.name : (isLoadingProducts ? "Loading..." : "Select product")}
-                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                        </FormControl>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                        <Command>
-                                        <CommandInput placeholder="Search product..." />
-                                        <CommandList>
-                                            <CommandEmpty>No product found.</CommandEmpty>
-                                            <CommandGroup>
-                                            {products.map((p) => (
-                                                <CommandItem
-                                                    value={p.name}
-                                                    key={p.id}
-                                                    onSelect={() => {
-                                                        form.setValue(`items.${index}.productId`, p.id);
-                                                        setOpenPopoverIndex(null);
-                                                    }}
-                                                    className="flex items-center gap-2"
-                                                >
-                                                    <div className="relative w-8 h-8 rounded-sm bg-accent overflow-hidden flex-shrink-0">
-                                                        {p.imageUrl ? <Image src={p.imageUrl} alt={p.name} layout="fill" objectFit="cover" data-ai-hint="product"/> : <ImageOff className="h-4 w-4 text-muted-foreground"/>}
-                                                    </div>
-                                                    <span className="flex-grow truncate">{p.name}</span>
-                                                    <Check className={cn("mr-2 h-4 w-4", p.id === field.value ? "opacity-100" : "opacity-0")} />
-                                                </CommandItem>
+                            <div className="flex gap-4 items-start">
+                                <div className="relative w-24 h-24 bg-accent rounded-md overflow-hidden flex-shrink-0">
+                                    {selectedProduct?.imageUrl ? <Image src={selectedProduct.imageUrl} alt={selectedProduct.name} layout="fill" objectFit="cover" data-ai-hint="product"/> : <div className="w-full h-full flex items-center justify-center"><ImageOff className="h-8 w-8 text-muted-foreground"/></div>}
+                                </div>
+                                <div className="flex-grow">
+                                <FormField
+                                    control={form.control}
+                                    name={`items.${index}.productId`}
+                                    render={({ field }) => (
+                                    <FormItem className="flex flex-col">
+                                        <FormLabel>Product</FormLabel>
+                                        <Popover open={openPopoverIndex === index} onOpenChange={(open) => setOpenPopoverIndex(open ? index : null)}>
+                                        <PopoverTrigger asChild>
+                                            <FormControl>
+                                            <Button variant="outline" role="combobox" className={cn("w-full justify-between", !field.value && "text-muted-foreground")} disabled={isLoadingProducts}>
+                                                {field.value ? products.find((p) => p.id === field.value)?.name : (isLoadingProducts ? "Loading..." : "Select product")}
+                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                            </FormControl>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Search product..." /><CommandList><CommandEmpty>No product found.</CommandEmpty><CommandGroup>
+                                            {products.map((p) => (<CommandItem value={p.name} key={p.id} onSelect={() => { form.setValue(`items.${index}.productId`, p.id); setOpenPopoverIndex(null);}} className="flex items-center gap-2">
+                                                <div className="relative w-8 h-8 rounded-sm bg-accent overflow-hidden flex-shrink-0">
+                                                    {p.imageUrl ? <Image src={p.imageUrl} alt={p.name} layout="fill" objectFit="cover" data-ai-hint="product"/> : <ImageOff className="h-4 w-4 text-muted-foreground"/>}
+                                                </div>
+                                                <span className="flex-grow truncate">{p.name}</span><Check className={cn("mr-2 h-4 w-4", p.id === field.value ? "opacity-100" : "opacity-0")} /></CommandItem>
                                             ))}
-                                            </CommandGroup>
-                                        </CommandList>
-                                        </Command>
-                                    </PopoverContent>
-                                    </Popover>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
+                                        </CommandGroup></CommandList></Command></PopoverContent>
+                                        </Popover><FormMessage />
+                                    </FormItem>
+                                    )}
+                                />
+                                </div>
+                            </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" {...field} min="1"/></FormControl><FormMessage/></FormItem>)}/>
                                 <div><FormLabel>Total Price</FormLabel><Input value={formatPrice(rowTotal)} disabled /></div>
@@ -273,22 +292,33 @@ export default function BulkOrderRequestPage() {
                             {optionsForProduct && optionsForProduct.length > 0 && (
                                 <div className="pt-2 border-t mt-3 space-y-3">
                                 <h4 className="text-sm font-medium flex items-center gap-1"><Settings className="h-4 w-4"/> Customizations</h4>
-                                {optionsForProduct.map(option => (
+                                {optionsForProduct.map(option => {
+                                    const uploadKey = `${index}-${option.id}`;
+                                    const currentUploadState = uploadStates[uploadKey];
+                                    return(
                                     <FormField
-                                    key={option.id}
-                                    control={form.control}
-                                    name={`items.${index}.customizations.${option.id}`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-xs">{option.label}</FormLabel>
-                                            {option.type === 'text' && <FormControl><Input {...field} placeholder={option.placeholder || ''} /></FormControl>}
-                                            {option.type === 'checkbox' && <div className="flex items-center gap-2"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="text-xs font-normal">{option.checkboxLabel}</FormLabel></div>}
-                                            {option.type === 'dropdown' && <Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder={`Select ${option.label.toLowerCase()}`} /></SelectTrigger></FormControl><SelectContent>{option.choices?.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent></Select>}
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
+                                        key={option.id}
+                                        control={form.control}
+                                        name={`items.${index}.customizations.${option.id}`}
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-xs">{option.label}</FormLabel>
+                                                {option.type === 'text' && <FormControl><Input {...field} placeholder={option.placeholder || ''} /></FormControl>}
+                                                {option.type === 'checkbox' && <div className="flex items-center gap-2"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="text-xs font-normal">{option.checkboxLabel}</FormLabel></div>}
+                                                {option.type === 'dropdown' && <Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder={`Select ${option.label.toLowerCase()}`} /></SelectTrigger></FormControl><SelectContent>{option.choices?.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent></Select>}
+                                                {option.type === 'image_upload' && (
+                                                    <div className="space-y-2">
+                                                        <Input id={uploadKey} type="file" onChange={(e) => handleImageUpload(e, index, option.id)} disabled={currentUploadState?.uploading} className="text-xs"/>
+                                                        {currentUploadState?.uploading && <div className="flex items-center text-xs text-muted-foreground gap-1"><Loader2 className="h-3 w-3 animate-spin"/> Uploading...</div>}
+                                                        {currentUploadState?.error && <p className="text-xs text-destructive">{currentUploadState.error}</p>}
+                                                        {currentUploadState?.url && <a href={currentUploadState.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">View Uploaded Image</a>}
+                                                    </div>
+                                                )}
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
                                     />
-                                ))}
+                                )})}
                                 </div>
                             )}
                         </div>
