@@ -66,6 +66,8 @@ export default function BulkOrderRequestPage() {
     defaultValues: {
       requesterName: user?.displayName || "",
       requesterEmail: user?.email || "",
+      requesterPhone: "",
+      companyName: "",
       items: [{ productId: "", quantity: 1, notes: "" }],
     },
   });
@@ -90,9 +92,13 @@ export default function BulkOrderRequestPage() {
     const userDocRef = doc(db, 'users', user.uid);
     const docSnap = await getDoc(userDocRef);
     if (docSnap.exists()) {
-      setAppUser(docSnap.data() as AppUser);
+      const userData = docSnap.data() as AppUser;
+      setAppUser(userData);
+      // Pre-fill form if not already filled
+      if (!form.getValues('requesterPhone') && userData.phone) form.setValue('requesterPhone', userData.phone);
     }
-  }, [user]);
+  }, [user, form]);
+
 
   const fetchProductsAndOptions = useCallback(async () => {
     if (!db) return;
