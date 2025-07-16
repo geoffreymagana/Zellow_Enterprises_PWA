@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import type { Order, OrderStatus } from "@/types";
-import { Eye, RefreshCw, FileText, Loader2, ShoppingCart, PackagePlus, Layers } from "lucide-react";
+import { Eye, RefreshCw, FileText, Loader2, ShoppingCart, PackagePlus, Layers, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
@@ -14,6 +14,7 @@ import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestor
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
+import { Separator } from "@/components/ui/separator";
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -40,6 +41,7 @@ const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] 
     case 'pending': return 'statusYellow';
     case 'processing': return 'statusAmber';
     case 'awaiting_assignment': return 'statusOrange';
+    case 'awaiting_customer_confirmation': return 'statusOrange';
     case 'assigned': return 'statusOrderAssigned';
     case 'out_for_delivery': return 'statusBlue';
     case 'shipped': return 'statusIndigo';
@@ -100,6 +102,8 @@ export default function OrdersPage() {
     }
   }, [user, role, authLoading, router, fetchOrders]);
   
+  const bulkOrdersAwaitingConfirmation = orders.filter(o => o.status === 'awaiting_customer_confirmation');
+  const regularOrders = orders.filter(o => o.status !== 'awaiting_customer_confirmation');
 
   if (authLoading || (isLoadingOrders && role === 'Customer')) {
     return (
@@ -115,19 +119,50 @@ export default function OrdersPage() {
 
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-headline font-semibold">My Orders</h1>
         <Button variant="outline" onClick={fetchOrders} disabled={isLoadingOrders}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${isLoadingOrders ? 'animate-spin' : ''}`} /> Refresh Orders
+          <RefreshCw className={`mr-2 h-4 w-4 ${isLoadingOrders ? 'animate-spin' : ''}`} /> Refresh
         </Button>
       </div>
       
-      {orders.length === 0 && !isLoadingOrders ? (
+      {bulkOrdersAwaitingConfirmation.length > 0 && (
+        <div className="space-y-4">
+            <h2 className="text-xl font-headline font-semibold flex items-center gap-2"><AlertCircle className="text-amber-500" />Action Required</h2>
+             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {bulkOrdersAwaitingConfirmation.map((order) => (
+                    <Card key={order.id} className="flex flex-col border-primary ring-2 ring-primary/50 shadow-lg">
+                        <CardHeader>
+                            <div className="flex justify-between items-start">
+                                <CardTitle className="font-headline text-lg">Bulk Order Awaiting Confirmation</CardTitle>
+                                <Badge variant={getOrderStatusBadgeVariant(order.status)} className="capitalize text-xs">{order.status.replace(/_/g," ")}</Badge>
+                            </div>
+                            <CardDescription>Request ID: {order.bulkOrderRequestId?.substring(0,8)}...</CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex-grow space-y-2">
+                             <p className="text-sm">Your bulk order request has been approved. Please review and provide shipping and payment details to finalize your order.</p>
+                             <p className="text-sm font-semibold">Total: {formatPrice(order.totalAmount)}</p>
+                        </CardContent>
+                        <CardFooter>
+                           <Link href={`/orders/confirm-bulk/${order.id}`} passHref className="w-full">
+                            <Button className="w-full">
+                                Review & Confirm
+                            </Button>
+                            </Link>
+                        </CardFooter>
+                    </Card>
+                ))}
+            </div>
+            <Separator className="my-8"/>
+        </div>
+      )}
+
+      {regularOrders.length === 0 && !isLoadingOrders ? (
         <Card>
           <CardContent className="pt-10 pb-10 text-center">
             <ShoppingCart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <p className="text-xl font-semibold">You have no orders yet.</p>
+            <p className="text-xl font-semibold">You have no other orders yet.</p>
             <p className="text-muted-foreground mt-2">Ready to find something special?</p>
             <div className="text-center mt-6">
               <Link href="/products" passHref>
@@ -138,7 +173,7 @@ export default function OrdersPage() {
         </Card>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {orders.map((order) => (
+          {regularOrders.map((order) => (
             <Card key={order.id} className="flex flex-col">
               <CardHeader>
                 <div className="flex justify-between items-start">
@@ -168,10 +203,9 @@ export default function OrdersPage() {
           ))}
         </div>
       )}
-      {orders.length > 0 && !isLoadingOrders && (
-        <p className="text-xs text-muted-foreground mt-4">Showing {orders.length} orders.</p>
+      {regularOrders.length > 0 && !isLoadingOrders && (
+        <p className="text-xs text-muted-foreground mt-4">Showing {regularOrders.length} orders.</p>
       )}
     </div>
   );
 }
-

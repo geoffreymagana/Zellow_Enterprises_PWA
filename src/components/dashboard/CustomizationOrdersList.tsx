@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Edit, Filter, Layers } from 'lucide-react';
+import { Loader2, Search, Edit, Filter, Layers, PackagePlus } from 'lucide-react';
 import type { Order, OrderStatus } from '@/types';
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import Link from 'next/link';
@@ -114,8 +114,8 @@ export function CustomizationOrdersList() {
   return (
     <Card>
         <CardHeader>
-            <CardTitle className="font-headline flex items-center gap-2"><Layers /> Orders with Customizations</CardTitle>
-            <CardDescription>View orders that require production tasks like engraving, printing, etc.</CardDescription>
+            <CardTitle className="font-headline flex items-center gap-2"><Layers /> Special & Bulk Orders</CardTitle>
+            <CardDescription>View orders that require production tasks or are bulk requests.</CardDescription>
              <div className="flex flex-col sm:flex-row gap-4 items-center pt-4">
                 <div className="relative w-full sm:max-w-md">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -155,7 +155,7 @@ export function CustomizationOrdersList() {
           ) : filteredOrders.length === 0 ? (
             <div className="p-10 text-center">
               <p className="text-muted-foreground">
-                {orders.length === 0 ? "No orders with customizations found." : "No orders match your current filters."}
+                {orders.length === 0 ? "No special orders found." : "No orders match your current filters."}
               </p>
             </div>
           ) : (
@@ -164,6 +164,7 @@ export function CustomizationOrdersList() {
                 <TableRow>
                   <TableHead>Order ID</TableHead>
                   <TableHead>Customer</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Total</TableHead>
@@ -177,6 +178,16 @@ export function CustomizationOrdersList() {
                     <TableCell>
                       <div className="font-medium">{order.customerName || "N/A"}</div>
                       <div className="text-xs text-muted-foreground">{order.customerEmail || "N/A"}</div>
+                    </TableCell>
+                    <TableCell>
+                        <div className="flex flex-col gap-1">
+                          {order.items.some(item => item.customizations && Object.keys(item.customizations).length > 0) && (
+                              <Badge variant="outline" className="text-xs w-fit"><Layers className="mr-1 h-3 w-3"/> Custom</Badge>
+                          )}
+                          {order.isBulkOrder && (
+                              <Badge variant="outline" className="text-xs w-fit"><PackagePlus className="mr-1 h-3 w-3"/> Bulk</Badge>
+                          )}
+                        </div>
                     </TableCell>
                     <TableCell>{formatDate(order.createdAt)}</TableCell>
                     <TableCell>
@@ -198,8 +209,7 @@ export function CustomizationOrdersList() {
             </Table>
           )}
         </CardContent>
-        {filteredOrders.length > 0 && <CardFooter className="pt-4"><p className="text-xs text-muted-foreground">Showing {filteredOrders.length} of {orders.length} customization orders.</p></CardFooter>}
+        {filteredOrders.length > 0 && <CardFooter className="pt-4"><p className="text-xs text-muted-foreground">Showing {filteredOrders.length} of {orders.length} special orders.</p></CardFooter>}
     </Card>
   );
 }
-

@@ -112,7 +112,7 @@ export default function AdminBulkOrdersPage() {
             price: product.price,
             quantity: item.quantity,
             imageUrl: product.imageUrl || null,
-            customizations: null, // Bulk orders might not have customizations at this stage
+            customizations: null, 
           };
         });
 
@@ -124,23 +124,23 @@ export default function AdminBulkOrdersPage() {
           customerEmail: viewingRequest.requesterEmail,
           customerPhone: viewingRequest.requesterPhone,
           items: orderItems,
-          totalAmount: subTotal, // Assuming no shipping/tax yet for bulk order
+          totalAmount: subTotal, 
           subTotal,
           shippingCost: 0,
-          status: 'processing', // Start in processing
+          status: 'awaiting_customer_confirmation', // New status
           paymentStatus: 'pending',
           isBulkOrder: true,
           bulkOrderRequestId: viewingRequest.id,
-          shippingAddress: { // A placeholder or require this in the form
+          // Shipping address will be added by the customer
+          shippingAddress: {
             fullName: viewingRequest.requesterName,
-            addressLine1: viewingRequest.companyName || 'To be confirmed',
-            city: 'N/A',
-            county: 'N/A',
+            addressLine1: '',
+            city: '',
+            county: '',
             phone: viewingRequest.requesterPhone,
             email: viewingRequest.requesterEmail,
           },
-          // IMPORTANT FIX: Use Timestamp.now() instead of serverTimestamp() inside an array
-          deliveryHistory: [{ status: 'pending', timestamp: Timestamp.now(), notes: 'Bulk order request approved and created.' }],
+          deliveryHistory: [{ status: 'pending_review', timestamp: Timestamp.now(), notes: 'Bulk order request approved by manager.' }],
         };
         batch.set(newOrderRef, { ...newOrder, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
         batch.update(requestRef, { status: newStatus, adminNotes, updatedAt: serverTimestamp(), convertedOrderId: newOrderRef.id });
@@ -249,4 +249,3 @@ export default function AdminBulkOrdersPage() {
     </div>
   );
 }
-
