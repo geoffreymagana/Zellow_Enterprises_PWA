@@ -45,7 +45,7 @@ const formatPrice = (price: number): string => {
 };
 
 const predefinedTaskTypes = ["Engraving", "Printing", "Assembly", "Quality Check", "Packaging"];
-const allOrderStatuses: OrderStatus[] = ['pending', 'processing', 'awaiting_assignment', 'assigned', 'out_for_delivery', 'shipped', 'delivered', 'delivery_attempted', 'cancelled'];
+const allOrderStatuses: OrderStatus[] = ['pending', 'pending_finance_approval', 'processing', 'awaiting_assignment', 'assigned', 'out_for_delivery', 'shipped', 'delivered', 'delivery_attempted', 'cancelled'];
 
 const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] => {
   switch (status) {
@@ -663,3 +663,5 @@ export default function AdminOrderDetailPage() {
     </div>
   );
 }
+
+    
