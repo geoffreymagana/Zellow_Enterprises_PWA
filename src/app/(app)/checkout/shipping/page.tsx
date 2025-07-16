@@ -16,7 +16,7 @@ import * as z from "zod";
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import type { ShippingAddress, ShippingRegion, User as AppUser } from '@/types';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Gift } from 'lucide-react';
