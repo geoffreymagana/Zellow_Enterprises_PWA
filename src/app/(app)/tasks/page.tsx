@@ -6,11 +6,11 @@ import { Badge, BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
-import type { Task, Order, OrderItem as OrderItemType, Product, ProductCustomizationOption, CustomizationGroupDefinition, User as AppUser, UserRole } from "@/types";
+import type { Task, Order, OrderItem as OrderItemType, Product, ProductCustomizationOption, CustomizationGroupDefinition, User as AppUser, UserRole, DeliveryHistoryEntry } from "@/types";
 import { Filter, Loader2, Wrench, CheckCircle, AlertTriangle, Eye, Image as ImageIconPlaceholder, Palette, UserCog, Upload, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, getDoc, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, getDoc, orderBy, getDocs, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
@@ -154,17 +154,38 @@ export default function TasksPage() {
   }, [authLoading, user, role, router, fetchTasks]);
   
   const handleStatusChange = async (taskId: string, newStatus: Task['status']) => {
-    if (!db) return;
+    if (!db || !selectedTask) return;
     try {
-      const taskRef = doc(db, 'tasks', taskId);
-      await updateDoc(taskRef, { status: newStatus, updatedAt: serverTimestamp() });
-      toast({ title: "Task Updated", description: `Task status changed to ${newStatus.replace('_', ' ')}.` });
-      if (selectedTask && selectedTask.id === taskId) {
-        setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null);
-      }
+        const taskRef = doc(db, 'tasks', taskId);
+        const orderRef = doc(db, 'orders', selectedTask.orderId!);
+
+        const historyNotes: Record<string, string> = {
+            'in-progress': `Task '${selectedTask.taskType}' for item '${selectedTask.itemName}' has started.`,
+            'completed': `Task '${selectedTask.taskType}' for item '${selectedTask.itemName}' was approved.`,
+        };
+
+        const newHistoryEntry: DeliveryHistoryEntry = {
+            status: 'processing', // Keep the order status as 'processing'
+            timestamp: serverTimestamp(),
+            notes: historyNotes[newStatus] || `Task status updated to ${newStatus}.`,
+            actorId: user?.uid,
+        };
+
+        await updateDoc(taskRef, { status: newStatus, updatedAt: serverTimestamp() });
+        // Only add to history for certain status changes to avoid clutter
+        if (historyNotes[newStatus]) {
+            await updateDoc(orderRef, {
+                deliveryHistory: arrayUnion(newHistoryEntry)
+            });
+        }
+
+        toast({ title: "Task Updated", description: `Task status changed to ${newStatus.replace('_', ' ')}.` });
+        if (selectedTask && selectedTask.id === taskId) {
+            setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null);
+        }
     } catch (error) {
-      console.error("Error updating task status: ", error);
-      toast({ title: "Error", description: "Could not update task status.", variant: "destructive" });
+        console.error("Error updating task status: ", error);
+        toast({ title: "Error", description: "Could not update task status.", variant: "destructive" });
     }
   };
 
@@ -284,10 +305,22 @@ export default function TasksPage() {
     }
     try {
       const taskRef = doc(db, 'tasks', selectedTask.id);
+      const orderRef = doc(db, 'orders', selectedTask.orderId!);
+      
+      const historyEntry: DeliveryHistoryEntry = {
+        status: 'processing',
+        timestamp: serverTimestamp(),
+        notes: `Task '${selectedTask.taskType}' for item '${selectedTask.itemName}' is complete and awaits quality check.`,
+        actorId: user?.uid
+      };
+
       await updateDoc(taskRef, {
         status: 'needs_approval',
         proofOfWorkUrl: uploadState.url,
         updatedAt: serverTimestamp(),
+      });
+      await updateDoc(orderRef, {
+          deliveryHistory: arrayUnion(historyEntry)
       });
       toast({ title: "Submitted", description: "Task submitted for approval." });
       setIsModalOpen(false);
@@ -462,4 +495,5 @@ export default function TasksPage() {
     </>
   );
 }
+
 
