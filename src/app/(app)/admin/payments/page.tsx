@@ -204,8 +204,10 @@ export default function AdminPaymentsPage() {
         break;
       case 'refund':
         newPaymentStatus = 'refunded';
+        newOrderStatus = 'cancelled';
         historyNotes = `Payment refunded by ${user.displayName || user.email}. Reason: ${actionReason}`;
         updatePayload.paymentStatus = newPaymentStatus;
+        updatePayload.status = newOrderStatus;
         break;
     }
 
