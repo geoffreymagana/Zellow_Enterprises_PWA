@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,104 +7,429 @@
     <title>Track Your Zellow Gift</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-    <!-- IMPORTANT: The path is relative to the page URL, not the file system -->
-    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #34A7C1;
+            --background: #F0F8FA;
+            --card-background: #FFFFFF;
+            --text-primary: #1E293B;
+            --text-secondary: #64748B;
+            --border-color: #E2E8F0;
+            --success-color: #10B981;
+            --font-headline: 'Poppins', sans-serif;
+            --font-body: 'Inter', sans-serif;
+        }
+        body {
+            font-family: var(--font-body);
+            background-color: var(--background);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 2rem 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            margin: auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .header h1 {
+            font-family: var(--font-headline);
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .card {
+            background-color: var(--card-background);
+            border-radius: 0.75rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05);
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+        }
+        .card-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .card-content {
+            padding: 1.5rem;
+        }
+        .card-title {
+            font-family: var(--font-headline);
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .status-card {
+            text-align: center;
+        }
+        .status-card .icon {
+            margin: 0 auto 0.5rem;
+            color: var(--primary);
+            width: 3.5rem;
+            height: 3.5rem;
+        }
+        .status-text {
+            font-family: var(--font-headline);
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0;
+            text-transform: capitalize;
+        }
+        .timeline {
+            position: relative;
+            list-style-type: none;
+            padding-left: 1.5rem;
+        }
+        .timeline:before {
+            content: '';
+            position: absolute;
+            left: 0.375rem;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: var(--border-color);
+        }
+        .timeline-item {
+            position: relative;
+            padding-bottom: 1.5rem;
+        }
+        .timeline-item:last-child {
+            padding-bottom: 0;
+        }
+        .timeline-item .dot {
+            position: absolute;
+            left: -0.25rem; /* calc( -(dot-width/2) + (line-width/2) ) */
+            top: 0.25rem;
+            height: 0.75rem;
+            width: 0.75rem;
+            border-radius: 50%;
+            background-color: var(--primary);
+            border: 2px solid var(--background);
+        }
+        .timeline-item .content p {
+            font-weight: 500;
+            margin: 0;
+            font-size: 0.9rem;
+        }
+        .timeline-item .content .time {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        .gift-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .gift-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+        .gift-item img {
+            width: 56px;
+            height: 56px;
+            border-radius: 0.5rem;
+            object-fit: cover;
+            background-color: #f1f5f9;
+        }
+        .gift-item-details p {
+            margin: 0;
+            font-weight: 600;
+        }
+        .gift-item-details .qty {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        .message-box {
+            background-color: #f1f5f9;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-style: italic;
+        }
+        .loader, .error-message {
+            text-align: center;
+            padding: 3rem 1rem;
+        }
+        .loader p {
+            margin-top: 1rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+        footer {
+            margin-top: auto;
+            padding-top: 2rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
-    <div id="app-container">
-        <!-- Header -->
-        <header id="app-header">
-            <div class="logo">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="aperture-icon"><circle cx="12" cy="12" r="10"></circle><line x1="14.31" y1="8" x2="20.05" y2="17.94"></line><line x1="9.69" y1="8" x2="21.17" y2="8"></line><line x1="7.38" y1="12" x2="13.12" y2="2.06"></line><line x1="9.69" y1="16" x2="3.95" y2="6.06"></line><line x1="14.31" y1="16" x2="2.83" y2="16"></line><line x1="16.62" y1="12" x2="10.88" y2="21.94"></line></svg>
-                <h1>Zellow Enterprises</h1>
-            </div>
+    <div class="container">
+        <header class="header">
+            <h1>
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+                Zellow Enterprises
+            </h1>
         </header>
 
-        <main id="app-main">
-            <!-- Loading State -->
-            <div id="loading-state" class="state-card">
-                <div class="spinner"></div>
-                <h2>Loading your gift details...</h2>
+        <main id="tracking-content" style="display: none;">
+            <!-- Status Card -->
+            <div class="card status-card">
+                <div class="card-content">
+                    <div id="status-icon-container"></div>
+                    <p class="text-secondary" id="status-date">As of: ...</p>
+                    <p class="status-text" id="status-text">Loading...</p>
+                </div>
             </div>
 
-            <!-- Error State -->
-            <div id="error-state" class="state-card" style="display: none;">
-                <div class="icon-wrapper error-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" x2="12" y1="9" y2="13"></line><line x1="12" x2="12.01" y1="17" y2="17"></line></svg>
-                </div>
-                <h2>Tracking Error</h2>
-                <p id="error-message">Could not find tracking details. Please check the link or contact the sender.</p>
-            </div>
-
-            <!-- Success State -->
-            <div id="success-state" style="display: none;">
-                <div class="intro-card">
-                    <h1>A Special Gift For You!</h1>
-                    <p>From: <strong id="sender-name">A friend</strong></p>
-                </div>
-
-                <div class="status-card">
-                    <div class="icon-wrapper status-icon">
-                        <svg id="status-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16.5V8.28a1 1 0 0 0-1.7-.7l-2.6 2.6a1 1 0 0 0 0 1.4l2.6 2.6a1 1 0 0 0 1.7-.7Z"/><path d="M10.4 3.6a1 1 0 0 0-1.8.8l.6 6.8a1 1 0 0 0 1 .8l6.8.6a1 1 0 0 0 .8-1.8Z"/><path d="M2.2 12a10 10 0 1 0 19.6 0 10 10 0 1 0-19.6 0Z"/></svg>
+            <!-- Shipping & ETA Card -->
+            <div class="card">
+                <div class="card-header"><h2 class="card-title">Delivery Details</h2></div>
+                <div class="card-content space-y-4">
+                    <div>
+                        <h3 class="font-semibold text-sm">Estimated Delivery:</h3>
+                        <p class="text-md" id="estimated-delivery">Calculating...</p>
                     </div>
-                    <h2>Current Status:</h2>
-                    <p id="order-status" class="status-text">Processing</p>
-                    <p id="status-note" class="status-note">Your gift is being prepared.</p>
-                </div>
-                
-                <div class="details-card">
-                    <h3>Gift Items</h3>
-                    <ul id="gift-items-list">
-                        <!-- Items will be injected here -->
-                    </ul>
-                </div>
-
-                <div class="details-card">
-                    <h3>Delivery Information</h3>
-                    <div class="info-grid">
-                        <p><strong>Order ID:</strong> <span id="order-id"></span></p>
-                        <p><strong>Shipping To:</strong></p>
-                        <address id="shipping-address">
-                            <!-- Address will be injected here -->
+                    <div>
+                        <h3 class="font-semibold text-sm">Shipping To:</h3>
+                        <address class="not-italic text-sm text-secondary" id="shipping-address">
+                           Loading address...
                         </address>
-                        <p><strong>Estimated Delivery:</strong> <span id="delivery-estimate"></span></p>
                     </div>
                 </div>
+            </div>
 
-                 <div class="history-card">
-                    <h3>Tracking History</h3>
-                    <ul id="tracking-history" class="timeline">
-                        <!-- History will be injected here -->
-                    </ul>
+            <!-- Gift Message Card -->
+            <div id="gift-message-card" class="card" style="display: none;">
+                 <div class="card-header"><h2 class="card-title">A Message For You</h2></div>
+                 <div class="card-content">
+                    <p class="message-box" id="gift-message"></p>
+                 </div>
+            </div>
+
+            <!-- Items Card -->
+            <div class="card">
+                <div class="card-header"><h2 class="card-title">Your Gift Includes</h2></div>
+                <div class="card-content p-0">
+                    <div id="gift-items-container" class="px-6"></div>
+                </div>
+            </div>
+
+             <!-- History Card -->
+            <div class="card">
+                <div class="card-header"><h2 class="card-title">Tracking History</h2></div>
+                <div class="card-content">
+                    <ul class="timeline" id="tracking-history"></ul>
                 </div>
             </div>
         </main>
+
+        <div id="loader" class="loader">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 2s linear infinite; color: var(--primary); margin: auto;">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+            </svg>
+            <p>Loading your gift details...</p>
+        </div>
+
+        <div id="error-message" class="error-message card" style="display: none;">
+            <div class="card-content">
+                <h2 class="card-title" style="color: #ef4444;">⚠️ Tracking Error</h2>
+                <p class="text-secondary" id="error-text">Could not find tracking details for this gift. Please check the link or contact the sender.</p>
+            </div>
+        </div>
         
-        <footer id="app-footer">
-            <p>&copy; 2025 Zellow Enterprises. All rights reserved.</p>
+        <footer>
+            © Zellow Enterprises. All rights reserved.
         </footer>
     </div>
 
-    <!-- Firebase SDKs -->
+    <!-- Firebase SDK -->
     <script type="module">
-        // IMPORTANT: Replace these with your actual Firebase project configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyDzUlYdqqdkTxcHJHChsX6zM-U_7N92xec",
-            authDomain: "zellowlive.firebaseapp.com",
-            projectId: "zellowlive",
-            storageBucket: "zellowlive.appspot.com",
-            messagingSenderId: "943761891650",
-            appId: "1:943761891650:web:e8c12f77ea9d5edf0b68db",
-            measurementId: "G-46MZ5BWTGD"
-        };
-        
-        // Pass the config to the main script
-        window.firebaseConfig = firebaseConfig;
-    </script>
-    
-    <!-- IMPORTANT: The path is relative to the page URL, not the file system -->
-    <script type="module" src="script.js"></script>
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+      import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+      // IMPORTANT: Replace with your actual Firebase config
+      const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_AUTH_DOMAIN",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_STORAGE_BUCKET",
+        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+        appId: "YOUR_APP_ID",
+      };
+
+      // UI Elements
+      const loader = document.getElementById('loader');
+      const trackingContent = document.getElementById('tracking-content');
+      const errorMessage = document.getElementById('error-message');
+      const errorText = document.getElementById('error-text');
+
+      // Functions to update UI
+      function setStatus(status, date) {
+          const statusTextEl = document.getElementById('status-text');
+          const statusDateEl = document.getElementById('status-date');
+          const statusIconContainer = document.getElementById('status-icon-container');
+
+          statusTextEl.textContent = status.replace(/_/g, ' ');
+          statusDateEl.textContent = `As of: ${formatDate(date, true)}`;
+
+          let iconHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`; // Default: Truck/Delivery
+          if (status === 'delivered') {
+              iconHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon" style="color: var(--success-color);"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
+          }
+          statusIconContainer.innerHTML = iconHtml;
+      }
+      
+      function setEstimatedDelivery(duration) {
+          document.getElementById('estimated-delivery').textContent = duration || '1-3 Business Days';
+      }
+
+      function setShippingAddress(address) {
+          const addrEl = document.getElementById('shipping-address');
+          if (address) {
+              addrEl.innerHTML = `${address.fullName}<br>${address.addressLine1}<br>${address.city}, ${address.county}`;
+          } else {
+              addrEl.textContent = 'Address not provided.';
+          }
+      }
+
+      function setGiftMessage(message) {
+          const card = document.getElementById('gift-message-card');
+          if (message) {
+              document.getElementById('gift-message').textContent = message;
+              card.style.display = 'block';
+          }
+      }
+
+      function renderGiftItems(items, showPrices) {
+          const container = document.getElementById('gift-items-container');
+          container.innerHTML = ''; // Clear previous items
+          if (!items || items.length === 0) {
+              container.innerHTML = '<p class="text-sm text-secondary p-4">No items listed for this gift.</p>';
+              return;
+          }
+          items.forEach(item => {
+              const itemEl = document.createElement('div');
+              itemEl.className = 'gift-item';
+              itemEl.innerHTML = `
+                  <img src="${item.imageUrl || 'https://placehold.co/64x64.png'}" alt="${item.name}">
+                  <div class="gift-item-details">
+                      <p>${item.name}</p>
+                      <span class="qty">Quantity: ${item.quantity}</span>
+                  </div>
+              `;
+              container.appendChild(itemEl);
+          });
+      }
+
+      function renderTrackingHistory(history) {
+          const container = document.getElementById('tracking-history');
+          container.innerHTML = '';
+          if (!history || history.length === 0) {
+              container.innerHTML = '<p class="text-sm text-secondary">No tracking history available yet.</p>';
+              return;
+          }
+          history.slice().reverse().forEach(entry => {
+              const itemEl = document.createElement('li');
+              itemEl.className = 'timeline-item';
+              itemEl.innerHTML = `
+                  <div class="dot"></div>
+                  <div class="content">
+                      <p class="capitalize">${entry.status.replace(/_/g, ' ')}</p>
+                      <p class="time">${formatDate(entry.timestamp, true)}</p>
+                  </div>
+              `;
+              container.appendChild(itemEl);
+          });
+      }
+      
+      function showError(message) {
+          if (errorText) errorText.textContent = message;
+          if (loader) loader.style.display = 'none';
+          if (trackingContent) trackingContent.style.display = 'none';
+          if (errorMessage) errorMessage.style.display = 'block';
+      }
+
+      function formatDate(timestamp, includeTime = false) {
+          if (!timestamp) return 'N/A';
+          const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+          if (isNaN(date.getTime())) return 'Invalid Date';
+          
+          const options = {
+              year: 'numeric', month: 'long', day: 'numeric',
+              hour: includeTime ? 'numeric' : undefined,
+              minute: includeTime ? 'numeric' : undefined,
+          };
+          return new Intl.DateTimeFormat('en-US', options).format(date);
+      }
+
+      async function main() {
+        try {
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+
+            const params = new URLSearchParams(window.location.search);
+            const token = params.get('token');
+
+            if (!token) {
+                throw new Error("No tracking token found in URL. Please check the link.");
+            }
+
+            const orderRef = doc(db, 'orders', token);
+            const orderDoc = await getDoc(orderRef);
+
+            if (!orderDoc.exists() || !orderDoc.data().isGift) {
+                throw new Error("This gift tracking link is invalid or the order is not marked as a gift.");
+            }
+            
+            const orderData = orderDoc.data();
+
+            if (!orderData.giftDetails.recipientCanViewAndTrack) {
+                throw new Error("The sender has restricted access to detailed tracking for this gift.");
+            }
+
+            // Populate UI
+            const latestHistory = orderData.deliveryHistory && orderData.deliveryHistory.length > 0 
+                ? orderData.deliveryHistory[orderData.deliveryHistory.length - 1]
+                : { status: orderData.status, timestamp: orderData.updatedAt };
+
+            setStatus(latestHistory.status, latestHistory.timestamp);
+            setEstimatedDelivery(orderData.shippingMethodName);
+            setShippingAddress(orderData.shippingAddress);
+            if (orderData.giftDetails.giftMessage) {
+                setGiftMessage(orderData.giftDetails.giftMessage);
+            }
+            renderGiftItems(orderData.items, orderData.giftDetails.showPricesToRecipient);
+            renderTrackingHistory(orderData.deliveryHistory);
+
+            loader.style.display = 'none';
+            trackingContent.style.display = 'block';
+
+        } catch (error) {
+            console.error("Tracking Page Error:", error);
+            showError(error.message || "An unknown error occurred.");
+        }
+      }
+
+      main();
+    </script>
 </body>
 </html>
