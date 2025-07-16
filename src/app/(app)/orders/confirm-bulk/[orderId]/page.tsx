@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter, useParams } from 'next/navigation';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, ShippingAddress, ShippingMethod, ShippingRate, DeliveryHistoryEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -169,7 +169,7 @@ export default function ConfirmBulkOrderPage() {
         };
         const historyEntry: DeliveryHistoryEntry = {
             status: 'processing',
-            timestamp: serverTimestamp(),
+            timestamp: Timestamp.now(), // Use client-side timestamp
             notes: 'Customer confirmed details and placed order.',
             actorId: user.uid,
         };
