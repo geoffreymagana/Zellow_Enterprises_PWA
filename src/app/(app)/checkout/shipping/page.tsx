@@ -19,7 +19,7 @@ import type { ShippingAddress, ShippingRegion, User as AppUser } from '@/types';
 import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Gift } from 'lucide-react';
+import { Loader2, Gift, Edit } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 const shippingFormSchema = z.object({
@@ -90,6 +90,7 @@ export default function ShippingPage() {
   const [townOptions, setTownOptions] = useState<TownOption[]>([]);
   const [isLoadingRegions, setIsLoadingRegions] = useState(true);
   const [appUser, setAppUser] = useState<AppUser | null>(null);
+  const [isContactInfoEditable, setIsContactInfoEditable] = useState(false);
 
   const form = useForm<ShippingFormValues>({
     resolver: zodResolver(shippingFormSchema),
@@ -278,15 +279,23 @@ export default function ShippingPage() {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <section>
                   <h3 className="text-lg font-medium mb-3">Recipient's Shipping Address</h3>
-                  <FormField control={form.control} name="fullName" render={({ field }) => (
-                    <FormItem className="mb-4"><FormLabel>Full Name</FormLabel><FormControl><Input {...field} placeholder="e.g., Jane Doe" /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="email" render={({ field }) => (
-                    <FormItem className="mb-4"><FormLabel>Email Address</FormLabel><FormControl><Input type="email" {...field} placeholder="you@example.com" /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="phone" render={({ field }) => (
-                    <FormItem className="mb-4"><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" {...field} placeholder="e.g., 0712 345 678" /></FormControl><FormMessage /></FormItem>
-                  )} />
+                  <div className="space-y-4 rounded-md border p-4 bg-muted/20">
+                    <FormField control={form.control} name="fullName" render={({ field }) => (
+                      <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} placeholder="e.g., Jane Doe" readOnly={!isContactInfoEditable} className={!isContactInfoEditable ? 'bg-muted/50 border-dashed' : ''} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="email" render={({ field }) => (
+                      <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" {...field} placeholder="you@example.com" readOnly={!isContactInfoEditable} className={!isContactInfoEditable ? 'bg-muted/50 border-dashed' : ''} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="phone" render={({ field }) => (
+                      <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" {...field} placeholder="e.g., 0712 345 678" readOnly={!isContactInfoEditable} className={!isContactInfoEditable ? 'bg-muted/50 border-dashed' : ''} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                  </div>
+                  <div className="text-right mt-2 mb-4">
+                      <Button type="button" variant="link" className="text-sm h-auto p-0" onClick={() => setIsContactInfoEditable(!isContactInfoEditable)}>
+                          <Edit className="mr-1 h-3 w-3" /> {isContactInfoEditable ? 'Lock Details' : 'Change Details'}
+                      </Button>
+                  </div>
+                  
                   <FormField control={form.control} name="addressLine1" render={({ field }) => (
                     <FormItem className="mb-4"><FormLabel>Address Line 1</FormLabel><FormControl><Input {...field} placeholder="Street address, P.O. box, Estate, House No." /></FormControl><FormMessage /></FormItem>
                   )} />
