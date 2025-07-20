@@ -354,12 +354,18 @@ export default function AdminUsersPage() {
           ) : (
             <Table>
               <TableHeader>
-                <TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Account Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow>
+                <TableRow><TableHead>Name</TableHead><TableHead>User ID</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Account Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow>
               </TableHeader>
               <TableBody>
                 {filteredUsers.map((user) => (
                   <TableRow key={user.uid} className={user.disabled ? "bg-muted/50 opacity-70" : ""}>
-                    <TableCell className={`font-medium ${user.disabled ? 'line-through' : ''}`}>{formatDisplayName(user)}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className={user.disabled ? 'line-through' : ''}>{formatDisplayName(user)}</div>
+                      <div className="text-xs text-muted-foreground">{user.town && user.county ? `${user.town}, ${user.county}` : (user.county || user.town || '')}</div>
+                    </TableCell>
+                    <TableCell>
+                      <code className="text-xs bg-muted p-1 rounded">{user.uid}</code>
+                    </TableCell>
                     <TableCell>{user.email || '-'}</TableCell>
                     <TableCell>{user.role || '-'}</TableCell>
                     <TableCell>

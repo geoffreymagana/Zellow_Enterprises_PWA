@@ -521,6 +521,7 @@ export default function AdminOrderDetailPage() {
             <CardHeader><CardTitle className="font-headline text-lg flex items-center"><User className="mr-2 h-5 w-5"/>Customer & Shipping</CardTitle></CardHeader>
             <CardContent className="space-y-1 text-sm">
               <p><strong>Name:</strong> {order.customerName}</p>
+              <p><strong>UID:</strong> <code className="text-xs bg-muted p-1 rounded">{order.customerId}</code></p>
               <p><strong>Email:</strong> {order.customerEmail}</p>
               <p><strong>Phone:</strong> {order.customerPhone}</p>
               <Separator className="my-2"/>
