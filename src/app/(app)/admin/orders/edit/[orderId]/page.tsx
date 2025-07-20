@@ -136,6 +136,14 @@ export default function AdminOrderDetailPage() {
   const taskForm = useForm<TaskFormValues>({ resolver: zodResolver(taskFormSchema) });
   const statusForm = useForm<OrderStatusFormValues>({ resolver: zodResolver(orderStatusFormSchema) });
 
+  const watchedTaskType = taskForm.watch("taskType");
+
+  const filteredTechnicians = React.useMemo(() => {
+    if (!watchedTaskType) return [];
+    return technicians.filter(tech => tech.role === watchedTaskType);
+  }, [technicians, watchedTaskType]);
+
+
   const formatDate = (timestamp: any, includeTime: boolean = true) => {
     if (!timestamp) return 'N/A';
     const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -583,7 +591,10 @@ export default function AdminOrderDetailPage() {
               <Controller
                 name="taskType" control={taskForm.control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value || undefined}>
+                  <Select onValueChange={(value) => {
+                      field.onChange(value);
+                      taskForm.setValue("assigneeId", ""); // Reset assignee when task type changes
+                  }} value={field.value} defaultValue={field.value || undefined}>
                     <SelectTrigger id="taskType"><SelectValue placeholder="Select task type" /></SelectTrigger>
                     <SelectContent>{predefinedTaskTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
                   </Select>
@@ -629,11 +640,11 @@ export default function AdminOrderDetailPage() {
               <Controller
                 name="assigneeId" control={taskForm.control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value || undefined}>
-                    <SelectTrigger id="assigneeId"><SelectValue placeholder="Select technician" /></SelectTrigger>
+                  <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value || undefined} disabled={!watchedTaskType}>
+                    <SelectTrigger id="assigneeId"><SelectValue placeholder={!watchedTaskType ? "Select task type first" : "Select technician"} /></SelectTrigger>
                     <SelectContent>
-                      {technicians.length === 0 && <SelectItem value="NO_TECHNICIANS_AVAILABLE_SENTINEL" disabled>No technicians found</SelectItem>}
-                      {technicians.map(tech => <SelectItem key={tech.uid} value={tech.uid}>{tech.displayName || tech.email}</SelectItem>)}
+                      {filteredTechnicians.length === 0 ? <SelectItem value="NO_TECHNICIANS_AVAILABLE_SENTINEL" disabled>No technicians for this role</SelectItem>
+                       : filteredTechnicians.map(tech => <SelectItem key={tech.uid} value={tech.uid}>{tech.displayName || tech.email}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 )}

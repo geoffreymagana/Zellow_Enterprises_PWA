@@ -127,6 +127,7 @@ export default function AdminUsersPage() {
     return users.filter(user => {
         const searchLower = searchTerm.toLowerCase();
         const searchMatch = !searchTerm ||
+            (user.uid.toLowerCase().includes(searchLower)) ||
             (user.displayName?.toLowerCase().includes(searchLower)) ||
             (user.email?.toLowerCase().includes(searchLower)) ||
             (user.firstName?.toLowerCase().includes(searchLower)) ||
@@ -316,7 +317,7 @@ export default function AdminUsersPage() {
            <div className="flex flex-col sm:flex-row gap-2 items-center">
               <div className="relative w-full sm:flex-1">
                 <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="Search users (Name, Email)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 h-9" />
+                <Input placeholder="Search users (ID, Name, Email)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 h-9" />
               </div>
               <Select value={roleFilter} onValueChange={setRoleFilter}>
                 <SelectTrigger className="w-full sm:w-[160px] h-9 text-xs sm:text-sm">
