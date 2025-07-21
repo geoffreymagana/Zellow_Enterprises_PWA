@@ -154,7 +154,7 @@ export default function TasksPage() {
   }, [authLoading, user, role, router, fetchTasks]);
   
   const handleStatusChange = async (taskId: string, newStatus: Task['status']) => {
-    if (!db || !selectedTask) return;
+    if (!db || !selectedTask || !user) return;
     try {
         const taskRef = doc(db, 'tasks', taskId);
         const orderRef = doc(db, 'orders', selectedTask.orderId!);
@@ -163,20 +163,46 @@ export default function TasksPage() {
             'in-progress': `Task '${selectedTask.taskType}' for item '${selectedTask.itemName}' has started.`,
             'completed': `Task '${selectedTask.taskType}' for item '${selectedTask.itemName}' was approved.`,
         };
+        
+        const updatePayload: any = { status: newStatus, updatedAt: serverTimestamp() };
+        
+        await updateDoc(taskRef, updatePayload);
 
-        const newHistoryEntry: DeliveryHistoryEntry = {
-            status: 'processing', // Keep the order status as 'processing'
-            timestamp: serverTimestamp(),
-            notes: historyNotes[newStatus] || `Task status updated to ${newStatus}.`,
-            actorId: user?.uid,
-        };
-
-        await updateDoc(taskRef, { status: newStatus, updatedAt: serverTimestamp() });
         // Only add to history for certain status changes to avoid clutter
         if (historyNotes[newStatus]) {
+            const newHistoryEntry: DeliveryHistoryEntry = {
+                status: 'processing', // Keep the order status as 'processing'
+                timestamp: serverTimestamp(),
+                notes: historyNotes[newStatus],
+                actorId: user?.uid,
+            };
             await updateDoc(orderRef, {
                 deliveryHistory: arrayUnion(newHistoryEntry)
             });
+        }
+        
+        // If the task is 'completed', check if all tasks for this order are also complete.
+        if (newStatus === 'completed') {
+            const allTasksForOrderQuery = query(collection(db, 'tasks'), where('orderId', '==', selectedTask.orderId));
+            const allTasksSnapshot = await getDocs(allTasksForOrderQuery);
+            const allTasks = allTasksSnapshot.docs.map(d => d.data() as Task);
+            
+            const allTasksAreComplete = allTasks.every(t => t.status === 'completed');
+
+            if (allTasksAreComplete) {
+                const finalHistoryEntry: DeliveryHistoryEntry = {
+                    status: 'awaiting_assignment',
+                    timestamp: serverTimestamp(),
+                    notes: `All production tasks completed. Order is now ready for dispatch assignment.`,
+                    actorId: "System",
+                };
+                await updateDoc(orderRef, {
+                    status: 'awaiting_assignment',
+                    deliveryHistory: arrayUnion(finalHistoryEntry),
+                    updatedAt: serverTimestamp()
+                });
+                toast({ title: "Order Ready for Dispatch", description: `Order ${selectedTask.orderId.substring(0,8)}... has moved to 'Awaiting Assignment'.` });
+            }
         }
 
         toast({ title: "Task Updated", description: `Task status changed to ${newStatus.replace('_', ' ')}.` });
@@ -299,7 +325,7 @@ export default function TasksPage() {
   };
 
   const handleSubmitForApproval = async () => {
-    if (!db || !selectedTask || !uploadState.url) {
+    if (!db || !selectedTask || !uploadState.url || !user) {
       toast({ title: "Error", description: "No proof image uploaded.", variant: "destructive" });
       return;
     }
@@ -495,5 +521,6 @@ export default function TasksPage() {
     </>
   );
 }
+
 
 
