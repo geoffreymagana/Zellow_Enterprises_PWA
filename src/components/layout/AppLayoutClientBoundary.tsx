@@ -55,11 +55,12 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
 
   useEffect(() => {
     if (!db || !role || !user) return;
+
     const unsubscribers: (() => void)[] = [];
 
     // Pending Payments (for Finance)
     if (role === 'Admin' || role === 'FinanceManager') {
-      const paymentsQuery = query(collection(db, 'orders'), where('paymentStatus', '==', 'pending'));
+      const paymentsQuery = query(collection(db, 'orders'), where('status', '==', 'pending_finance_approval'));
       unsubscribers.push(onSnapshot(paymentsQuery, (snapshot) => setPendingPaymentsCount(snapshot.size)));
     }
     // Pending Orders (for Admin/Service Mgr)
@@ -75,7 +76,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     // Unread Messages
     const threadsQuery = query(collection(db, 'feedbackThreads'), where('targetRole', '==', role));
     unsubscribers.push(onSnapshot(threadsQuery, (snapshot) => {
-      const unread = snapshot.docs.filter(doc => (doc.data() as FeedbackThread).lastReplierRole !== role).length;
+      const unread = snapshot.docs.filter(doc => (doc.data() as FeedbackThread).lastReplierRole !== role && doc.data().status !== 'closed').length;
       setUnreadMessagesCount(unread);
     }));
 
@@ -356,7 +357,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
       let count = 0;
       snapshot.forEach((doc) => {
         const thread = doc.data() as FeedbackThread;
-        if (thread.lastReplierRole !== role) {
+        if (thread.lastReplierRole !== role && doc.data().status !== 'closed') {
           count++;
         }
       });

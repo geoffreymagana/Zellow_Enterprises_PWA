@@ -13,7 +13,6 @@ import { db } from '@/lib/firebase';
 import type { User as AppUser, Order, OrderStatus, Product, StockRequest, Invoice, InvoiceStatus, Task, UserRole } from '@/types';
 import { useRouter } from 'next/navigation'; 
 import { CustomizationOrdersList } from '@/components/dashboard/CustomizationOrdersList';
-import { BulkOrdersList } from '@/components/dashboard/BulkOrdersList';
 
 
 const formatPrice = (price: number): string => {
@@ -694,7 +693,6 @@ export default function DashboardPage() {
       {role === 'ServiceManager' && (
         <div className="space-y-8 mt-8">
             <CustomizationOrdersList />
-            <BulkOrdersList />
         </div>
       )}
 
