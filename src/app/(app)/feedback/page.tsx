@@ -86,6 +86,7 @@ export default function MessagesPage() {
     const isBroadcast = recipientId === "Customer Broadcast";
     const recipient = !isBroadcast ? recipients.find(e => e.uid === recipientId) : null;
     const recipientRole = isBroadcast ? "Customer Broadcast" : recipient?.role;
+    const recipientName = isBroadcast ? "All Customers" : recipient?.displayName;
 
     if (!recipientRole) {
         toast({ title: "Error", description: "Could not find the recipient's role.", variant: "destructive" });
@@ -106,6 +107,7 @@ export default function MessagesPage() {
           senderEmail: user.email || "N/A",
           targetRole: recipientRole, 
           targetUserId: isBroadcast ? null : recipientId,
+          targetUserName: recipientName || null,
           status: 'open',
           lastMessageSnippet: values.message.substring(0, 50),
           createdAt: serverTimestamp(),
@@ -327,23 +329,29 @@ export default function MessagesPage() {
                 {isLoadingHistory ? <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin" /></div>
                 : history.length === 0 ? <p className="text-center text-muted-foreground py-6">You have no message history yet.</p>
                 : <div className="space-y-3">
-                    {history.map(thread => (
-                        <button key={thread.id} onClick={() => setSelectedThreadId(thread.id)} className="w-full text-left">
-                            <Card className="hover:shadow-md hover:border-primary/50 transition-all">
-                                <CardContent className="p-4">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex-grow min-w-0">
-                                            <p className="font-semibold text-primary truncate" title={thread.subject}>{thread.subject}</p>
-                                            <p className="text-xs text-muted-foreground truncate">To: {typeof thread.targetRole === 'string' ? thread.targetRole.replace('Customer Broadcast', 'All Customers') : 'N/A'}</p>
+                    {history.map(thread => {
+                        const recipientDisplay = thread.targetUserName 
+                          ? `${thread.targetUserName} (${thread.targetRole})`
+                          : typeof thread.targetRole === 'string' ? thread.targetRole.replace('Customer Broadcast', 'All Customers') : 'N/A';
+                        
+                        return (
+                            <button key={thread.id} onClick={() => setSelectedThreadId(thread.id)} className="w-full text-left">
+                                <Card className="hover:shadow-md hover:border-primary/50 transition-all">
+                                    <CardContent className="p-4">
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex-grow min-w-0">
+                                                <p className="font-semibold text-primary truncate" title={thread.subject}>{thread.subject}</p>
+                                                <p className="text-xs text-muted-foreground truncate">To: {recipientDisplay}</p>
+                                            </div>
+                                            <Badge variant={getStatusVariant(thread.status)}>{thread.status}</Badge>
                                         </div>
-                                        <Badge variant={getStatusVariant(thread.status)}>{thread.status}</Badge>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground mt-2 italic truncate">"{thread.lastMessageSnippet}"</p>
-                                    <p className="text-xs text-right text-muted-foreground mt-2">Last update: {thread.updatedAt ? format(thread.updatedAt.toDate(), 'PP') : 'N/A'}</p>
-                                </CardContent>
-                            </Card>
-                        </button>
-                    ))}
+                                        <p className="text-sm text-muted-foreground mt-2 italic truncate">"{thread.lastMessageSnippet}"</p>
+                                        <p className="text-xs text-right text-muted-foreground mt-2">Last update: {thread.updatedAt ? format(thread.updatedAt.toDate(), 'PP') : 'N/A'}</p>
+                                    </CardContent>
+                                </Card>
+                            </button>
+                        )
+                    })}
                 </div>
                 }
               </CardContent>

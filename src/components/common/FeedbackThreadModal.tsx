@@ -131,13 +131,18 @@ export function FeedbackThreadModal({ isOpen, onOpenChange, threadId, currentUse
   let lastDate: Date | null = null;
   const canCloseThread = thread && thread.status !== 'closed' && (thread.targetRole !== 'Customer Broadcast' || currentUserRole === 'Admin');
 
+  const recipientDisplay = thread?.targetUserName 
+    ? `${thread.targetUserName} (${thread.targetRole})`
+    : typeof thread?.targetRole === 'string' ? thread.targetRole.replace('Manager', ' Manager').replace('Customer Broadcast', 'All Customers') : 'N/A';
+
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg md:max-w-xl lg:max-w-2xl flex flex-col h-[calc(100vh-4rem)] sm:h-[90vh] max-h-[800px]">
         <DialogHeader>
           <DialogTitle className="truncate pr-8">{thread?.subject || "Conversation"}</DialogTitle>
           <DialogDescription>
-            From: {thread?.senderName || "..."} | To: {typeof thread?.targetRole === 'string' ? thread.targetRole.replace('Manager', ' Manager').replace('Customer Broadcast', 'All Customers') : 'N/A'}
+            From: {thread?.senderName || "..."} | To: {recipientDisplay}
           </DialogDescription>
         </DialogHeader>
         

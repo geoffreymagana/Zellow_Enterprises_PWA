@@ -1,4 +1,5 @@
 
+
 export type UserRole =
   | 'Admin'
   | 'Customer'
@@ -425,7 +426,8 @@ export interface FeedbackThread {
   senderName: string;
   senderEmail: string;
   targetRole: UserRole | 'Customer Broadcast';
-  targetUserId?: string; // New field for specific user targeting
+  targetUserId?: string;
+  targetUserName?: string | null;
   status: 'open' | 'replied' | 'closed';
   lastMessageSnippet: string;
   createdAt: any;
