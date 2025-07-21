@@ -16,6 +16,7 @@ import {
   SidebarMenuButton,
   SidebarProvider,
   useSidebar,
+  SidebarMenuBadge,
 } from "@/components/ui/sidebar";
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import Link from 'next/link';
@@ -47,6 +48,41 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   const pathname = usePathname();
   const isMobile = useIsMobile();
 
+  const [pendingPaymentsCount, setPendingPaymentsCount] = useState(0);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  const [generalApprovalsCount, setGeneralApprovalsCount] = useState(0);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+
+  useEffect(() => {
+    if (!db || !role || !user) return;
+    const unsubscribers: (() => void)[] = [];
+
+    // Pending Payments (for Finance)
+    if (role === 'Admin' || role === 'FinanceManager') {
+      const paymentsQuery = query(collection(db, 'orders'), where('paymentStatus', '==', 'pending'));
+      unsubscribers.push(onSnapshot(paymentsQuery, (snapshot) => setPendingPaymentsCount(snapshot.size)));
+    }
+    // Pending Orders (for Admin/Service Mgr)
+    if (role === 'Admin' || role === 'ServiceManager') {
+      const ordersQuery = query(collection(db, 'orders'), where('status', '==', 'pending_finance_approval'));
+       unsubscribers.push(onSnapshot(ordersQuery, (snapshot) => setPendingOrdersCount(snapshot.size)));
+    }
+    // General Approvals (for Admin)
+    if (role === 'Admin') {
+      const approvalsQuery = query(collection(db, 'approvalRequests'), where('status', '==', 'pending'));
+      unsubscribers.push(onSnapshot(approvalsQuery, (snapshot) => setGeneralApprovalsCount(snapshot.size)));
+    }
+    // Unread Messages
+    const threadsQuery = query(collection(db, 'feedbackThreads'), where('targetRole', '==', role));
+    unsubscribers.push(onSnapshot(threadsQuery, (snapshot) => {
+      const unread = snapshot.docs.filter(doc => (doc.data() as FeedbackThread).lastReplierRole !== role).length;
+      setUnreadMessagesCount(unread);
+    }));
+
+    return () => unsubscribers.forEach(unsub => unsub());
+  }, [db, role, user]);
+
+
   if (!sidebarContext) {
     return <div className="flex items-center justify-center min-h-screen">Error: Sidebar context not found.</div>;
   }
@@ -58,17 +94,17 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/products', label: 'Products', icon: Package, roles: ['Admin'] },
     { href: '/inventory', label: 'Inventory Mgt', icon: Warehouse, roles: ['Admin', 'InventoryManager'] },
     { href: '/inventory/receivership', label: 'Receive Stock', icon: PackageSearch, roles: ['Admin', 'InventoryManager'] },
-    { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, roles: ['Admin', 'ServiceManager'] }, 
+    { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, roles: ['Admin', 'ServiceManager'], count: pendingOrdersCount },
     { href: '/admin/bulk-orders', label: 'Bulk Orders', icon: PackagePlus, roles: ['Admin', 'FinanceManager', 'ServiceManager'] },
     { href: '/tasks', label: 'Production Tasks', icon: Wrench, roles: ['Admin', 'ServiceManager'] },
     { href: '/admin/customizations', label: 'Customizations', icon: Layers, roles: ['Admin', 'ServiceManager'] },
-    { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'] },
+    { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'], count: pendingPaymentsCount },
     { href: '/admin/shipping', label: 'Shipping', icon: Ship, roles: ['Admin', 'DispatchManager'] },
-    { href: '/admin/approvals', label: 'General Approvals', icon: ClipboardCheck, roles: ['Admin'] }, 
-    { href: '/finance/approvals', label: 'Stock Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] }, 
+    { href: '/admin/approvals', label: 'General Approvals', icon: ClipboardCheck, roles: ['Admin'], count: generalApprovalsCount },
+    { href: '/finance/approvals', label: 'Stock Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] },
     { href: '/finance/financials', label: 'Financials', icon: BarChart2, roles: ['Admin', 'FinanceManager'] },
     { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['Admin', 'FinanceManager'] },
-    { href: '/admin/notifications', label: 'Notifications', icon: Bell, roles: ['Admin'] },
+    { href: '/admin/notifications', label: 'Notifications', icon: Bell, roles: ['Admin'], count: unreadMessagesCount },
     { href: '/admin/reports', label: 'System Reports', icon: FileArchive, roles: ['Admin'] },
   ];
 
@@ -150,6 +186,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                            >
                             <item.icon className="mr-2 h-4 w-4" />
                             <span>{item.label}</span>
+                            {item.count && item.count > 0 && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
                           </SidebarMenuButton>
                         </Link>
                       </SidebarMenuItem>
@@ -235,6 +272,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                         >
                           <item.icon className="mr-2 h-4 w-4" />
                           <span>{item.label}</span>
+                          {item.count && item.count > 0 && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
                         </SidebarMenuButton>
                       </Link>
                     </SidebarMenuItem>
