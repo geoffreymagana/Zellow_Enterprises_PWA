@@ -155,7 +155,6 @@ export default function TasksPage() {
   
   const handleStatusChange = async (taskId: string, newStatus: Task['status'], newOrderStatus?: OrderStatus) => {
     if (!db || !selectedTask || !user) return;
-
     setIsUpdating(true);
     try {
         const taskRef = doc(db, 'tasks', taskId);
@@ -176,7 +175,7 @@ export default function TasksPage() {
 
         if (historyNote) {
             const newHistoryEntry: DeliveryHistoryEntry = {
-                status: newOrderStatus || selectedTask.status as OrderStatus, // Use new status if available
+                status: newOrderStatus || selectedTask.status as OrderStatus,
                 timestamp: serverTimestamp(),
                 notes: historyNote,
                 actorId: user.uid,
@@ -189,12 +188,14 @@ export default function TasksPage() {
             await updateDoc(orderRef, orderUpdatePayload);
         }
 
+        // If the task was just completed, check if all tasks for the order are done
         if (newStatus === 'completed') {
             const allTasksForOrderQuery = query(collection(db, 'tasks'), where('orderId', '==', selectedTask.orderId));
             const allTasksSnapshot = await getDocs(allTasksForOrderQuery);
             const allTasks = allTasksSnapshot.docs.map(d => ({id: d.id, ...d.data()} as Task));
             
-            const allTasksCompleted = allTasks.every(t => t.status === 'completed');
+            // Check if every task for the order is now 'completed'
+            const allTasksCompleted = allTasks.every(t => t.id === taskId ? newStatus === 'completed' : t.status === 'completed');
             
             if (allTasksCompleted) {
                 const finalHistoryEntry: DeliveryHistoryEntry = {
@@ -374,7 +375,7 @@ export default function TasksPage() {
       setIsRejectionModalOpen(false);
       setIsModalOpen(false);
     } catch (error) {
-      // no toast
+      console.error("Error rejecting task:", error);
     } finally {
         setIsUpdating(false);
     }
@@ -510,7 +511,7 @@ export default function TasksPage() {
                 </div>)}
                 {selectedTask && role === 'ServiceManager' && selectedTask.status === 'needs_approval' && (<>
                     <Button size="sm" variant="destructive" onClick={() => setIsRejectionModalOpen(true)} disabled={isUpdating}><XCircle className="mr-2 h-4 w-4"/> Reject</Button>
-                    <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'completed', 'production_complete')} disabled={isUpdating}><CheckCircle className="mr-2 h-4 w-4"/> Approve</Button>
+                    <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'completed', 'awaiting_assignment')} disabled={isUpdating}><CheckCircle className="mr-2 h-4 w-4"/> Approve</Button>
                 </>)}
              </div>
           </DialogFooter>
@@ -525,4 +526,3 @@ export default function TasksPage() {
     </>
   );
 }
-
