@@ -6,7 +6,7 @@ import { Badge, BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
-import type { Task, Order, OrderItem as OrderItemType, Product, ProductCustomizationOption, CustomizationGroupDefinition, User as AppUser, UserRole, DeliveryHistoryEntry } from "@/types";
+import type { Task, Order, OrderItem as OrderItemType, Product, ProductCustomizationOption, CustomizationGroupDefinition, User as AppUser, UserRole, DeliveryHistoryEntry, OrderStatus } from "@/types";
 import { Filter, Loader2, Wrench, CheckCircle, AlertTriangle, Eye, Image as ImageIconPlaceholder, Palette, UserCog, Upload, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
@@ -153,7 +153,7 @@ export default function TasksPage() {
     return () => unsubscribe();
   }, [authLoading, user, role, router, fetchTasks]);
   
-  const handleStatusChange = async (taskId: string, newStatus: Task['status']) => {
+  const handleStatusChange = async (taskId: string, newStatus: Task['status'], newOrderStatus?: OrderStatus) => {
     if (!db || !selectedTask || !user) return;
 
     setIsUpdating(true);
@@ -162,40 +162,41 @@ export default function TasksPage() {
         const orderRef = doc(db, 'orders', selectedTask.orderId!);
 
         let historyNote: string | null = null;
-        if (newStatus === 'in-progress') {
-            historyNote = `Task '${selectedTask.taskType}' for item '${selectedTask.itemName}' has started.`;
-        } else if (newStatus === 'completed') {
-            historyNote = `Task '${selectedTask.taskType}' for item '${selectedTask.itemName}' was approved by manager.`;
+        if (newOrderStatus) {
+            historyNote = `Order status updated to ${newOrderStatus.replace(/_/g, ' ')} as task '${selectedTask.taskType}' moved to '${newStatus}'.`;
         }
 
         const taskUpdatePayload: any = { status: newStatus, updatedAt: serverTimestamp() };
         await updateDoc(taskRef, taskUpdatePayload);
+        
+        const orderUpdatePayload: any = {};
+        if (newOrderStatus) {
+            orderUpdatePayload.status = newOrderStatus;
+        }
 
         if (historyNote) {
             const newHistoryEntry: DeliveryHistoryEntry = {
-                status: 'processing', // Keep the order status as 'processing' for history
+                status: newOrderStatus || selectedTask.status as OrderStatus, // Use new status if available
                 timestamp: serverTimestamp(),
                 notes: historyNote,
                 actorId: user.uid,
             };
-            await updateDoc(orderRef, {
-                deliveryHistory: arrayUnion(newHistoryEntry)
-            });
+            orderUpdatePayload.deliveryHistory = arrayUnion(newHistoryEntry);
         }
-        
-        // If the task is 'completed', check if all tasks for this order are also complete.
+
+        if (Object.keys(orderUpdatePayload).length > 0) {
+            orderUpdatePayload.updatedAt = serverTimestamp();
+            await updateDoc(orderRef, orderUpdatePayload);
+        }
+
         if (newStatus === 'completed') {
             const allTasksForOrderQuery = query(collection(db, 'tasks'), where('orderId', '==', selectedTask.orderId));
             const allTasksSnapshot = await getDocs(allTasksForOrderQuery);
-            const allTasks = allTasksSnapshot.docs.map(d => d.data() as Task);
+            const allTasks = allTasksSnapshot.docs.map(d => ({id: d.id, ...d.data()} as Task));
             
-            // This is slightly tricky due to local state vs firestore state.
-            // Check if all OTHER tasks are completed, and if the CURRENT task is now complete.
-            const allOtherTasksCompleted = allTasks
-                .filter(t => t.id !== taskId)
-                .every(t => t.status === 'completed');
+            const allTasksCompleted = allTasks.every(t => t.status === 'completed');
             
-            if (allOtherTasksCompleted) {
+            if (allTasksCompleted) {
                 const finalHistoryEntry: DeliveryHistoryEntry = {
                     status: 'awaiting_assignment',
                     timestamp: serverTimestamp(),
@@ -207,11 +208,9 @@ export default function TasksPage() {
                     deliveryHistory: arrayUnion(finalHistoryEntry),
                     updatedAt: serverTimestamp()
                 });
-                toast({ title: "Order Ready for Dispatch", description: `Order ${selectedTask.orderId.substring(0,8)}... has moved to 'Awaiting Assignment'.` });
             }
         }
-
-        toast({ title: "Task Updated", description: `Task status changed to ${newStatus.replace('_', ' ')}.` });
+        
         setIsModalOpen(false);
     } catch (error) {
         console.error("Error updating task status: ", error);
@@ -240,13 +239,11 @@ export default function TasksPage() {
             assigneeName: technicianToAssign.displayName || technicianToAssign.email,
             updatedAt: serverTimestamp()
         });
-        toast({ title: "Assignee Updated", description: `Task assigned to ${technicianToAssign.displayName || technicianToAssign.email}.` });
         if (selectedTask) {
             setSelectedTask(prev => prev ? { ...prev, assigneeId: technicianToAssign.uid, assigneeName: technicianToAssign.displayName || technicianToAssign.email } : null);
         }
     } catch (error) {
         console.error("Error updating assignee:", error);
-        toast({ title: "Update Failed", description: "Could not update task assignee.", variant: "destructive" });
     } finally {
         setIsUpdating(false);
     }
@@ -289,12 +286,10 @@ export default function TasksPage() {
           setModalCustomizationOptions([]);
         }
       } else {
-        toast({ title: "Error", description: "Order details for this task not found.", variant: "destructive" });
         setModalOrder(null); setModalOrderItem(null); setModalCustomizationOptions([]);
       }
     } catch (e) {
       console.error("Error fetching modal details:", e);
-      toast({ title: "Error", description: "Could not load task details.", variant: "destructive" });
     } finally {
       setIsLoadingModalDetails(false);
     }
@@ -310,7 +305,6 @@ export default function TasksPage() {
   
   const handleProofUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
-      toast({ title: "Upload Error", description: "Cloudinary environment variables not configured.", variant: "destructive" });
       setUploadState(prev => ({ ...prev, error: "Upload service not configured.", uploading: false }));
       return;
     }
@@ -333,7 +327,6 @@ export default function TasksPage() {
 
   const handleSubmitForApproval = async () => {
     if (!db || !selectedTask || !uploadState.url || !user) {
-      toast({ title: "Error", description: "No proof image uploaded.", variant: "destructive" });
       return;
     }
     setIsUpdating(true);
@@ -342,7 +335,7 @@ export default function TasksPage() {
       const orderRef = doc(db, 'orders', selectedTask.orderId!);
       
       const historyEntry: DeliveryHistoryEntry = {
-        status: 'processing',
+        status: 'awaiting_quality_check',
         timestamp: serverTimestamp(),
         notes: `Task '${selectedTask.taskType}' for item '${selectedTask.itemName}' is complete and awaits quality check.`,
         actorId: user.uid
@@ -354,13 +347,13 @@ export default function TasksPage() {
         updatedAt: serverTimestamp(),
       });
       await updateDoc(orderRef, {
-          deliveryHistory: arrayUnion(historyEntry)
+          status: 'awaiting_quality_check',
+          deliveryHistory: arrayUnion(historyEntry),
+          updatedAt: serverTimestamp(),
       });
-      toast({ title: "Submitted", description: "Task submitted for approval." });
       setIsModalOpen(false);
     } catch (error) {
       console.error("Error submitting for approval:", error);
-      toast({ title: "Submission Failed", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -368,7 +361,6 @@ export default function TasksPage() {
 
   const handleRejectionSubmit = async () => {
     if (!db || !selectedTask || !rejectionReason.trim()) {
-      toast({ title: "Error", description: "Rejection reason is required.", variant: "destructive" });
       return;
     }
     setIsUpdating(true);
@@ -379,11 +371,10 @@ export default function TasksPage() {
         serviceManagerNotes: rejectionReason,
         updatedAt: serverTimestamp(),
       });
-      toast({ title: "Task Rejected", description: `Task has been marked as rejected.` });
       setIsRejectionModalOpen(false);
       setIsModalOpen(false);
     } catch (error) {
-      toast({ title: "Error", description: "Failed to reject task.", variant: "destructive" });
+      // no toast
     } finally {
         setIsUpdating(false);
     }
@@ -508,7 +499,7 @@ export default function TasksPage() {
           <DialogFooter className="pt-4 border-t flex-col sm:flex-row sm:justify-between gap-2">
             <DialogClose asChild><Button type="button" variant="outline" size="sm">Close</Button></DialogClose>
              <div className="flex flex-wrap gap-2 justify-end">
-                {selectedTask && role && technicianRoles.includes(role) && selectedTask.status === 'pending' && (<Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'in-progress')} disabled={isUpdating}><Wrench className="mr-2 h-4 w-4" /> Start Task</Button>)}
+                {selectedTask && role && technicianRoles.includes(role) && selectedTask.status === 'pending' && (<Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'in-progress', 'in_production')} disabled={isUpdating}><Wrench className="mr-2 h-4 w-4" /> Start Task</Button>)}
                 {selectedTask && role && technicianRoles.includes(role) && selectedTask.status === 'in-progress' && (<div className="w-full space-y-2">
                     <Separator/>
                     <Label htmlFor="proofUpload">Upload Proof & Submit for Approval</Label>
@@ -519,7 +510,7 @@ export default function TasksPage() {
                 </div>)}
                 {selectedTask && role === 'ServiceManager' && selectedTask.status === 'needs_approval' && (<>
                     <Button size="sm" variant="destructive" onClick={() => setIsRejectionModalOpen(true)} disabled={isUpdating}><XCircle className="mr-2 h-4 w-4"/> Reject</Button>
-                    <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'completed')} disabled={isUpdating}><CheckCircle className="mr-2 h-4 w-4"/> Approve</Button>
+                    <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'completed', 'production_complete')} disabled={isUpdating}><CheckCircle className="mr-2 h-4 w-4"/> Approve</Button>
                 </>)}
              </div>
           </DialogFooter>
@@ -534,7 +525,4 @@ export default function TasksPage() {
     </>
   );
 }
-
-
-
 

@@ -472,6 +472,7 @@ export default function AdminOrderDetailPage() {
                   {order.items.map((item, index) => {
                     const itemKey = `${item.productId}_${index}`;
                     const itemOptionDefinitions = resolvedOrderItemOptionsMap.get(itemKey);
+                    const taskExistsForItem = itemHasExistingTask(item.name);
                     return (
                       <React.Fragment key={itemKey}>
                         <TableRow>
@@ -482,8 +483,13 @@ export default function AdminOrderDetailPage() {
                           <TableCell className="text-right font-medium">{formatPrice(item.price)}</TableCell>
                           <TableCell className="text-right">
                             {item.customizations && Object.keys(item.customizations).length > 0 && (role === 'Admin' || role === 'ServiceManager') && (
-                              <Button variant="outline" size="sm" onClick={() => openTaskDialog(item)} disabled={!isTaskCreationAllowed}>
-                                <Settings2 className="mr-1 h-3 w-3"/> Create Task
+                              <Button
+                                variant={taskExistsForItem ? "secondary" : "outline"}
+                                size="sm"
+                                onClick={() => openTaskDialog(item)}
+                                disabled={!isTaskCreationAllowed || taskExistsForItem}
+                              >
+                                <Settings2 className="mr-1 h-3 w-3" /> {taskExistsForItem ? 'Task Assigned' : 'Create Task'}
                               </Button>
                             )}
                           </TableCell>
