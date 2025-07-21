@@ -13,6 +13,7 @@ import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, 
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
+import { sendDeliveryConfirmation } from "@/ai/flows/send-delivery-confirmation-flow";
 
 const getDeliveryStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] => {
   // Delivery Status uses the same mapping as Order Status for these colors
@@ -120,6 +121,7 @@ export default function DeliveriesPage() {
 
       await updateDoc(orderRef, updatePayload);
 
+      // Send customer notification via API
       try {
         await fetch('/api/push/send-notification', {
             method: 'POST',
@@ -133,9 +135,22 @@ export default function DeliveriesPage() {
         });
       } catch (notificationError) {
         console.error("Failed to send push notification:", notificationError);
+        // Don't block main flow for this
+      }
+      
+      // If delivered, send email confirmation flow
+      if (newStatus === 'delivered') {
+        try {
+          await sendDeliveryConfirmation({ order });
+          toast({ title: "Delivery & Email Confirmation Sent", description: "Customer has been notified via email." });
+        } catch (emailError) {
+          console.error("Failed to send delivery confirmation email:", emailError);
+          toast({ title: "Delivery Confirmed (Email Failed)", description: "Order status updated, but email notification failed.", variant: "destructive" });
+        }
+      } else {
+        toast({ title: "Status Updated", description: `Delivery ${order.id} marked as ${newStatus}.` });
       }
 
-      toast({ title: "Status Updated", description: `Delivery ${order.id} marked as ${newStatus}.` });
     } catch (error) {
       console.error("Error updating status: ", error);
       toast({ title: "Error", description: "Could not update delivery status.", variant: "destructive" });
