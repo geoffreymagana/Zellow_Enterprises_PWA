@@ -136,32 +136,25 @@ export default function MessagesPage() {
   };
   
   const fetchRecipients = useCallback(async () => {
-    if (!db || !role) return;
+    if (!db || !user) return;
     setIsLoadingRecipients(true);
     const usersRef = collection(db, 'users');
-    // Base query for all active users
     const q = query(usersRef, where('disabled', '!=', true), orderBy('displayName', 'asc'));
 
     try {
         const snapshot = await getDocs(q);
-        let allUsers = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
-
-        if (role === 'Customer') {
-            // Filter out other customers on the client-side
-            allUsers = allUsers.filter(u => u.role !== 'Customer' && u.uid !== user?.uid);
-        } else {
-            // Filter out self for staff/admin
-            allUsers = allUsers.filter(u => u.uid !== user?.uid);
-        }
+        // Fetch all active users, then filter out the current user client-side
+        const allActiveUsers = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
+        const filteredRecipients = allActiveUsers.filter(u => u.uid !== user.uid);
         
-        setRecipients(allUsers);
+        setRecipients(filteredRecipients);
     } catch (error) {
         console.error("Error fetching recipients:", error);
         toast({ title: "Error", description: "Could not fetch recipient list.", variant: "destructive" });
     } finally {
         setIsLoadingRecipients(false);
     }
-  }, [toast, role, user?.uid]);
+  }, [toast, user]);
 
 
   useEffect(() => {
@@ -266,13 +259,13 @@ export default function MessagesPage() {
                           </PopoverTrigger>
                           <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                             <Command>
-                              <CommandInput placeholder="Search recipients..." />
+                              <CommandInput placeholder="Search recipients by name or role..." />
                               <CommandList>
                                 <CommandEmpty>No recipient found.</CommandEmpty>
                                 <CommandGroup>
                                   {role !== 'Customer' && (
                                      <CommandItem
-                                      value="Customer Broadcast"
+                                      value="All Customers (Broadcast)"
                                       onSelect={() => {
                                         form.setValue("targetRole", "Customer Broadcast");
                                         setIsPopoverOpen(false);
@@ -284,7 +277,7 @@ export default function MessagesPage() {
                                   )}
                                   {recipients.map(e => (
                                     <CommandItem
-                                      value={e.displayName || e.email || e.uid}
+                                      value={`${e.displayName || e.email} - ${e.role}`}
                                       key={e.uid}
                                       onSelect={() => {
                                         form.setValue("targetRole", e.uid);
