@@ -112,7 +112,7 @@ export default function MessagesPage() {
           lastMessageSnippet: values.message.substring(0, 50),
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          lastReplierRole: role,
+          lastReplierRole: role, // Set the sender's role as the last replier initially
         });
         
         transaction.set(doc(messagesCollection), {
@@ -143,7 +143,6 @@ export default function MessagesPage() {
 
     try {
         const snapshot = await getDocs(q);
-        // Fetch all active users, then filter out the current user client-side
         const allActiveUsers = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
         const filteredRecipients = allActiveUsers.filter(u => u.uid !== user.uid);
         
@@ -323,10 +322,18 @@ export default function MessagesPage() {
                 : history.length === 0 ? <p className="text-center text-muted-foreground py-6">You have no message history yet.</p>
                 : <div className="space-y-3">
                     {history.map(thread => {
-                        const recipientDisplay = thread.targetUserName 
-                          ? `${thread.targetUserName} (${thread.targetRole})`
-                          : typeof thread.targetRole === 'string' ? thread.targetRole.replace('Customer Broadcast', 'All Customers') : 'N/A';
-                        
+                        const isLastReplierCurrentUser = thread.lastReplierRole === role;
+                        let conversationPartner;
+                        if (isLastReplierCurrentUser) {
+                            // If current user sent last, show who it was to
+                            conversationPartner = thread.targetUserName 
+                              ? `${thread.targetUserName} (${thread.targetRole})`
+                              : thread.targetRole?.replace('Customer Broadcast', 'All Customers') || 'N/A';
+                        } else {
+                            // If current user received last, show who it was from
+                            conversationPartner = thread.senderId === user?.uid ? thread.targetUserName : thread.senderName;
+                        }
+
                         return (
                             <button key={thread.id} onClick={() => setSelectedThreadId(thread.id)} className="w-full text-left">
                                 <Card className="hover:shadow-md hover:border-primary/50 transition-all">
@@ -334,7 +341,10 @@ export default function MessagesPage() {
                                         <div className="flex justify-between items-start">
                                             <div className="flex-grow min-w-0">
                                                 <p className="font-semibold text-primary truncate" title={thread.subject}>{thread.subject}</p>
-                                                <p className="text-xs text-muted-foreground truncate">To: {recipientDisplay}</p>
+                                                <p className="text-xs text-muted-foreground truncate">
+                                                    {isLastReplierCurrentUser ? 'To: ' : 'From: '}
+                                                    {conversationPartner}
+                                                </p>
                                             </div>
                                             <Badge variant={getStatusVariant(thread.status)}>{thread.status}</Badge>
                                         </div>

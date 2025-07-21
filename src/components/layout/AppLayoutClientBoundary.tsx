@@ -73,12 +73,17 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
       const approvalsQuery = query(collection(db, 'approvalRequests'), where('status', '==', 'pending'));
       unsubscribers.push(onSnapshot(approvalsQuery, (snapshot) => setGeneralApprovalsCount(snapshot.size)));
     }
-    // Unread Messages
-    const threadsQuery = query(collection(db, 'feedbackThreads'), where('targetRole', '==', role));
+    // Unread Messages for all staff roles
+    const threadsQuery = query(collection(db, 'feedbackThreads'), where('targetUserId', '==', user.uid));
     unsubscribers.push(onSnapshot(threadsQuery, (snapshot) => {
-      const unread = snapshot.docs.filter(doc => (doc.data() as FeedbackThread).lastReplierRole !== role && doc.data().status !== 'closed').length;
+      const unread = snapshot.docs.filter(doc => {
+          const threadData = doc.data() as FeedbackThread;
+          // An unread message is one where the last replier was not the current user, and the thread is not closed.
+          return threadData.lastReplierRole !== role && threadData.status !== 'closed';
+      }).length;
       setUnreadMessagesCount(unread);
     }));
+
 
     return () => unsubscribers.forEach(unsub => unsub());
   }, [db, role, user]);
@@ -341,15 +346,14 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
     if (!db || !user || !role) return;
 
     let q;
+    // For customers, check threads they started
     if (role === 'Customer') {
       q = query(collection(db, 'feedbackThreads'), 
-        where('senderId', '==', user.uid),
-        where('status', 'in', ['open', 'replied'])
+        where('senderId', '==', user.uid)
       );
-    } else {
+    } else { // For other staff, check threads targeted to them
       q = query(collection(db, 'feedbackThreads'), 
-        where('targetRole', '==', role),
-        where('status', 'in', ['open', 'replied'])
+        where('targetUserId', '==', user.uid)
       );
     }
 
@@ -357,7 +361,8 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
       let count = 0;
       snapshot.forEach((doc) => {
         const thread = doc.data() as FeedbackThread;
-        if (thread.lastReplierRole !== role && doc.data().status !== 'closed') {
+        // Count as unread if the last replier was not the current user, and the thread is not closed.
+        if (thread.lastReplierRole !== role && thread.status !== 'closed') {
           count++;
         }
       });
