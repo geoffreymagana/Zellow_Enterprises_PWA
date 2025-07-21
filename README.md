@@ -163,6 +163,200 @@ This Next.js application is optimized for deployment on Vercel.
 *   **`src/ai/`**: Genkit flows and configuration.
 *   **`public/`**: Static assets like icons, manifest.json, and the service worker (sw.js).
 
+## Relational Database Schema (Example)
+
+For developers who prefer a relational database like PostgreSQL or MySQL, here is an example SQL schema that reflects the application's data structure. This schema uses `JSON` types for flexible fields like customizations, which is a good compromise between relational and document-based models.
+
+```sql
+-- Users table stores all user types, from customers to staff and admins
+CREATE TABLE users (
+    id VARCHAR(255) PRIMARY KEY, -- Corresponds to Firebase Auth UID
+    email VARCHAR(255) UNIQUE NOT NULL,
+    display_name VARCHAR(255),
+    first_name VARCHAR(255),
+    last_name VARCHAR(255),
+    phone VARCHAR(50),
+    county VARCHAR(100),
+    town VARCHAR(100),
+    photo_url TEXT,
+    role VARCHAR(50) NOT NULL CHECK (role IN ('Admin', 'Customer', 'Engraving', 'Printing', 'Assembly', 'Quality Check', 'Packaging', 'Rider', 'Supplier', 'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager')),
+    status VARCHAR(50) DEFAULT 'pending' NOT NULL, -- pending, approved, rejected
+    rejection_reason TEXT,
+    disabled BOOLEAN DEFAULT FALSE NOT NULL,
+    disabled_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+-- Products table for all sellable items
+CREATE TABLE products (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL(10, 2) NOT NULL,
+    supplier_price DECIMAL(10, 2), -- Cost price
+    stock INT NOT NULL DEFAULT 0,
+    published BOOLEAN DEFAULT TRUE NOT NULL,
+    image_url TEXT,
+    categories TEXT[], -- Using an array type for PostgreSQL
+    supplier_info TEXT, -- Simplified supplier info
+    customization_group_id VARCHAR(255) REFERENCES customization_groups(id),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMPTZ
+);
+
+-- Customization groups for reusable sets of options
+CREATE TABLE customization_groups (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    options JSONB, -- Store the array of option definitions as JSON
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMPTZ
+);
+
+-- Orders table to track customer purchases
+CREATE TABLE orders (
+    id VARCHAR(255) PRIMARY KEY,
+    customer_id VARCHAR(255) NOT NULL REFERENCES users(id),
+    customer_name VARCHAR(255),
+    customer_email VARCHAR(255),
+    customer_phone VARCHAR(50),
+    total_amount DECIMAL(10, 2) NOT NULL,
+    sub_total DECIMAL(10, 2) NOT NULL,
+    shipping_cost DECIMAL(10, 2) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    payment_status VARCHAR(50) NOT NULL,
+    payment_method VARCHAR(50),
+    transaction_id VARCHAR(255),
+    shipping_address JSONB, -- Store shipping address object
+    shipping_method_id VARCHAR(255) REFERENCES shipping_methods(id),
+    rider_id VARCHAR(255) REFERENCES users(id),
+    delivery_history JSONB, -- Array of history entries
+    is_gift BOOLEAN DEFAULT FALSE NOT NULL,
+    gift_details JSONB, -- Store gift recipient details
+    rating JSONB, -- Store rating value, comment, etc.
+    is_bulk_order BOOLEAN DEFAULT FALSE NOT NULL,
+    bulk_order_request_id VARCHAR(255),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMPTZ
+);
+
+-- Order items, linking products to orders
+CREATE TABLE order_items (
+    id VARCHAR(255) PRIMARY KEY,
+    order_id VARCHAR(255) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    product_id VARCHAR(255) NOT NULL REFERENCES products(id),
+    product_name VARCHAR(255),
+    quantity INT NOT NULL,
+    price_per_unit DECIMAL(10, 2) NOT NULL, -- The price at the time of sale
+    customizations JSONB -- Store selected customizations as a JSON object
+);
+
+-- Tasks for production workflow
+CREATE TABLE tasks (
+    id VARCHAR(255) PRIMARY KEY,
+    order_id VARCHAR(255) NOT NULL REFERENCES orders(id),
+    task_type VARCHAR(50) NOT NULL,
+    description TEXT,
+    assignee_id VARCHAR(255) REFERENCES users(id),
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    proof_of_work_url TEXT,
+    service_manager_notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMPTZ
+);
+
+-- Shipping regions and methods
+CREATE TABLE shipping_regions (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    county VARCHAR(255),
+    towns TEXT[] NOT NULL,
+    active BOOLEAN DEFAULT TRUE NOT NULL
+);
+
+CREATE TABLE shipping_methods (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    duration VARCHAR(100),
+    base_price DECIMAL(10, 2) NOT NULL,
+    active BOOLEAN DEFAULT TRUE NOT NULL
+);
+
+-- Shipping rates link regions and methods with specific prices
+CREATE TABLE shipping_rates (
+    id VARCHAR(255) PRIMARY KEY,
+    region_id VARCHAR(255) NOT NULL REFERENCES shipping_regions(id),
+    method_id VARCHAR(255) NOT NULL REFERENCES shipping_methods(id),
+    custom_price DECIMAL(10, 2) NOT NULL,
+    active BOOLEAN DEFAULT TRUE NOT NULL,
+    UNIQUE (region_id, method_id)
+);
+
+-- Stock management
+CREATE TABLE stock_requests (
+    id VARCHAR(255) PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL REFERENCES products(id),
+    requester_id VARCHAR(255) NOT NULL REFERENCES users(id),
+    requested_quantity INT NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    notes TEXT,
+    bids JSONB, -- Array of bid objects from suppliers
+    winning_bid_id VARCHAR(255),
+    supplier_id VARCHAR(255) REFERENCES users(id),
+    supplier_price DECIMAL(10, 2),
+    fulfilled_quantity INT,
+    received_quantity INT,
+    invoice_id VARCHAR(255),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMPTZ
+);
+
+-- Invoices from suppliers
+CREATE TABLE invoices (
+    id VARCHAR(255) PRIMARY KEY,
+    invoice_number VARCHAR(255) UNIQUE NOT NULL,
+    supplier_id VARCHAR(255) NOT NULL REFERENCES users(id),
+    stock_request_id VARCHAR(255) REFERENCES stock_requests(id),
+    total_amount DECIMAL(10, 2) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    invoice_date DATE NOT NULL,
+    due_date DATE NOT NULL,
+    paid_at TIMESTAMPTZ,
+    items JSONB,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMPTZ
+);
+
+-- Feedback and support threads
+CREATE TABLE feedback_threads (
+    id VARCHAR(255) PRIMARY KEY,
+    subject TEXT,
+    sender_id VARCHAR(255) NOT NULL REFERENCES users(id),
+    target_role VARCHAR(50),
+    target_user_id VARCHAR(255) REFERENCES users(id),
+    status VARCHAR(50),
+    last_message_snippet TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMPTZ
+);
+
+CREATE TABLE feedback_messages (
+    id VARCHAR(255) PRIMARY KEY,
+    thread_id VARCHAR(255) NOT NULL REFERENCES feedback_threads(id) ON DELETE CASCADE,
+    sender_id VARCHAR(255) NOT NULL REFERENCES users(id),
+    message TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+-- Push notification subscriptions
+CREATE TABLE push_subscriptions (
+    user_id VARCHAR(255) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    subscription_details JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+```
+
 ## Future Considerations (Potential Enhancements)
 
 *   Trigger push notifications automatically from the backend when an order status changes (e.g., using Firebase Functions).
