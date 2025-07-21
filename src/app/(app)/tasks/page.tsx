@@ -67,7 +67,7 @@ export default function TasksPage() {
   const [technicians, setTechnicians] = useState<AppUser[]>([]);
   const [isLoadingTechnicians, setIsLoadingTechnicians] = useState(false);
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | undefined>(undefined);
-  const [isUpdatingAssignee, setIsUpdatingAssignee] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   
   const [uploadState, setUploadState] = useState<{ progress: number; error?: string; uploading: boolean; url?: string }>({ progress: 0, uploading: false });
   const [isRejectionModalOpen, setIsRejectionModalOpen] = useState(false);
@@ -155,26 +155,28 @@ export default function TasksPage() {
   
   const handleStatusChange = async (taskId: string, newStatus: Task['status']) => {
     if (!db || !selectedTask || !user) return;
+
+    setIsUpdating(true);
     try {
         const taskRef = doc(db, 'tasks', taskId);
         const orderRef = doc(db, 'orders', selectedTask.orderId!);
 
-        const historyNotes: Record<string, string> = {
-            'in-progress': `Task '${selectedTask.taskType}' for item '${selectedTask.itemName}' has started.`,
-            'completed': `Task '${selectedTask.taskType}' for item '${selectedTask.itemName}' was approved.`,
-        };
-        
-        const updatePayload: any = { status: newStatus, updatedAt: serverTimestamp() };
-        
-        await updateDoc(taskRef, updatePayload);
+        let historyNote: string | null = null;
+        if (newStatus === 'in-progress') {
+            historyNote = `Task '${selectedTask.taskType}' for item '${selectedTask.itemName}' has started.`;
+        } else if (newStatus === 'completed') {
+            historyNote = `Task '${selectedTask.taskType}' for item '${selectedTask.itemName}' was approved by manager.`;
+        }
 
-        // Only add to history for certain status changes to avoid clutter
-        if (historyNotes[newStatus]) {
+        const taskUpdatePayload: any = { status: newStatus, updatedAt: serverTimestamp() };
+        await updateDoc(taskRef, taskUpdatePayload);
+
+        if (historyNote) {
             const newHistoryEntry: DeliveryHistoryEntry = {
-                status: 'processing', // Keep the order status as 'processing'
+                status: 'processing', // Keep the order status as 'processing' for history
                 timestamp: serverTimestamp(),
-                notes: historyNotes[newStatus],
-                actorId: user?.uid,
+                notes: historyNote,
+                actorId: user.uid,
             };
             await updateDoc(orderRef, {
                 deliveryHistory: arrayUnion(newHistoryEntry)
@@ -187,9 +189,13 @@ export default function TasksPage() {
             const allTasksSnapshot = await getDocs(allTasksForOrderQuery);
             const allTasks = allTasksSnapshot.docs.map(d => d.data() as Task);
             
-            const allTasksAreComplete = allTasks.every(t => t.status === 'completed');
-
-            if (allTasksAreComplete) {
+            // This is slightly tricky due to local state vs firestore state.
+            // Check if all OTHER tasks are completed, and if the CURRENT task is now complete.
+            const allOtherTasksCompleted = allTasks
+                .filter(t => t.id !== taskId)
+                .every(t => t.status === 'completed');
+            
+            if (allOtherTasksCompleted) {
                 const finalHistoryEntry: DeliveryHistoryEntry = {
                     status: 'awaiting_assignment',
                     timestamp: serverTimestamp(),
@@ -206,14 +212,15 @@ export default function TasksPage() {
         }
 
         toast({ title: "Task Updated", description: `Task status changed to ${newStatus.replace('_', ' ')}.` });
-        if (selectedTask && selectedTask.id === taskId) {
-            setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null);
-        }
+        setIsModalOpen(false);
     } catch (error) {
         console.error("Error updating task status: ", error);
         toast({ title: "Error", description: "Could not update task status.", variant: "destructive" });
+    } finally {
+        setIsUpdating(false);
     }
   };
+
 
   const handleAssigneeChange = async () => {
     if (!db || !selectedTask || !selectedAssigneeId) {
@@ -225,7 +232,7 @@ export default function TasksPage() {
         toast({ title: "Error", description: "Selected technician not found.", variant: "destructive" });
         return;
     }
-    setIsUpdatingAssignee(true);
+    setIsUpdating(true);
     try {
         const taskRef = doc(db, 'tasks', selectedTask.id);
         await updateDoc(taskRef, {
@@ -241,7 +248,7 @@ export default function TasksPage() {
         console.error("Error updating assignee:", error);
         toast({ title: "Update Failed", description: "Could not update task assignee.", variant: "destructive" });
     } finally {
-        setIsUpdatingAssignee(false);
+        setIsUpdating(false);
     }
   };
 
@@ -329,6 +336,7 @@ export default function TasksPage() {
       toast({ title: "Error", description: "No proof image uploaded.", variant: "destructive" });
       return;
     }
+    setIsUpdating(true);
     try {
       const taskRef = doc(db, 'tasks', selectedTask.id);
       const orderRef = doc(db, 'orders', selectedTask.orderId!);
@@ -337,7 +345,7 @@ export default function TasksPage() {
         status: 'processing',
         timestamp: serverTimestamp(),
         notes: `Task '${selectedTask.taskType}' for item '${selectedTask.itemName}' is complete and awaits quality check.`,
-        actorId: user?.uid
+        actorId: user.uid
       };
 
       await updateDoc(taskRef, {
@@ -353,6 +361,8 @@ export default function TasksPage() {
     } catch (error) {
       console.error("Error submitting for approval:", error);
       toast({ title: "Submission Failed", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -361,6 +371,7 @@ export default function TasksPage() {
       toast({ title: "Error", description: "Rejection reason is required.", variant: "destructive" });
       return;
     }
+    setIsUpdating(true);
     try {
       const taskRef = doc(db, 'tasks', selectedTask.id);
       await updateDoc(taskRef, {
@@ -373,6 +384,8 @@ export default function TasksPage() {
       setIsModalOpen(false);
     } catch (error) {
       toast({ title: "Error", description: "Failed to reject task.", variant: "destructive" });
+    } finally {
+        setIsUpdating(false);
     }
   };
 
@@ -481,8 +494,8 @@ export default function TasksPage() {
               {(role === 'ServiceManager' || role === 'Admin') && (<div className="pt-2 space-y-2">
                   <Label htmlFor="assigneeSelect">Assigned Technician:</Label>
                   {selectedTask && (selectedTask.status === 'completed' || selectedTask.status === 'rejected') ? <Input value={selectedTask.assigneeName || "N/A"} disabled className="h-9 text-sm" /> : (<div className="flex gap-2 items-center">
-                      <Select value={selectedAssigneeId || ""} onValueChange={setSelectedAssigneeId} disabled={isLoadingTechnicians || isUpdatingAssignee}><SelectTrigger id="assigneeSelect" className="flex-grow h-9 text-xs sm:text-sm"><SelectValue placeholder="Select Technician" /></SelectTrigger><SelectContent>{isLoadingTechnicians && <SelectItem value="loading" disabled>Loading...</SelectItem>}{technicians.length === 0 && !isLoadingTechnicians && <SelectItem value="no-techs" disabled>No technicians available</SelectItem>}{technicians.map(tech => <SelectItem key={tech.uid} value={tech.uid}>{tech.displayName || tech.email}</SelectItem>)}</SelectContent></Select>
-                      <Button size="sm" onClick={handleAssigneeChange} disabled={isLoadingTechnicians || isUpdatingAssignee || !selectedAssigneeId || selectedAssigneeId === selectedTask?.assigneeId} className="h-9">{isUpdatingAssignee && <Loader2 className="mr-1 h-4 w-4 animate-spin"/>} Update</Button>
+                      <Select value={selectedAssigneeId || ""} onValueChange={setSelectedAssigneeId} disabled={isLoadingTechnicians || isUpdating}><SelectTrigger id="assigneeSelect" className="flex-grow h-9 text-xs sm:text-sm"><SelectValue placeholder="Select Technician" /></SelectTrigger><SelectContent>{isLoadingTechnicians && <SelectItem value="loading" disabled>Loading...</SelectItem>}{technicians.length === 0 && !isLoadingTechnicians && <SelectItem value="no-techs" disabled>No technicians available</SelectItem>}{technicians.map(tech => <SelectItem key={tech.uid} value={tech.uid}>{tech.displayName || tech.email}</SelectItem>)}</SelectContent></Select>
+                      <Button size="sm" onClick={handleAssigneeChange} disabled={isLoadingTechnicians || isUpdating || !selectedAssigneeId || selectedAssigneeId === selectedTask?.assigneeId} className="h-9">{isUpdating && <Loader2 className="mr-1 h-4 w-4 animate-spin"/>} Update</Button>
                   </div>)}
               </div>)}
               {role && technicianRoles.includes(role) && selectedTask?.assigneeName && <div><p className="text-sm font-medium">Assigned To:</p><p className="text-sm text-muted-foreground">{selectedTask.assigneeName}</p></div>}
@@ -495,18 +508,18 @@ export default function TasksPage() {
           <DialogFooter className="pt-4 border-t flex-col sm:flex-row sm:justify-between gap-2">
             <DialogClose asChild><Button type="button" variant="outline" size="sm">Close</Button></DialogClose>
              <div className="flex flex-wrap gap-2 justify-end">
-                {selectedTask && role && technicianRoles.includes(role) && selectedTask.status === 'pending' && (<Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'in-progress')}><Wrench className="mr-2 h-4 w-4" /> Start Task</Button>)}
+                {selectedTask && role && technicianRoles.includes(role) && selectedTask.status === 'pending' && (<Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'in-progress')} disabled={isUpdating}><Wrench className="mr-2 h-4 w-4" /> Start Task</Button>)}
                 {selectedTask && role && technicianRoles.includes(role) && selectedTask.status === 'in-progress' && (<div className="w-full space-y-2">
                     <Separator/>
                     <Label htmlFor="proofUpload">Upload Proof & Submit for Approval</Label>
-                    <Input id="proofUpload" type="file" onChange={handleProofUpload} disabled={uploadState.uploading}/>
+                    <Input id="proofUpload" type="file" onChange={handleProofUpload} disabled={uploadState.uploading || isUpdating}/>
                     {uploadState.error && <p className="text-xs text-destructive">{uploadState.error}</p>}
-                    <Button size="sm" onClick={handleSubmitForApproval} disabled={!uploadState.url || uploadState.uploading} className="w-full">{uploadState.uploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Uploading...</> : <><CheckCircle className="mr-2 h-4 w-4"/> Submit for Approval</>}
+                    <Button size="sm" onClick={handleSubmitForApproval} disabled={!uploadState.url || uploadState.uploading || isUpdating} className="w-full">{uploadState.uploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Uploading...</> : <><CheckCircle className="mr-2 h-4 w-4"/> Submit for Approval</>}
                     </Button>
                 </div>)}
                 {selectedTask && role === 'ServiceManager' && selectedTask.status === 'needs_approval' && (<>
-                    <Button size="sm" variant="destructive" onClick={() => setIsRejectionModalOpen(true)}><XCircle className="mr-2 h-4 w-4"/> Reject</Button>
-                    <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'completed')}><CheckCircle className="mr-2 h-4 w-4"/> Approve</Button>
+                    <Button size="sm" variant="destructive" onClick={() => setIsRejectionModalOpen(true)} disabled={isUpdating}><XCircle className="mr-2 h-4 w-4"/> Reject</Button>
+                    <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'completed')} disabled={isUpdating}><CheckCircle className="mr-2 h-4 w-4"/> Approve</Button>
                 </>)}
              </div>
           </DialogFooter>
@@ -515,12 +528,13 @@ export default function TasksPage() {
       <Dialog open={isRejectionModalOpen} onOpenChange={setIsRejectionModalOpen}>
         <DialogContent><DialogHeader><DialogTitle>Reject Task</DialogTitle><DialogDescription>Provide a reason for rejecting the proof of work. This will be visible to the technician.</DialogDescription></DialogHeader>
           <div className="py-2"><Textarea placeholder="e.g., Image is blurry, customization is incorrect..." value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} /></div>
-          <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose><Button type="button" variant="destructive" onClick={handleRejectionSubmit} disabled={!rejectionReason.trim()}>Confirm Rejection</Button></DialogFooter>
+          <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose><Button type="button" variant="destructive" onClick={handleRejectionSubmit} disabled={!rejectionReason.trim() || isUpdating}>Confirm Rejection</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </>
   );
 }
+
 
 
 
