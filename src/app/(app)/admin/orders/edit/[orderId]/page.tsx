@@ -25,6 +25,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from 'date-fns';
+import { sendDeliveryConfirmation } from '@/ai/flows/send-delivery-confirmation-flow';
 
 const technicianRoles: UserRole[] = ['Engraving', 'Printing', 'Assembly', 'Quality Check', 'Packaging'];
 
@@ -281,6 +282,18 @@ export default function AdminOrderDetailPage() {
         console.error("Failed to send push notification:", notificationError);
       }
       
+      if (data.status === 'delivered') {
+        try {
+          // Clone order object to ensure it has all latest properties before sending
+          const latestOrderData = { ...order, status: data.status as OrderStatus, updatedAt: new Date() };
+          await sendDeliveryConfirmation({ order: latestOrderData });
+          toast({ title: "Delivery & Email Confirmation Sent", description: "Customer has been notified via email." });
+        } catch (emailError) {
+          console.error("Failed to send delivery confirmation email:", emailError);
+          toast({ title: "Delivery Confirmed (Email Failed)", description: "Order status updated, but email notification failed.", variant: "destructive" });
+        }
+      }
+
       setOrder(prev => prev ? { 
           ...prev, 
           status: data.status as OrderStatus, 
@@ -394,6 +407,8 @@ export default function AdminOrderDetailPage() {
     return <div className="flex items-center justify-center min-h-screen"><AlertTriangle className="h-10 w-10 text-destructive mr-2" /> Order not found.</div>;
   }
 
+  const isOrderDelivered = order.status === 'delivered';
+
   return (
     <div className="space-y-6">
       <Button variant="outline" onClick={() => router.push('/admin/orders')} className="mb-4">
@@ -422,7 +437,7 @@ export default function AdminOrderDetailPage() {
                         name="status"
                         control={statusForm.control}
                         render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isOrderDelivered}>
                             <SelectTrigger id="orderStatus"><SelectValue placeholder="Select new status" /></SelectTrigger>
                             <SelectContent>
                             {allOrderStatuses.map(s => <SelectItem key={s} value={s} className="capitalize">{s.replace(/_/g, ' ')}</SelectItem>)}
@@ -432,7 +447,7 @@ export default function AdminOrderDetailPage() {
                     />
                     {statusForm.formState.errors.status && <p className="text-xs text-destructive mt-1">{statusForm.formState.errors.status.message}</p>}
                     </div>
-                    <Button type="submit" disabled={isUpdatingStatus}>
+                    <Button type="submit" disabled={isUpdatingStatus || isOrderDelivered}>
                         {isUpdatingStatus ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />} Save Status
                     </Button>
                 </form>
