@@ -46,7 +46,12 @@ const formatPrice = (price: number): string => {
 };
 
 const predefinedTaskTypes = ["Engraving", "Printing", "Assembly", "Quality Check", "Packaging"];
-const allOrderStatuses: OrderStatus[] = ['pending', 'pending_finance_approval', 'processing', 'awaiting_assignment', 'assigned', 'out_for_delivery', 'shipped', 'delivered', 'delivery_attempted', 'cancelled'];
+const allOrderStatuses: OrderStatus[] = [
+    'pending', 'pending_finance_approval', 'processing',
+    'in_production', 'awaiting_quality_check', 'production_complete', 
+    'awaiting_assignment', 'assigned', 'out_for_delivery', 'shipped', 
+    'delivered', 'delivery_attempted', 'cancelled'
+];
 
 const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] => {
   switch (status) {
@@ -54,6 +59,9 @@ const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] 
     case 'pending_finance_approval':
        return 'statusYellow';
     case 'processing': return 'statusAmber';
+    case 'in_production': return 'statusPurple';
+    case 'awaiting_quality_check': return 'statusIndigo';
+    case 'production_complete': return 'statusOrange';
     case 'awaiting_assignment': return 'statusOrange';
     case 'assigned': return 'statusOrderAssigned';
     case 'out_for_delivery': return 'statusBlue';
@@ -399,6 +407,7 @@ export default function AdminOrderDetailPage() {
     return { label: optionDef.label, value: displayValue, isColor, colorHex, isImage, imageUrl };
   };
 
+  const isTaskCreationAllowed = order?.paymentStatus === 'paid' && order?.status === 'processing';
 
   if (isLoading || authLoading || isLoadingItemOptions) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -472,13 +481,10 @@ export default function AdminOrderDetailPage() {
                           </TableCell>
                           <TableCell className="text-right font-medium">{formatPrice(item.price)}</TableCell>
                           <TableCell className="text-right">
-                            {item.customizations && Object.keys(item.customizations).length > 0 && !itemHasExistingTask(item.name) && (role === 'Admin' || role === 'ServiceManager') && (
-                              <Button variant="outline" size="sm" onClick={() => openTaskDialog(item)}>
+                            {item.customizations && Object.keys(item.customizations).length > 0 && (role === 'Admin' || role === 'ServiceManager') && (
+                              <Button variant="outline" size="sm" onClick={() => openTaskDialog(item)} disabled={!isTaskCreationAllowed}>
                                 <Settings2 className="mr-1 h-3 w-3"/> Create Task
                               </Button>
-                            )}
-                            {itemHasExistingTask(item.name) && (
-                                <Badge variant="outline" className="text-xs">ASSIGNED</Badge>
                             )}
                           </TableCell>
                         </TableRow>
@@ -690,5 +696,3 @@ export default function AdminOrderDetailPage() {
     </div>
   );
 }
-
-    

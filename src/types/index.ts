@@ -100,8 +100,11 @@ export interface Product {
 export type OrderStatus =
   | 'pending'
   | 'pending_finance_approval'
-  | 'processing'
-  | 'awaiting_assignment'
+  | 'processing' // Order approved, ready for production tasks to be created
+  | 'in_production' // A task has been started by a technician
+  | 'awaiting_quality_check' // A technician has submitted work for approval
+  | 'production_complete' // All tasks are done, ready for dispatch assignment
+  | 'awaiting_assignment' // Alias for production_complete, for dispatch view
   | 'assigned'
   | 'out_for_delivery'
   | 'delivered'

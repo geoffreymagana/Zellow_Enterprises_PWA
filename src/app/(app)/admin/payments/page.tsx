@@ -157,7 +157,7 @@ export default function AdminPaymentsPage() {
       } else {
           const invoice = tx as Invoice;
           searchMatch = invoice.invoiceNumber.toLowerCase().includes(searchTermLower) ||
-                        invoice.supplierName?.toLowerCase().includes(searchTermLower);
+                        (invoice as any).supplierName?.toLowerCase().includes(searchTermLower);
       }
       
       const statusMatch = statusFilter === ALL_STATUSES_SENTINEL || tx.paymentStatus === statusFilter;
@@ -204,7 +204,7 @@ export default function AdminPaymentsPage() {
         break;
       case 'refund':
         newPaymentStatus = 'refunded';
-        newOrderStatus = 'cancelled';
+        newOrderStatus = 'cancelled'; // A refunded order is also cancelled from a fulfillment POV
         historyNotes = `Payment refunded by ${user.displayName || user.email}. Reason: ${actionReason}`;
         updatePayload.paymentStatus = newPaymentStatus;
         updatePayload.status = newOrderStatus;
@@ -356,7 +356,7 @@ export default function AdminPaymentsPage() {
                   const order = isRevenue ? tx as Order : null;
                   const invoice = !isRevenue ? tx as Invoice : null;
                   const referenceId = order?.id || invoice?.invoiceNumber || 'N/A';
-                  const partyName = order?.customerName || invoice?.supplierName || 'N/A';
+                  const partyName = order?.customerName || (invoice as any)?.supplierName || 'N/A';
                   const date = order?.createdAt || invoice?.createdAt;
                   const paymentMethod = order?.paymentMethod || 'Bank Transfer';
                   const paymentStatus = order?.paymentStatus || invoice?.status;
@@ -451,7 +451,7 @@ export default function AdminPaymentsPage() {
                 {viewingTransaction?.transactionType === 'revenue' && (viewingTransaction as Order).paymentStatus === 'pending' && (
                   <Button onClick={() => handleOpenActionModal(viewingTransaction as Order, 'confirm')} disabled={isSubmittingAction}>
                     {isSubmittingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Confirm Payment Received
+                    Confirm Payment
                   </Button>
                 )}
                 <DialogClose asChild>
@@ -488,7 +488,7 @@ export default function AdminPaymentsPage() {
                 type="button" 
                 onClick={handleConfirmAction} 
                 disabled={isSubmittingAction || ((actionType === 'reject' || actionType === 'refund') && !actionReason.trim())}
-                variant={actionType === 'reject' ? 'destructive' : 'default'}
+                variant={actionType === 'reject' || actionType === 'refund' ? 'destructive' : 'default'}
             >
                 {isSubmittingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
                 Confirm {actionType}
