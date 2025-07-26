@@ -1,3 +1,5 @@
+
+
 "use client";
 
 import { useAuth } from '@/hooks/useAuth';
@@ -9,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Edit, Filter, DollarSign, CheckCircle, PackageOpen, AlertTriangle, RefreshCw, CreditCard, Banknote, Truck, ArrowUpRight, ArrowDownLeft, Eye, XCircle, Undo2 } from 'lucide-react';
+import { Loader2, Search, Filter, DollarSign, CheckCircle, PackageOpen, AlertTriangle, RefreshCw, CreditCard, Banknote, Truck, ArrowUpRight, ArrowDownLeft, Eye, XCircle, Undo2, FileText } from 'lucide-react';
 import type { Order, Invoice, PaymentStatus, OrderStatus, DeliveryHistoryEntry } from '@/types';
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import Link from 'next/link';
@@ -21,12 +23,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { sendOrderReceipt } from '@/ai/flows/send-receipt-flow';
 
 
 type UnifiedTransaction = (Order | Invoice) & { transactionType: 'revenue' | 'expense' };
 type PaymentAction = 'confirm' | 'reject' | 'refund';
 
-const paymentStatuses: (PaymentStatus | "all")[] = ['all', 'pending', 'paid', 'failed', 'refunded'];
+const paymentStatuses: (PaymentStatus | "all")[] = ['all', 'pending', 'paid', 'failed', 'refunded', 'refund_requested'];
 const ALL_STATUSES_SENTINEL = "all";
 
 const formatPrice = (price: number): string => {
@@ -35,7 +38,9 @@ const formatPrice = (price: number): string => {
 
 const formatDate = (timestamp: any) => {
   if (!timestamp) return 'N/A';
-  return timestamp.toDate ? format(timestamp.toDate(), 'PPp') : 'Invalid Date';
+  const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+  if (isNaN(date.getTime())) return 'Invalid Date';
+  return format(date, 'PPp');
 };
 
 const getPaymentStatusBadgeVariant = (status: PaymentStatus): BadgeProps['variant'] => {
@@ -43,10 +48,30 @@ const getPaymentStatusBadgeVariant = (status: PaymentStatus): BadgeProps['varian
     case 'pending': return 'statusAmber';
     case 'paid': return 'statusGreen';
     case 'failed': return 'statusRed';
+    case 'refund_requested': return 'statusOrange';
     case 'refunded': return 'statusGrey';
     default: return 'outline';
   }
 };
+
+// Helper to convert Firestore Timestamps to JS Dates for serialization
+const convertTimestampsToDates = (obj: any): any => {
+    if (obj === null || typeof obj !== 'object') {
+        return obj;
+    }
+    if (obj instanceof Timestamp) {
+        return obj.toDate();
+    }
+    if (Array.isArray(obj)) {
+        return obj.map(convertTimestampsToDates);
+    }
+    const newObj: { [key: string]: any } = {};
+    for (const key in obj) {
+        newObj[key] = convertTimestampsToDates(obj[key]);
+    }
+    return newObj;
+};
+
 
 export default function AdminPaymentsPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -64,6 +89,7 @@ export default function AdminPaymentsPage() {
   const [actionType, setActionType] = useState<PaymentAction | null>(null);
   const [actionReason, setActionReason] = useState("");
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const [isSendingReceipt, setIsSendingReceipt] = useState(false);
 
   const [summaryStats, setSummaryStats] = useState({
     totalRevenue: 0,
@@ -156,7 +182,7 @@ export default function AdminPaymentsPage() {
       } else {
           const invoice = tx as Invoice;
           searchMatch = invoice.invoiceNumber.toLowerCase().includes(searchTermLower) ||
-                        invoice.supplierName?.toLowerCase().includes(searchTermLower);
+                        (invoice as any).supplierName?.toLowerCase().includes(searchTermLower);
       }
       
       const statusMatch = statusFilter === ALL_STATUSES_SENTINEL || tx.paymentStatus === statusFilter;
@@ -203,8 +229,12 @@ export default function AdminPaymentsPage() {
         break;
       case 'refund':
         newPaymentStatus = 'refunded';
-        historyNotes = `Payment refunded by ${user.displayName || user.email}. Reason: ${actionReason}`;
+        historyNotes = `Refund processed by ${user.displayName || user.email}. Reason: ${actionReason}`;
         updatePayload.paymentStatus = newPaymentStatus;
+        if (actionableOrder.status !== 'cancelled') {
+            newOrderStatus = 'cancelled';
+            updatePayload.status = newOrderStatus;
+        }
         break;
     }
 
@@ -218,6 +248,13 @@ export default function AdminPaymentsPage() {
     
     try {
       await updateDoc(orderRef, updatePayload);
+      
+      if (newPaymentStatus === 'paid' || newPaymentStatus === 'refunded') {
+        const fullOrderData = { ...actionableOrder, ...updatePayload, deliveryHistory: [...(actionableOrder.deliveryHistory || []), newHistoryEntry] };
+        const serializableOrder = convertTimestampsToDates(fullOrderData);
+        await sendOrderReceipt({ order: serializableOrder });
+      }
+
       toast({ title: `Action Successful`, description: `Order payment has been ${newPaymentStatus || 'updated'}.` });
       fetchFinancialData(); // Refresh data after action
       setIsActionModalOpen(false);
@@ -226,6 +263,23 @@ export default function AdminPaymentsPage() {
       toast({ title: "Action Failed", description: `Could not update order: ${e.message}`, variant: "destructive" });
     } finally {
       setIsSubmittingAction(false);
+    }
+  };
+
+  const handleGenerateReceipt = async (order: Order) => {
+    setIsSendingReceipt(true);
+    try {
+        const serializableOrder = convertTimestampsToDates(order);
+        const result = await sendOrderReceipt({ order: serializableOrder, emailSubject: `Receipt for your Zellow Order #${order.id.substring(0,8)}` });
+        if (result.success) {
+            toast({ title: "Receipt Sent", description: `An updated receipt has been sent to ${order.customerEmail}.` });
+        } else {
+            throw new Error(result.message);
+        }
+    } catch (e: any) {
+        toast({ title: "Failed to Send Receipt", description: e.message, variant: "destructive" });
+    } finally {
+        setIsSendingReceipt(false);
     }
   };
 
@@ -353,7 +407,7 @@ export default function AdminPaymentsPage() {
                   const order = isRevenue ? tx as Order : null;
                   const invoice = !isRevenue ? tx as Invoice : null;
                   const referenceId = order?.id || invoice?.invoiceNumber || 'N/A';
-                  const partyName = order?.customerName || invoice?.supplierName || 'N/A';
+                  const partyName = order?.customerName || (invoice as any)?.supplierName || 'N/A';
                   const date = order?.createdAt || invoice?.createdAt;
                   const paymentMethod = order?.paymentMethod || 'Bank Transfer';
                   const paymentStatus = order?.paymentStatus || invoice?.status;
@@ -394,8 +448,13 @@ export default function AdminPaymentsPage() {
                               <Button size="sm" onClick={() => handleOpenActionModal(order!, 'confirm')} disabled={isSubmittingAction}><CheckCircle className="h-4 w-4"/></Button>
                             </>
                           )}
-                           {isRevenue && paymentStatus === 'paid' && (
-                            <Button size="sm" variant="outline" onClick={() => handleOpenActionModal(order!, 'refund')} disabled={isSubmittingAction}><Undo2 className="h-4 w-4"/></Button>
+                           {isRevenue && paymentStatus === 'refund_requested' && (
+                            <Button size="sm" variant="destructive" onClick={() => handleOpenActionModal(order!, 'refund')} disabled={isSubmittingAction}><Undo2 className="h-4 w-4 mr-1"/> Process Refund</Button>
+                          )}
+                          {isRevenue && ['paid', 'refunded', 'cancelled'].includes(paymentStatus) && (
+                            <Button size="sm" variant="outline" onClick={() => handleGenerateReceipt(order!)} disabled={isSendingReceipt || isSubmittingAction}>
+                                {isSendingReceipt ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4"/>}
+                            </Button>
                           )}
                           <Button variant="ghost" size="icon" aria-label="View Details" onClick={() => setViewingTransaction(tx)}>
                             <Eye className="h-4 w-4"/>
@@ -435,7 +494,7 @@ export default function AdminPaymentsPage() {
                  {viewingTransaction && viewingTransaction.transactionType === 'expense' && (
                   <div className="space-y-2 text-sm">
                     <p><strong>Type:</strong> Supplier Payment (Expense)</p>
-                    <p><strong>Supplier:</strong> {(viewingTransaction as Invoice).supplierName}</p>
+                    <p><strong>Supplier:</strong> {(viewingTransaction as any).supplierName}</p>
                     <p><strong>Payment Method:</strong> Bank Transfer</p>
                     <p><strong>Payment Status:</strong> <Badge variant="statusGreen">Paid</Badge></p>
                     <p><strong>Date Paid:</strong> {formatDate((viewingTransaction as Invoice).updatedAt)}</p>
@@ -448,7 +507,7 @@ export default function AdminPaymentsPage() {
                 {viewingTransaction?.transactionType === 'revenue' && (viewingTransaction as Order).paymentStatus === 'pending' && (
                   <Button onClick={() => handleOpenActionModal(viewingTransaction as Order, 'confirm')} disabled={isSubmittingAction}>
                     {isSubmittingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Confirm Payment Received
+                    Confirm Payment
                   </Button>
                 )}
                 <DialogClose asChild>
@@ -485,7 +544,7 @@ export default function AdminPaymentsPage() {
                 type="button" 
                 onClick={handleConfirmAction} 
                 disabled={isSubmittingAction || ((actionType === 'reject' || actionType === 'refund') && !actionReason.trim())}
-                variant={actionType === 'reject' ? 'destructive' : 'default'}
+                variant={actionType === 'reject' || actionType === 'refund' ? 'destructive' : 'default'}
             >
                 {isSubmittingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
                 Confirm {actionType}

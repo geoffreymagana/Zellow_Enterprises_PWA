@@ -34,7 +34,13 @@ export async function sendOrderReceipt(input: ReceiptFlowInput): Promise<Receipt
 const generateReceiptPdf = (order: Order): string => {
   const doc = new jsPDF();
   const formatPrice = (price: number): string => new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
-  const formatDate = (timestamp: any) => timestamp?.toDate ? format(timestamp.toDate(), 'PP') : (timestamp ? format(new Date(timestamp), 'PP') : 'N/A');
+  
+  // Simplified formatDate since it will receive a proper Date object
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return 'N/A';
+    const date = new Date(timestamp);
+    return isNaN(date.getTime()) ? 'Invalid Date' : format(date, 'PP');
+  };
   
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
@@ -61,10 +67,11 @@ const generateReceiptPdf = (order: Order): string => {
 
   doc.setFont('helvetica', 'normal');
   order.items.forEach(item => {
+    const itemTotalPrice = item.price * item.quantity;
     doc.text(item.name, 14, yPos);
     doc.text(item.quantity.toString(), 110, yPos);
     doc.text(formatPrice(item.price), 140, yPos);
-    doc.text(formatPrice(item.price * item.quantity), 170, yPos);
+    doc.text(formatPrice(itemTotalPrice), 170, yPos);
     yPos += 7;
   });
 
@@ -90,8 +97,12 @@ const generateReceiptPdf = (order: Order): string => {
     doc.text('REFUNDED', 14, yPos);
     doc.setTextColor(0, 0, 0); // Reset color
     
-    const refundHistory = order.deliveryHistory?.find(h => h.status === 'cancelled' && h.notes?.toLowerCase().includes('refund'));
-    if (refundHistory) {
+    // Attempt to find the refund history entry
+    const refundHistory = (order.deliveryHistory || []).find(h => 
+        (h.status === 'cancelled' || h.status === 'refunded') && 
+        h.notes?.toLowerCase().includes('refund')
+    );
+    if (refundHistory && refundHistory.timestamp) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text(`Refund processed on: ${formatDate(refundHistory.timestamp)}`, 14, yPos + 6);
@@ -146,22 +157,23 @@ const sendReceiptFlow = ai.defineFlow(
     let emailHtmlBody = "";
 
     if (!finalSubject) {
-        switch (order.status) {
-            case 'delivered':
-                finalSubject = `Your Zellow Order #${order.id.substring(0,8)} Has Been Delivered`;
-                emailHtmlBody = `<p>Your order from Zellow Enterprises has been successfully delivered! We've attached a receipt for your records.</p>`;
-                break;
-            case 'cancelled':
-                finalSubject = `Receipt for Your Cancelled Zellow Order #${order.id.substring(0,8)}`;
-                 if (order.paymentStatus === 'refunded') {
-                    emailHtmlBody = `<p>This is a confirmation that your order has been cancelled and your payment has been refunded. A receipt is attached for your records.</p>`;
+        switch (order.paymentStatus) {
+            case 'paid':
+                if (order.status === 'delivered') {
+                    finalSubject = `Your Zellow Order #${order.id.substring(0,8)} Has Been Delivered`;
+                    emailHtmlBody = `<p>Your order from Zellow Enterprises has been successfully delivered! We've attached a receipt for your records.</p>`;
                 } else {
-                    emailHtmlBody = `<p>This is a receipt for your cancelled order. Please contact support if you have any questions.</p>`;
+                    finalSubject = `Receipt for Your Zellow Order #${order.id.substring(0,8)}`;
+                    emailHtmlBody = `<p>Thank you for your order with Zellow Enterprises. Your payment has been confirmed. We've attached a receipt for your records.</p>`;
                 }
                 break;
-            default:
-                finalSubject = `Receipt for Your Zellow Order #${order.id.substring(0,8)}`;
-                emailHtmlBody = `<p>Thank you for your order with Zellow Enterprises. We've attached a receipt for your records.</p>`;
+            case 'refunded':
+                finalSubject = `Refund Confirmation for Zellow Order #${order.id.substring(0,8)}`;
+                emailHtmlBody = `<p>This is a confirmation that your order has been cancelled and your payment has been refunded. A receipt is attached for your records.</p>`;
+                break;
+            default: // Other statuses, e.g., cancelled with no payment
+                finalSubject = `Update on Your Zellow Order #${order.id.substring(0,8)}`;
+                emailHtmlBody = `<p>Please find an updated receipt for your order attached. If you have any questions, please contact our support team.</p>`;
                 break;
         }
     } else {
