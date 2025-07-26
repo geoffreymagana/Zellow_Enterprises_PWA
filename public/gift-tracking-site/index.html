@@ -1,455 +1,394 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Track Your Gift - Zellow Enterprises</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Track Your Gift - Zellow Enterprises</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f8f9fa;
-            color: #333;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            padding: 40px 20px;
-        }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f8f9fa;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 20px;
+    }
 
-        .container {
-            background: white;
-            width: 100%;
-            max-width: 420px;
-            border-radius: 16px;
-            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
-            overflow: hidden;
-        }
+    .container {
+      background: white;
+      width: 100%;
+      max-width: 420px;
+      border-radius: 16px;
+      box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+    }
 
-        .header {
-            text-align: center;
-            padding: 40px 30px 30px;
-        }
+    .header {
+      text-align: center;
+      padding: 40px 30px 30px;
+    }
 
-        .status-icon {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #4CAF50, #81C784);
-            border-radius: 50%;
-            margin: 0 auto 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32px;
-            position: relative;
-        }
+    .status-icon {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, #4CAF50, #81C784);
+      border-radius: 50%;
+      margin: 0 auto 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      position: relative;
+    }
 
-        .status-icon::after {
-            content: '';
-            position: absolute;
-            width: 100px;
-            height: 100px;
-            background: rgba(76, 175, 80, 0.1);
-            border-radius: 50%;
-            z-index: -1;
-        }
+    .status-icon::after {
+      content: '';
+      position: absolute;
+      width: 100px;
+      height: 100px;
+      background: rgba(76, 175, 80, 0.1);
+      border-radius: 50%;
+      z-index: -1;
+    }
 
-        .header h1 {
-            font-size: 24px;
-            font-weight: 600;
-            color: #1a1a1a;
-            margin-bottom: 8px;
-        }
+    .header h1 {
+      font-size: 24px;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 8px;
+    }
 
-        .header p {
-            color: #666;
-            font-size: 16px;
-        }
+    .header p {
+      color: #666;
+      font-size: 16px;
+    }
 
-        .content {
-            padding: 0 30px 30px;
-        }
+    .content {
+      padding: 0 30px 30px;
+    }
 
-        .order-item {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 24px;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
+    .order-item {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
 
-        .item-image {
-            width: 60px;
-            height: 60px;
-            background: #e9ecef;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            flex-shrink: 0;
-        }
+    .item-image {
+      width: 60px;
+      height: 60px;
+      background: #e9ecef;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
 
-        .item-details {
-            flex: 1;
-        }
+    .item-details {
+      flex: 1;
+    }
 
-        .item-name {
-            font-weight: 600;
-            color: #1a1a1a;
-            margin-bottom: 4px;
-            font-size: 16px;
-        }
+    .item-name {
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 4px;
+      font-size: 16px;
+    }
 
-        .item-meta {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 2px;
-        }
+    .item-meta {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
 
-        .item-price {
-            font-weight: 600;
-            color: #1a1a1a;
-            font-size: 16px;
-        }
+    .summary-section {
+      margin-top: 8px;
+    }
 
-        .summary-section {
-            margin-top: 8px;
-        }
+    .summary-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 16px;
+    }
 
-        .summary-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1a1a1a;
-            margin-bottom: 16px;
-        }
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
 
-        .summary-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
+    .summary-row:last-child {
+      border-bottom: none;
+    }
 
-        .summary-row:last-child {
-            border-bottom: none;
-        }
+    .summary-label {
+      color: #666;
+      font-size: 14px;
+    }
 
-        .summary-label {
-            color: #666;
-            font-size: 14px;
-        }
+    .summary-value {
+      color: #1a1a1a;
+      font-size: 14px;
+      font-weight: 500;
+      text-align: right;
+    }
 
-        .summary-value {
-            color: #1a1a1a;
-            font-size: 14px;
-            font-weight: 500;
-            text-align: right;
-        }
+    .loader {
+      text-align: center;
+      padding: 60px 30px;
+      color: #666;
+    }
 
-        .loader {
-            text-align: center;
-            padding: 60px 30px;
-            color: #666;
-        }
+    .loader-icon {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #f0f0f0;
+      border-top: 3px solid #4CAF50;
+      border-radius: 50%;
+      margin: 0 auto 16px;
+      animation: spin 1s linear infinite;
+    }
 
-        .loader-icon {
-            width: 40px;
-            height: 40px;
-            border: 3px solid #f0f0f0;
-            border-top: 3px solid #4CAF50;
-            border-radius: 50%;
-            margin: 0 auto 16px;
-            animation: spin 1s linear infinite;
-        }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+    .error-message {
+      text-align: center;
+      padding: 40px 30px;
+      color: #d32f2f;
+      background: #ffebee;
+      margin: 20px;
+      border-radius: 12px;
+    }
 
-        .error-message {
-            text-align: center;
-            padding: 40px 30px;
-            color: #d32f2f;
-            background: #ffebee;
-            margin: 20px;
-            border-radius: 12px;
-        }
+    .footer {
+      text-align: center;
+      padding: 20px;
+      color: #999;
+      font-size: 12px;
+      border-top: 1px solid #f0f0f0;
+    }
 
-        .footer {
-            text-align: center;
-            padding: 20px;
-            color: #999;
-            font-size: 12px;
-            border-top: 1px solid #f0f0f0;
-        }
+    /* Status Styles */
+    .status-pending .status-icon { background: linear-gradient(135deg, #9e9e9e, #bdbdbd); }
+    .status-pending_finance_approval .status-icon { background: linear-gradient(135deg, #6a1b9a, #ab47bc); }
+    .status-processing .status-icon { background: linear-gradient(135deg, #FF9800, #FFB74D); }
+    .status-in_production .status-icon { background: linear-gradient(135deg, #00897b, #4db6ac); }
+    .status-awaiting_quality_check .status-icon { background: linear-gradient(135deg, #fbc02d, #fff176); }
+    .status-production_complete .status-icon { background: linear-gradient(135deg, #00796b, #4db6ac); }
+    .status-awaiting_assignment .status-icon,
+    .status-assigned .status-icon { background: linear-gradient(135deg, #5c6bc0, #7986cb); }
+    .status-out_for_delivery .status-icon { background: linear-gradient(135deg, #1e88e5, #64b5f6); }
+    .status-shipped .status-icon { background: linear-gradient(135deg, #2196F3, #64B5F6); }
+    .status-delivery_attempted .status-icon { background: linear-gradient(135deg, #ef6c00, #ffb74d); }
+    .status-delivered .status-icon { background: linear-gradient(135deg, #4CAF50, #81C784); }
+    .status-cancelled .status-icon { background: linear-gradient(135deg, #f44336, #ef5350); }
+    .status-completed .status-icon { background: linear-gradient(135deg, #43a047, #66bb6a); }
+    .status-rejected_by_customer .status-icon { background: linear-gradient(135deg, #c62828, #ef5350); }
+    .status-awaiting_customer_confirmation .status-icon,
+    .status-awaiting_customer_approval .status-icon { background: linear-gradient(135deg, #1565c0, #64b5f6); }
 
-        /* Status-specific colors */
-        .status-processing .status-icon {
-            background: linear-gradient(135deg, #FF9800, #FFB74D);
-        }
-        
-        .status-processing .status-icon::after {
-            background: rgba(255, 152, 0, 0.1);
-        }
+    @media (max-width: 480px) {
+      body { padding: 20px 15px; }
+      .header { padding: 30px 20px 20px; }
+      .content { padding: 0 20px 20px; }
+      .container { border-radius: 12px; }
+    }
 
-        .status-shipped .status-icon {
-            background: linear-gradient(135deg, #2196F3, #64B5F6);
-        }
-        
-        .status-shipped .status-icon::after {
-            background: rgba(33, 150, 243, 0.1);
-        }
-        .status-cancelled .status-icon {
-    background: linear-gradient(135deg, #f44336, #ef5350);
-}
-        
-.status-cancelled .status-icon::after {
-    background: rgba(244, 67, 54, 0.1);
-}
-
-        .status-delivered .status-icon {
-            background: linear-gradient(135deg, #4CAF50, #81C784);
-        }
-        
-        .status-delivered .status-icon::after {
-            background: rgba(76, 175, 80, 0.1);
-        }
-
-        /* Responsive */
-        @media (max-width: 480px) {
-            body {
-                padding: 20px 15px;
-            }
-            
-            .header {
-                padding: 30px 20px 20px;
-            }
-            
-            .content {
-                padding: 0 20px 20px;
-            }
-            
-            .container {
-                border-radius: 12px;
-            }
-        }
-
-        /* Hidden by default */
-        #order-details {
-            display: none;
-        }
-    </style>
-
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    #order-details { display: none; }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
-    <div class="container">
-        <div id="loader" class="loader">
-            <div class="loader-icon"></div>
-            <p>Loading your gift details...</p>
-        </div>
-        
-        <div id="error-message" class="error-message" style="display: none;"></div>
-        
-        <div id="order-details">
-            <div class="header status-processing">
-                <div class="status-icon">🎁</div>
-                <h1 id="order-status-title">Order Status</h1>
-                <p id="order-status-subtitle">Your package is on the way</p>
-            </div>
-            
-            <div class="content">
-                <div class="order-item">
-                    <div class="item-image">🎁</div>
-                    <div class="item-details">
-                        <div class="item-name">Gift Package</div>
-                        <div class="item-meta">For: <span id="recipient-name">Valued Recipient</span></div>
-                    </div>
-                </div>
-                
-                <div class="summary-section">
-                    <h3 class="summary-title">Order Summary</h3>
-                    
-                    <div class="summary-row">
-                        <span class="summary-label">Order ID</span>
-                        <span class="summary-value" id="order-id" style="color: #2196F3;">Loading...</span>
-                    </div>
-                    
-                    <div class="summary-row">
-                        <span class="summary-label">Status</span>
-                        <span class="summary-value" id="order-status">Processing</span>
-                    </div>
-                    
-                    <div class="summary-row">
-                        <span class="summary-label">Delivery Date</span>
-                        <span class="summary-value" id="expected-delivery-date">Calculating...</span>
-                    </div>
-                    
-                    <div id="message-row" style="display: none; flex-direction: column; align-items: center; text-align: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0;">
-                        <span style="color: #666; font-size: 14px; margin-bottom: 8px;">Message</span>
-                        <span id="message-from-sender" style="color: #1a1a1a; font-size: 14px; font-weight: 400; font-style: italic; text-align: center; word-wrap: break-word; max-width: 100%;"></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="footer">
-            <p>&copy; <span id="current-year">2025</span> Zellow Enterprises. All rights reserved.</p>
-        </div>
+  <div class="container">
+    <div id="loader" class="loader">
+      <div class="loader-icon"></div>
+      <p>Loading your gift details...</p>
     </div>
 
-    <script>
-        // Firebase configuration and initialization
-        const firebaseConfig = {
-            apiKey: "AIzaSyDzUlYdqqdkTxcHJHChsX6zM-U_7N92xec",
-            authDomain: "zellowlive.firebaseapp.com",
-            projectId: "zellowlive",
-            storageBucket: "zellowlive.firebasestorage.app",
-            messagingSenderId: "943761891650",
-            appId: "1:943761891650:web:e8c12f77ea9d5edf0b68db",
+    <div id="error-message" class="error-message" style="display: none;"></div>
+
+    <div id="order-details">
+      <div class="header status-processing">
+        <div class="status-icon">🎁</div>
+        <h1 id="order-status-title">Order Status</h1>
+        <p id="order-status-subtitle">Your package is on the way</p>
+      </div>
+
+      <div class="content">
+        <div class="order-item">
+          <div class="item-image">🎁</div>
+          <div class="item-details">
+            <div class="item-name">Gift Package</div>
+            <div class="item-meta">For: <span id="recipient-name">Valued Recipient</span></div>
+          </div>
+        </div>
+
+        <div class="summary-section">
+          <h3 class="summary-title">Order Summary</h3>
+          <div class="summary-row">
+            <span class="summary-label">Order ID</span>
+            <span class="summary-value" id="order-id" style="color: #2196F3;">Loading...</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Status</span>
+            <span class="summary-value" id="order-status">Processing</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Delivery Date</span>
+            <span class="summary-value" id="expected-delivery-date">Calculating...</span>
+          </div>
+          <div id="message-row" style="display: none; flex-direction: column; align-items: center; text-align: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0;">
+            <span style="color: #666; font-size: 14px; margin-bottom: 8px;">Message</span>
+            <span id="message-from-sender" style="color: #1a1a1a; font-size: 14px; font-weight: 400; font-style: italic;"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>&copy; <span id="current-year">2025</span> Zellow Enterprises. All rights reserved.</p>
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDzUlYdqqdkTxcHJHChsX6zM-U_7N92xec",
+      authDomain: "zellowlive.firebaseapp.com",
+      projectId: "zellowlive",
+      storageBucket: "zellowlive.appspot.com",
+      messagingSenderId: "943761891650",
+      appId: "1:943761891650:web:e8c12f77ea9d5edf0b68db"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const loader = document.getElementById('loader');
+      const errorMessageDiv = document.getElementById('error-message');
+      const orderDetailsDiv = document.getElementById('order-details');
+      const recipientNameEl = document.getElementById('recipient-name');
+      const orderStatusEl = document.getElementById('order-status');
+      const orderStatusTitleEl = document.getElementById('order-status-title');
+      const orderStatusSubtitleEl = document.getElementById('order-status-subtitle');
+      const expectedDeliveryEl = document.getElementById('expected-delivery-date');
+      const orderIdEl = document.getElementById('order-id');
+      const messageRowEl = document.getElementById('message-row');
+      const messageFromSenderEl = document.getElementById('message-from-sender');
+      const headerEl = document.querySelector('.header');
+      document.getElementById('current-year').textContent = new Date().getFullYear();
+
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+
+      if (!token) return showError("No tracking token provided.");
+
+      orderIdEl.textContent = token;
+      const orderRef = db.collection("orders").doc(token);
+
+      orderRef.onSnapshot((doc) => {
+        loader.style.display = 'none';
+        if (!doc.exists) return showError("Order not found.");
+
+        const data = doc.data();
+        orderDetailsDiv.style.display = 'block';
+        errorMessageDiv.style.display = 'none';
+
+        const status = (data.status || 'processing').toLowerCase();
+        const displayStatus = status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        orderStatusEl.textContent = displayStatus;
+        headerEl.className = `header status-${status}`;
+
+        const statusMessages = {
+          pending: "Order received. Awaiting processing.",
+          pending_finance_approval: "Awaiting finance approval.",
+          processing: "Your gift is being prepared",
+          in_production: "Production is underway.",
+          awaiting_quality_check: "Awaiting quality inspection.",
+          production_complete: "Production complete.",
+          awaiting_assignment: "Awaiting delivery assignment.",
+          assigned: "Delivery assigned.",
+          out_for_delivery: "Out for delivery.",
+          delivery_attempted: "Delivery was attempted.",
+          shipped: "Your package is on the way.",
+          delivered: "Your gift has been delivered.",
+          completed: "Order completed successfully.",
+          cancelled: "Order cancelled.",
+          rejected_by_customer: "Rejected by customer.",
+          awaiting_customer_confirmation: "Awaiting customer confirmation.",
+          awaiting_customer_approval: "Awaiting customer approval."
         };
 
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
+        const statusIcons = {
+          pending: "⏳",
+          pending_finance_approval: "💰",
+          processing: "📦",
+          in_production: "🛠️",
+          awaiting_quality_check: "🔍",
+          production_complete: "✅",
+          awaiting_assignment: "📋",
+          assigned: "👤",
+          out_for_delivery: "🏃‍♂️",
+          delivery_attempted: "📭",
+          shipped: "🚚",
+          delivered: "🎉",
+          completed: "🏁",
+          cancelled: "🚫",
+          rejected_by_customer: "❌",
+          awaiting_customer_confirmation: "📨",
+          awaiting_customer_approval: "📝"
+        };
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const loader = document.getElementById('loader');
-            const errorMessageDiv = document.getElementById('error-message');
-            const orderDetailsDiv = document.getElementById('order-details');
-            
-            const recipientNameEl = document.getElementById('recipient-name');
-            const orderStatusEl = document.getElementById('order-status');
-            const orderStatusTitleEl = document.getElementById('order-status-title');
-            const orderStatusSubtitleEl = document.getElementById('order-status-subtitle');
-            const expectedDeliveryEl = document.getElementById('expected-delivery-date');
-            const orderIdEl = document.getElementById('order-id');
-            const messageRowEl = document.getElementById('message-row');
-            const messageFromSenderEl = document.getElementById('message-from-sender');
-            const headerEl = document.querySelector('.header');
-            
-            document.getElementById('current-year').textContent = new Date().getFullYear();
+        orderStatusSubtitleEl.textContent = statusMessages[status] || "Order update available.";
+        document.querySelector('.status-icon').textContent = statusIcons[status] || "🎁";
 
-            const params = new URLSearchParams(window.location.search);
-            const token = params.get('token');
+        if (recipientNameEl) recipientNameEl.textContent = data?.giftDetails?.recipientName || "Valued Recipient";
 
-            if (!token) {
-                showError("No tracking token (order ID) provided. Please check the link.");
-                return;
-            }
+        if (data.estimatedDeliveryTime?.toDate) {
+          expectedDeliveryEl.textContent = data.estimatedDeliveryTime.toDate().toLocaleDateString();
+        } else if (data.actualDeliveryTime?.toDate) {
+          expectedDeliveryEl.textContent = data.actualDeliveryTime.toDate().toLocaleDateString();
+        } else {
+          expectedDeliveryEl.textContent = "3-5 Business Days";
+        }
 
-            // Set the order ID immediately
-            if (orderIdEl) orderIdEl.textContent = token;
+        if (data?.giftDetails?.giftMessage) {
+          messageRowEl.style.display = 'flex';
+          messageFromSenderEl.textContent = data.giftDetails.giftMessage;
+        } else {
+          messageRowEl.style.display = 'none';
+        }
+      }, (err) => {
+        console.error(err);
+        showError("Error fetching order.");
+      });
 
-            const orderRef = db.collection("orders").doc(token);
-
-            orderRef.onSnapshot((docSnapshot) => {
-                loader.style.display = 'none';
-                if (!docSnapshot.exists) {
-                    showError("Gift tracking information not found. The link may be invalid or expired.");
-                    return;
-                }
-
-                const orderData = docSnapshot.data();
-
-                if (orderData) {
-                    orderDetailsDiv.style.display = 'block';
-                    errorMessageDiv.style.display = 'none';
-
-                    // Update recipient name
-                    if (recipientNameEl) {
-                        recipientNameEl.textContent = orderData.giftDetails?.recipientName || 'Valued Recipient';
-                    }
-
-                    // Update status and header styling
-                    const status = orderData.status || 'processing';
-                    if (orderStatusEl) orderStatusEl.textContent = status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    
-                    // Update header based on status
-                    headerEl.className = `header status-${status.toLowerCase()}`;
-                    
-                    const statusMessages = {
-                        'processing': 'Your gift is being prepared',
-                        'shipped': 'Your package is on the way',
-                        'out_for_delivery': 'Out for delivery',
-                        'delivered': 'Your gift has been delivered',
-                        'cancelled': 'Your order has been cancelled'
-                    };
-                    
-                    const statusIcons = {
-                        'processing': '📦',
-                        'shipped': '🚚',
-                        'out_for_delivery': '🏃‍♂️',
-                        'cancelled': '🚫',
-                        'delivered': '✅'
-                    };
-                    
-                    if (orderStatusSubtitleEl) {
-                        orderStatusSubtitleEl.textContent = statusMessages[status] || 'Your package is being processed';
-                    }
-                    
-                    // Update status icon
-                    const statusIcon = document.querySelector('.status-icon');
-                    if (statusIcon) {
-                        statusIcon.textContent = statusIcons[status] || '🎁';
-                    }
-                    
-                    // Update delivery date
-                    if (expectedDeliveryEl) {
-                        if (orderData.estimatedDeliveryTime && orderData.estimatedDeliveryTime.toDate) {
-                            expectedDeliveryEl.textContent = orderData.estimatedDeliveryTime.toDate().toLocaleDateString('en-US', { 
-                                month: 'short', 
-                                day: 'numeric',
-                                year: 'numeric'
-                            });
-                        } else if (orderData.status === 'delivered' && orderData.actualDeliveryTime && orderData.actualDeliveryTime.toDate) {
-                            expectedDeliveryEl.textContent = orderData.actualDeliveryTime.toDate().toLocaleDateString('en-US', { 
-                                month: 'short', 
-                                day: 'numeric',
-                                year: 'numeric'
-                            });
-                        } else {
-                            expectedDeliveryEl.textContent = '3-5 Business Days';
-                        }
-                    }
-
-                    // Handle gift message
-                    if (orderData.giftDetails?.giftMessage) {
-                        if (messageRowEl) messageRowEl.style.display = 'flex';
-                        if (messageFromSenderEl) messageFromSenderEl.textContent = orderData.giftDetails.giftMessage;
-                    } else {
-                        if (messageRowEl) messageRowEl.style.display = 'none';
-                    }
-                } else {
-                    showError("Could not retrieve gift details at this time.");
-                }
-
-            }, (error) => {
-                console.error("Error fetching gift details:", error);
-                showError("An error occurred while fetching gift details. Please try again later.");
-            });
-
-            function showError(message) {
-                loader.style.display = 'none';
-                orderDetailsDiv.style.display = 'none';
-                if (errorMessageDiv) {
-                    errorMessageDiv.textContent = message;
-                    errorMessageDiv.style.display = 'block';
-                }
-            }
-        });
-    </script>
-    <script src="script.js"></script> 
+      function showError(msg) {
+        loader.style.display = 'none';
+        errorMessageDiv.textContent = msg;
+        errorMessageDiv.style.display = 'block';
+      }
+    });
+  </script>
 </body>
 </html>
