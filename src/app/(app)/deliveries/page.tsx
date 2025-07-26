@@ -13,7 +13,7 @@ import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, 
 import { db } from '@/lib/firebase';
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
-import { sendDeliveryConfirmation } from "@/ai/flows/send-delivery-confirmation-flow";
+import { sendOrderReceipt } from '@/ai/flows/send-receipt-flow';
 
 const getDeliveryStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] => {
   // Delivery Status uses the same mapping as Order Status for these colors
@@ -141,7 +141,9 @@ export default function DeliveriesPage() {
       // If delivered, send email confirmation flow
       if (newStatus === 'delivered') {
         try {
-          await sendDeliveryConfirmation({ order });
+          // Construct the order object with the latest status to ensure email is correct
+          const deliveredOrderData = { ...order, status: newStatus as OrderStatus };
+          await sendOrderReceipt({ order: deliveredOrderData });
           toast({ title: "Delivery & Email Confirmation Sent", description: "Customer has been notified via email." });
         } catch (emailError) {
           console.error("Failed to send delivery confirmation email:", emailError);

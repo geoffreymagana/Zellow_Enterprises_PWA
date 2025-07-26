@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Edit, Filter, DollarSign, CheckCircle, PackageOpen, AlertTriangle, RefreshCw, CreditCard, Banknote, Truck, ArrowUpRight, ArrowDownLeft, Eye, XCircle, Undo2 } from 'lucide-react';
+import { Loader2, Search, Filter, DollarSign, CheckCircle, PackageOpen, AlertTriangle, RefreshCw, CreditCard, Banknote, Truck, ArrowUpRight, ArrowDownLeft, Eye, XCircle, Undo2, FileText } from 'lucide-react';
 import type { Order, Invoice, PaymentStatus, OrderStatus, DeliveryHistoryEntry } from '@/types';
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import Link from 'next/link';
@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { sendOrderReceipt } from '@/ai/flows/send-receipt-flow';
 
 
 type UnifiedTransaction = (Order | Invoice) & { transactionType: 'revenue' | 'expense' };
@@ -67,6 +68,7 @@ export default function AdminPaymentsPage() {
   const [actionType, setActionType] = useState<PaymentAction | null>(null);
   const [actionReason, setActionReason] = useState("");
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const [isSendingReceipt, setIsSendingReceipt] = useState(false);
 
   const [summaryStats, setSummaryStats] = useState({
     totalRevenue: 0,
@@ -208,8 +210,6 @@ export default function AdminPaymentsPage() {
         newPaymentStatus = 'refunded';
         historyNotes = `Refund processed by ${user.displayName || user.email}. Reason: ${actionReason}`;
         updatePayload.paymentStatus = newPaymentStatus;
-        // The order status might already be 'cancelled' if refund was requested.
-        // We'll keep it as cancelled or update it if it wasn't.
         if (actionableOrder.status !== 'cancelled') {
             newOrderStatus = 'cancelled';
             updatePayload.status = newOrderStatus;
@@ -227,6 +227,13 @@ export default function AdminPaymentsPage() {
     
     try {
       await updateDoc(orderRef, updatePayload);
+      
+      // Send receipt for paid or refunded orders
+      if (newPaymentStatus === 'paid' || newPaymentStatus === 'refunded') {
+        const updatedOrderData = { ...actionableOrder, ...updatePayload };
+        await sendOrderReceipt({ order: updatedOrderData });
+      }
+
       toast({ title: `Action Successful`, description: `Order payment has been ${newPaymentStatus || 'updated'}.` });
       fetchFinancialData(); // Refresh data after action
       setIsActionModalOpen(false);
@@ -235,6 +242,22 @@ export default function AdminPaymentsPage() {
       toast({ title: "Action Failed", description: `Could not update order: ${e.message}`, variant: "destructive" });
     } finally {
       setIsSubmittingAction(false);
+    }
+  };
+
+  const handleGenerateReceipt = async (order: Order) => {
+    setIsSendingReceipt(true);
+    try {
+        const result = await sendOrderReceipt({ order, emailSubject: `Receipt for your Zellow Order #${order.id.substring(0,8)}` });
+        if (result.success) {
+            toast({ title: "Receipt Sent", description: `An updated receipt has been sent to ${order.customerEmail}.` });
+        } else {
+            throw new Error(result.message);
+        }
+    } catch (e: any) {
+        toast({ title: "Failed to Send Receipt", description: e.message, variant: "destructive" });
+    } finally {
+        setIsSendingReceipt(false);
     }
   };
 
@@ -403,11 +426,13 @@ export default function AdminPaymentsPage() {
                               <Button size="sm" onClick={() => handleOpenActionModal(order!, 'confirm')} disabled={isSubmittingAction}><CheckCircle className="h-4 w-4"/></Button>
                             </>
                           )}
-                           {isRevenue && paymentStatus === 'paid' && (
-                            <Button size="sm" variant="outline" onClick={() => handleOpenActionModal(order!, 'refund')} disabled={isSubmittingAction}><Undo2 className="h-4 w-4"/></Button>
-                          )}
-                          {isRevenue && paymentStatus === 'refund_requested' && (
+                           {isRevenue && paymentStatus === 'refund_requested' && (
                             <Button size="sm" variant="destructive" onClick={() => handleOpenActionModal(order!, 'refund')} disabled={isSubmittingAction}><Undo2 className="h-4 w-4 mr-1"/> Process Refund</Button>
+                          )}
+                          {isRevenue && ['paid', 'refunded', 'cancelled'].includes(paymentStatus) && (
+                            <Button size="sm" variant="outline" onClick={() => handleGenerateReceipt(order!)} disabled={isSendingReceipt || isSubmittingAction}>
+                                {isSendingReceipt ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4"/>}
+                            </Button>
                           )}
                           <Button variant="ghost" size="icon" aria-label="View Details" onClick={() => setViewingTransaction(tx)}>
                             <Eye className="h-4 w-4"/>
@@ -500,7 +525,7 @@ export default function AdminPaymentsPage() {
                 variant={actionType === 'reject' || actionType === 'refund' ? 'destructive' : 'default'}
             >
                 {isSubmittingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                Confirm
+                Confirm {actionType}
             </Button>
           </DialogFooter>
         </DialogContent>

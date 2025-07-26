@@ -102,3 +102,4 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: "Failed to send notification", details: error.message }, { status: 500 });
     }
 }
+

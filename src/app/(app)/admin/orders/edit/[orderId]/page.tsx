@@ -25,7 +25,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from 'date-fns';
-import { sendDeliveryConfirmation } from '@/ai/flows/send-delivery-confirmation-flow';
+import { sendOrderReceipt } from '@/ai/flows/send-receipt-flow';
 
 const technicianRoles: UserRole[] = ['Engraving', 'Printing', 'Assembly', 'Quality Check', 'Packaging'];
 
@@ -301,12 +301,14 @@ export default function AdminOrderDetailPage() {
         try {
           // Clone order object to ensure it has all latest properties before sending
           const latestOrderData = { ...order, status: data.status as OrderStatus, updatedAt: new Date() };
-          await sendDeliveryConfirmation({ order: latestOrderData });
+          await sendOrderReceipt({ order: latestOrderData });
           toast({ title: "Delivery & Email Confirmation Sent", description: "Customer has been notified via email." });
         } catch (emailError) {
           console.error("Failed to send delivery confirmation email:", emailError);
           toast({ title: "Delivery Confirmed (Email Failed)", description: "Order status updated, but email notification failed.", variant: "destructive" });
         }
+      } else {
+        toast({ title: "Order Status Updated", description: `Order marked as ${data.status.replace(/_/g, ' ')}.` });
       }
 
       setOrder(prev => prev ? { 
@@ -315,7 +317,6 @@ export default function AdminOrderDetailPage() {
           deliveryHistory: [...(prev.deliveryHistory || []), {...newHistoryEntry, timestamp: new Date() }] 
       } : null);
       statusForm.reset({ status: data.status as OrderStatus }); 
-      toast({ title: "Order Status Updated", description: `Order marked as ${data.status.replace(/_/g, ' ')}.` });
     } catch (error) {
       console.error("Error updating order status:", error);
       toast({ title: "Error", description: "Failed to update order status.", variant: "destructive" });

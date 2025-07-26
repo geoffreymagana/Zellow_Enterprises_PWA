@@ -212,14 +212,18 @@ export default function TrackOrderPage() {
     }
   };
   
-  const handleProofOfWorkApproval = async (approved: boolean, rejectionNotes?: string) => {
-    if (!order || !user) return;
+  const handleProofOfWorkApproval = async (approved: boolean) => {
+    if (!order || !user || !rejectionReason.trim() && !approved) {
+        toast({ title: "Reason Required", description: "Please provide feedback or a reason for rejection.", variant: "destructive" });
+        return;
+    }
     const newStatus: OrderStatus = approved ? 'in_production' : 'processing';
     const notes = approved 
         ? 'Customer approved the proof of work.'
-        : `Customer rejected proof of work. Reason: ${rejectionNotes}`;
+        : `Customer rejected proof of work. Reason: ${rejectionReason}`;
 
     handleUpdateStatus(newStatus, notes);
+    setIsRejectModalOpen(false);
   };
 
   const pageContent = (
@@ -259,7 +263,7 @@ export default function TrackOrderPage() {
 
     const canRateOrder = !isGiftRecipientView && user && order.customerId === user.uid && order.status === 'completed' && !order.rating;
     const hasBeenRated = !isGiftRecipientView && user && order.customerId === user.uid && !!order.rating;
-    const canDownloadReceipt = !isGiftRecipientView && user && order.customerId === user.uid && order.paymentStatus === 'paid';
+    const canDownloadReceipt = !isGiftRecipientView && user && order.customerId === user.uid && ['paid', 'refund_requested', 'refunded'].includes(order.paymentStatus);
     const isOrderMutable = !['delivered', 'completed', 'cancelled', 'rejected_by_customer'].includes(order.status);
     const canConfirmDelivery = !isGiftRecipientView && user && order.customerId === user.uid && order.status === 'delivered';
     const canApproveProof = !isGiftRecipientView && user && order.customerId === user.uid && order.status === 'awaiting_customer_approval';
@@ -274,7 +278,7 @@ export default function TrackOrderPage() {
                 <CardDescription>Order ID: {order.id.substring(0,12)}...</CardDescription>
             </CardHeader>
             <CardContent>
-                <p className="text-muted-foreground">We hope you enjoy your special gift from {order.senderName || "your sender"}!</p>
+                <p className="text-muted-foreground">We hope you enjoy your special gift from {order.customerName || "your sender"}!</p>
                 {order.actualDeliveryTime && (
                     <p className="text-xs text-muted-foreground mt-2">Delivered on: {formatDate(order.actualDeliveryTime)}</p>
                 )}
@@ -429,9 +433,31 @@ export default function TrackOrderPage() {
         </CardContent>
       </Card>
       <Dialog open={isRejectModalOpen} onOpenChange={setIsRejectModalOpen}>
-        <DialogContent><DialogHeader><DialogTitle>Reject Delivery</DialogTitle><DialogDescription>Please provide a reason for rejecting this delivery. This will be sent to our support team.</DialogDescription></DialogHeader>
-          <div className="py-2 space-y-1"><Label htmlFor="rejectionReason">Reason</Label><Textarea id="rejectionReason" value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="e.g., Item was damaged, wrong item received..." /></div>
-          <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose><Button onClick={handleRejectDelivery} disabled={!rejectionReason.trim() || isUpdating} variant="destructive">Submit Rejection</Button></DialogFooter>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Reject Delivery or Proof</DialogTitle>
+                <DialogDescription>Please provide a reason for the rejection. This will be sent to our team.</DialogDescription>
+            </DialogHeader>
+            <div className="py-2 space-y-1">
+                <Label htmlFor="rejectionReason">Reason</Label>
+                <Textarea 
+                    id="rejectionReason" 
+                    value={rejectionReason} 
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder={canApproveProof ? "e.g., The engraving text is incorrect, please change..." : "e.g., Item was damaged, wrong item received..."}
+                />
+            </div>
+            <DialogFooter>
+                <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+                <Button 
+                    onClick={() => canApproveProof ? handleProofOfWorkApproval(false) : handleRejectDelivery()} 
+                    disabled={!rejectionReason.trim() || isUpdating} 
+                    variant="destructive"
+                >
+                  {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Submit Rejection
+                </Button>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
