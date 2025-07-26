@@ -138,13 +138,25 @@ export default function MessagesPage() {
   const fetchRecipients = useCallback(async () => {
     if (!db || !user) return;
     setIsLoadingRecipients(true);
+    
+    // Define manager roles
+    const managerRoles: UserRole[] = ['Admin', 'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'];
+    
     const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('disabled', '!=', true), orderBy('displayName', 'asc'));
+    // Query for users where role is in the managerRoles array
+    const q = query(
+        usersRef, 
+        where('role', 'in', managerRoles),
+        where('disabled', '!=', true), 
+        orderBy('displayName', 'asc')
+    );
 
     try {
         const snapshot = await getDocs(q);
-        const allActiveUsers = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
-        const filteredRecipients = allActiveUsers.filter(u => u.uid !== user.uid);
+        const managerUsers = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
+        
+        // Filter out the current user to prevent self-messaging
+        const filteredRecipients = managerUsers.filter(u => u.uid !== user.uid);
         
         setRecipients(filteredRecipients);
     } catch (error) {
@@ -322,16 +334,15 @@ export default function MessagesPage() {
                 : history.length === 0 ? <p className="text-center text-muted-foreground py-6">You have no message history yet.</p>
                 : <div className="space-y-3">
                     {history.map(thread => {
-                        const isLastReplierCurrentUser = thread.lastReplierRole === role;
+                        const isSentByCurrentUser = thread.senderId === user?.uid;
+                        
                         let conversationPartner;
-                        if (isLastReplierCurrentUser) {
-                            // If current user sent last, show who it was to
+                        if (isSentByCurrentUser) {
                             conversationPartner = thread.targetUserName 
                               ? `${thread.targetUserName} (${thread.targetRole})`
                               : thread.targetRole?.replace('Customer Broadcast', 'All Customers') || 'N/A';
                         } else {
-                            // If current user received last, show who it was from
-                            conversationPartner = thread.senderId === user?.uid ? thread.targetUserName : thread.senderName;
+                            conversationPartner = thread.senderName;
                         }
 
                         return (
@@ -342,7 +353,7 @@ export default function MessagesPage() {
                                             <div className="flex-grow min-w-0">
                                                 <p className="font-semibold text-primary truncate" title={thread.subject}>{thread.subject}</p>
                                                 <p className="text-xs text-muted-foreground truncate">
-                                                    {isLastReplierCurrentUser ? 'To: ' : 'From: '}
+                                                    {isSentByCurrentUser ? 'To: ' : 'From: '}
                                                     {conversationPartner}
                                                 </p>
                                             </div>
