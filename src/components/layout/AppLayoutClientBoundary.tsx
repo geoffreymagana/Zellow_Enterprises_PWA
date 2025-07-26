@@ -113,7 +113,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'], count: pendingPaymentsCount },
     { href: '/admin/shipping', label: 'Shipping', icon: Ship, roles: ['Admin', 'DispatchManager'] },
     { href: '/admin/approvals', label: 'General Approvals', icon: ClipboardCheck, roles: ['Admin'], count: generalApprovalsCount },
-    { href: '/finance/approvals', label: 'Stock Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] },
+    { href: '/finance/approvals', label: 'Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] },
     { href: '/finance/financials', label: 'Financials', icon: BarChart2, roles: ['Admin', 'FinanceManager'] },
     { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['Admin', 'FinanceManager'] },
     { href: '/admin/notifications', label: 'Notifications', icon: Bell, roles: ['Admin'], count: unreadMessagesCount },
@@ -438,7 +438,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
                                {role === 'FinanceManager' && (<>
                                 <Link href="/invoices" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/invoices") ? "bg-muted text-primary font-semibold" : ""}`}><FileText className="mr-2 h-4 w-4" />Invoices</Link>
                                 <Link href="/finance/financials" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/finance/financials") ? "bg-muted text-primary font-semibold" : ""}`}><BarChart2 className="mr-2 h-4 w-4" />Financials</Link>
-                                <Link href="/finance/approvals" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/finance/approvals") ? "bg-muted text-primary font-semibold" : ""}`}><Coins className="mr-2 h-4 w-4" />Stock Approvals</Link>
+                                <Link href="/finance/approvals" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/finance/approvals") ? "bg-muted text-primary font-semibold" : ""}`}><Coins className="mr-2 h-4 w-4" />Approvals</Link>
                               </>)}
                               <Link href="/profile" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/profile" ? "bg-muted text-primary font-semibold" : ""}`}><UserCircle className="mr-2 h-4 w-4" />Profile</Link>
                           </nav>
