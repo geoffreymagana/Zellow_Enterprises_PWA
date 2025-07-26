@@ -50,7 +50,8 @@ const allOrderStatuses: OrderStatus[] = [
     'pending', 'pending_finance_approval', 'processing',
     'in_production', 'awaiting_quality_check', 'production_complete', 
     'awaiting_assignment', 'assigned', 'out_for_delivery', 'shipped', 
-    'delivered', 'delivery_attempted', 'cancelled', 'completed', 'rejected_by_customer'
+    'delivered', 'delivery_attempted', 'cancelled', 'completed', 'rejected_by_customer',
+    'awaiting_customer_confirmation', 'awaiting_customer_approval'
 ];
 
 const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] => {
@@ -63,6 +64,8 @@ const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] 
     case 'awaiting_quality_check': return 'statusIndigo';
     case 'production_complete': return 'statusOrange';
     case 'awaiting_assignment': return 'statusOrange';
+    case 'awaiting_customer_confirmation': return 'statusOrange';
+    case 'awaiting_customer_approval': return 'statusOrange';
     case 'assigned': return 'statusOrderAssigned';
     case 'out_for_delivery': return 'statusBlue';
     case 'shipped': return 'statusIndigo';

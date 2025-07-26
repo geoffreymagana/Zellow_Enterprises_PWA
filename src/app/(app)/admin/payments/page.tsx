@@ -447,7 +447,7 @@ export default function AdminPaymentsPage() {
                  {viewingTransaction && viewingTransaction.transactionType === 'expense' && (
                   <div className="space-y-2 text-sm">
                     <p><strong>Type:</strong> Supplier Payment (Expense)</p>
-                    <p><strong>Supplier:</strong> {(viewingTransaction as Invoice).supplierName}</p>
+                    <p><strong>Supplier:</strong> {(viewingTransaction as any).supplierName}</p>
                     <p><strong>Payment Method:</strong> Bank Transfer</p>
                     <p><strong>Payment Status:</strong> <Badge variant="statusGreen">Paid</Badge></p>
                     <p><strong>Date Paid:</strong> {formatDate((viewingTransaction as Invoice).updatedAt)}</p>

@@ -52,7 +52,6 @@ export default function MessagesPage() {
 
   const [sentThreads, setSentThreads] = useState<FeedbackThread[]>([]);
   const [receivedThreads, setReceivedThreads] = useState<FeedbackThread[]>([]);
-  const [broadcastThreads, setBroadcastThreads] = useState<FeedbackThread[]>([]); 
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   
   const [recipients, setRecipients] = useState<AppUser[]>([]);
@@ -61,7 +60,7 @@ export default function MessagesPage() {
 
   const history = useMemo(() => {
     const allThreads = new Map<string, FeedbackThread>();
-    [...sentThreads, ...receivedThreads, ...broadcastThreads].forEach(thread => {
+    [...sentThreads, ...receivedThreads].forEach(thread => {
       if (thread?.id) {
         allThreads.set(thread.id, thread);
       }
@@ -69,7 +68,7 @@ export default function MessagesPage() {
     const combined = Array.from(allThreads.values());
     combined.sort((a, b) => (b.updatedAt?.toDate() ?? 0) - (a.updatedAt?.toDate() ?? 0));
     return combined;
-  }, [sentThreads, receivedThreads, broadcastThreads]);
+  }, [sentThreads, receivedThreads]);
 
   const form = useForm<FeedbackFormValues>({
     resolver: zodResolver(feedbackFormSchema),
@@ -143,7 +142,6 @@ export default function MessagesPage() {
     const q = query(
         usersRef, 
         where('role', 'in', managerRoles),
-        where('disabled', '!=', true),
         orderBy('displayName', 'asc')
     );
 
@@ -151,12 +149,13 @@ export default function MessagesPage() {
         const snapshot = await getDocs(q);
         const managerUsers = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
         
-        const filteredRecipients = managerUsers.filter(u => u.uid !== user.uid);
+        // Filter out disabled users and the current user client-side
+        const filteredRecipients = managerUsers.filter(u => u.uid !== user.uid && !u.disabled);
         
         setRecipients(filteredRecipients);
     } catch (error: any) {
         console.error("Error fetching recipients:", error);
-        toast({ title: "Error Fetching Recipients", description: "Could not fetch the recipient list. An index might be required in Firestore.", variant: "destructive" });
+        toast({ title: "Error Fetching Recipients", description: "Could not fetch the recipient list. A Firestore index might be required.", variant: "destructive" });
         console.info("Firestore index creation required. An error log in your Firebase backend should contain a direct link to create it.");
     } finally {
         setIsLoadingRecipients(false);
@@ -183,7 +182,7 @@ export default function MessagesPage() {
         setSentThreads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedbackThread)));
     }));
   
-    if (role && role !== 'Customer') {
+    if (role !== 'Customer') {
         const receivedQuery = query(
             collection(db, 'feedbackThreads'), 
             or(
@@ -197,15 +196,6 @@ export default function MessagesPage() {
         }));
     } else {
         setReceivedThreads([]);
-    }
-      
-    if (role === 'Customer') {
-        const broadcastQuery = query(collection(db, 'feedbackThreads'), where("targetRole", "==", "Customer Broadcast"), orderBy('updatedAt', 'desc'));
-        unsubscribers.push(onSnapshot(broadcastQuery, (snapshot) => {
-            setBroadcastThreads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedbackThread)));
-        }));
-    } else {
-        setBroadcastThreads([]);
     }
 
     setIsLoadingHistory(false);
@@ -272,7 +262,7 @@ export default function MessagesPage() {
                                 <CommandGroup>
                                   {recipients.map(e => (
                                     <CommandItem
-                                      value={`${e.displayName || e.email} - ${e.role}`}
+                                      value={`${e.displayName || e.email} ${e.role}`}
                                       key={e.uid}
                                       onSelect={() => {
                                         form.setValue("targetRole", e.uid);
@@ -318,18 +308,17 @@ export default function MessagesPage() {
                 : history.length === 0 ? <p className="text-center text-muted-foreground py-6">You have no message history yet.</p>
                 : <div className="space-y-3">
                     {history.map(thread => {
-                        const isSentByCurrentUser = thread.senderId === user?.uid;
-                        const lastReplyByCurrentUser = thread.lastReplierRole === role;
+                        const lastReplyWasFromMe = thread.lastReplierRole === role;
 
-                        let conversationPartner, direction;
-                        if (isSentByCurrentUser) { // Thread I started
-                          direction = lastReplyByCurrentUser ? 'To: ' : 'From: ';
-                          conversationPartner = thread.targetUserName || (thread.targetRole === 'Customer Broadcast' ? 'All Customers' : thread.targetRole);
-                        } else { // Thread I received
-                          direction = lastReplyByCurrentUser ? 'To: ' : 'From: ';
-                          conversationPartner = thread.senderName;
+                        let directionText, partnerName;
+                        if (thread.senderId === user?.uid) { // I started it
+                            partnerName = thread.targetUserName || thread.targetRole;
+                            directionText = lastReplyWasFromMe ? 'To:' : 'From:';
+                        } else { // I received it
+                            partnerName = thread.senderName;
+                            directionText = lastReplyWasFromMe ? 'To:' : 'From:';
                         }
-
+                        
                         return (
                             <button key={thread.id} onClick={() => setSelectedThreadId(thread.id)} className="w-full text-left">
                                 <Card className="hover:shadow-md hover:border-primary/50 transition-all">
@@ -338,8 +327,7 @@ export default function MessagesPage() {
                                             <div className="flex-grow min-w-0">
                                                 <p className="font-semibold text-primary truncate" title={thread.subject}>{thread.subject}</p>
                                                 <p className="text-xs text-muted-foreground truncate">
-                                                    {direction}
-                                                    {conversationPartner}
+                                                    {directionText} {partnerName}
                                                 </p>
                                             </div>
                                             <Badge variant={getStatusVariant(thread.status)}>{thread.status}</Badge>
