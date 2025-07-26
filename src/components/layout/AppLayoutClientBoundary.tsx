@@ -52,6 +52,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
   const [generalApprovalsCount, setGeneralApprovalsCount] = useState(0);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [qaCount, setQaCount] = useState(0);
 
   useEffect(() => {
     if (!db || !role || !user) return;
@@ -73,12 +74,16 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
       const approvalsQuery = query(collection(db, 'approvalRequests'), where('status', '==', 'pending'));
       unsubscribers.push(onSnapshot(approvalsQuery, (snapshot) => setGeneralApprovalsCount(snapshot.size)));
     }
+     // QA Count
+    if (role === 'Admin' || role === 'Quality Check') {
+        const qaQuery = query(collection(db, 'orders'), where('status', '==', 'awaiting_quality_check'));
+        unsubscribers.push(onSnapshot(qaQuery, (snapshot) => setQaCount(snapshot.size)));
+    }
     // Unread Messages for all staff roles
     const threadsQuery = query(collection(db, 'feedbackThreads'), where('targetUserId', '==', user.uid));
     unsubscribers.push(onSnapshot(threadsQuery, (snapshot) => {
       const unread = snapshot.docs.filter(doc => {
           const threadData = doc.data() as FeedbackThread;
-          // An unread message is one where the last replier was not the current user, and the thread is not closed.
           return threadData.lastReplierRole !== role && threadData.status !== 'closed';
       }).length;
       setUnreadMessagesCount(unread);
@@ -95,7 +100,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   const { searchTerm, setSearchTerm, setOpenMobile } = sidebarContext;
 
   const baseAdminNavItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager'] },
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager', 'Quality Check'] },
     { href: '/admin/users', label: 'Users', icon: Users, roles: ['Admin'] },
     { href: '/admin/products', label: 'Products', icon: Package, roles: ['Admin'] },
     { href: '/inventory', label: 'Inventory Mgt', icon: Warehouse, roles: ['Admin', 'InventoryManager'] },
@@ -103,6 +108,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, roles: ['Admin', 'ServiceManager'], count: pendingOrdersCount },
     { href: '/admin/bulk-orders', label: 'Bulk Orders', icon: PackagePlus, roles: ['Admin', 'FinanceManager', 'ServiceManager'] },
     { href: '/tasks', label: 'Production Tasks', icon: Wrench, roles: ['Admin', 'ServiceManager'] },
+    { href: '/admin/quality-assurance', label: 'Quality Assurance', icon: ClipboardCheck, roles: ['Admin', 'Quality Check'], count: qaCount },
     { href: '/admin/customizations', label: 'Customizations', icon: Layers, roles: ['Admin', 'ServiceManager'] },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'], count: pendingPaymentsCount },
     { href: '/admin/shipping', label: 'Shipping', icon: Ship, roles: ['Admin', 'DispatchManager'] },
@@ -115,7 +121,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   ];
 
   const footerAdminNavItems = [
-    { href: '/profile', label: 'Profile', icon: UserCircle, roles: ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager'] },
+    { href: '/profile', label: 'Profile', icon: UserCircle, roles: ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager', 'Quality Check'] },
     { href: '/admin/settings', label: 'Settings', icon: SettingsIcon, roles: ['Admin'] },
   ];
 
@@ -346,12 +352,11 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
     if (!db || !user || !role) return;
 
     let q;
-    // For customers, check threads they started
     if (role === 'Customer') {
       q = query(collection(db, 'feedbackThreads'), 
         where('senderId', '==', user.uid)
       );
-    } else { // For other staff, check threads targeted to them
+    } else { 
       q = query(collection(db, 'feedbackThreads'), 
         where('targetUserId', '==', user.uid)
       );
@@ -361,7 +366,6 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
       let count = 0;
       snapshot.forEach((doc) => {
         const thread = doc.data() as FeedbackThread;
-        // Count as unread if the last replier was not the current user, and the thread is not closed.
         if (thread.lastReplierRole !== role && thread.status !== 'closed') {
           count++;
         }
@@ -491,7 +495,7 @@ function AppLayoutContent({ children }: LayoutProps) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /> Awaiting authentication...</div>;
   }
 
-  const isAdminPanelRole = role && ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager'].includes(role);
+  const isAdminPanelRole = role && ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager', 'Quality Check'].includes(role);
 
   if (isAdminPanelRole) {
     return <SidebarProvider><AdminLayout>{children}</AdminLayout></SidebarProvider>;

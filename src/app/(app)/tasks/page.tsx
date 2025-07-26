@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Badge, BadgeProps } from "@/components/ui/badge";
@@ -188,7 +187,6 @@ export default function TasksPage() {
             await updateDoc(orderRef, orderUpdatePayload);
         }
 
-        // If the task was just completed by a manager, check if all tasks for the order are done
         if (newStatus === 'completed' && (role === 'ServiceManager' || role === 'Admin')) {
             const allTasksForOrderQuery = query(collection(db, 'tasks'), where('orderId', '==', selectedTask.orderId));
             const allTasksSnapshot = await getDocs(allTasksForOrderQuery);
@@ -200,7 +198,7 @@ export default function TasksPage() {
                 const finalHistoryEntry: DeliveryHistoryEntry = {
                     status: 'awaiting_assignment',
                     timestamp: serverTimestamp(),
-                    notes: `All production tasks completed. Order is now ready for dispatch assignment.`,
+                    notes: `All production tasks completed. Order is ready for dispatch assignment.`,
                     actorId: "System",
                 };
                 await updateDoc(orderRef, {
@@ -332,25 +330,31 @@ export default function TasksPage() {
     setIsUpdating(true);
     try {
       const taskRef = doc(db, 'tasks', selectedTask.id);
-      const orderRef = doc(db, 'orders', selectedTask.orderId!);
       
-      const historyEntry: DeliveryHistoryEntry = {
-        status: 'awaiting_customer_approval',
-        timestamp: serverTimestamp(),
-        notes: `Proof of work for '${selectedTask.itemName}' is ready for customer review.`,
-        actorId: user.uid
-      };
+      const newStatus: Task['status'] = (role === 'Admin' || role === 'ServiceManager') ? 'completed' : 'needs_approval';
+      const orderNewStatus: OrderStatus = 'awaiting_quality_check';
 
       await updateDoc(taskRef, {
-        status: 'completed', // Task is considered complete by technician, pending approvals
+        status: newStatus,
         proofOfWorkUrl: uploadState.url,
         updatedAt: serverTimestamp(),
       });
-      await updateDoc(orderRef, {
-          status: 'awaiting_customer_approval',
-          deliveryHistory: arrayUnion(historyEntry),
-          updatedAt: serverTimestamp(),
-      });
+
+      if (newStatus === 'completed') {
+          const orderRef = doc(db, 'orders', selectedTask.orderId!);
+           const historyEntry: DeliveryHistoryEntry = {
+            status: orderNewStatus,
+            timestamp: serverTimestamp(),
+            notes: `Task '${selectedTask.taskType}' approved by ${role}. Order is now awaiting QA.`,
+            actorId: user.uid
+          };
+           await updateDoc(orderRef, {
+              status: orderNewStatus,
+              deliveryHistory: arrayUnion(historyEntry),
+              updatedAt: serverTimestamp(),
+          });
+      }
+
       setIsModalOpen(false);
     } catch (error) {
       console.error("Error submitting for approval:", error);
@@ -508,9 +512,9 @@ export default function TasksPage() {
                     <Button size="sm" onClick={handleSubmitForApproval} disabled={!uploadState.url || uploadState.uploading || isUpdating} className="w-full">{uploadState.uploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Uploading...</> : <><CheckCircle className="mr-2 h-4 w-4"/> Submit for Approval</>}
                     </Button>
                 </div>)}
-                {selectedTask && role === 'ServiceManager' && selectedTask.status === 'needs_approval' && (<>
+                {selectedTask && (role === 'ServiceManager' || role === 'Admin') && selectedTask.status === 'needs_approval' && (<>
                     <Button size="sm" variant="destructive" onClick={() => setIsRejectionModalOpen(true)} disabled={isUpdating}><XCircle className="mr-2 h-4 w-4"/> Reject</Button>
-                    <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'completed')} disabled={isUpdating}><CheckCircle className="mr-2 h-4 w-4"/> Approve</Button>
+                    <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'completed', 'awaiting_quality_check')} disabled={isUpdating}><CheckCircle className="mr-2 h-4 w-4"/> Approve & Send to QA</Button>
                 </>)}
              </div>
           </DialogFooter>
