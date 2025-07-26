@@ -188,13 +188,12 @@ export default function TasksPage() {
             await updateDoc(orderRef, orderUpdatePayload);
         }
 
-        // If the task was just completed, check if all tasks for the order are done
-        if (newStatus === 'completed') {
+        // If the task was just completed by a manager, check if all tasks for the order are done
+        if (newStatus === 'completed' && (role === 'ServiceManager' || role === 'Admin')) {
             const allTasksForOrderQuery = query(collection(db, 'tasks'), where('orderId', '==', selectedTask.orderId));
             const allTasksSnapshot = await getDocs(allTasksForOrderQuery);
             const allTasks = allTasksSnapshot.docs.map(d => ({id: d.id, ...d.data()} as Task));
             
-            // Check if every task for the order is now 'completed'
             const allTasksCompleted = allTasks.every(t => t.id === taskId ? newStatus === 'completed' : t.status === 'completed');
             
             if (allTasksCompleted) {
@@ -336,19 +335,19 @@ export default function TasksPage() {
       const orderRef = doc(db, 'orders', selectedTask.orderId!);
       
       const historyEntry: DeliveryHistoryEntry = {
-        status: 'awaiting_quality_check',
+        status: 'awaiting_customer_approval',
         timestamp: serverTimestamp(),
-        notes: `Task '${selectedTask.taskType}' for item '${selectedTask.itemName}' is complete and awaits quality check.`,
+        notes: `Proof of work for '${selectedTask.itemName}' is ready for customer review.`,
         actorId: user.uid
       };
 
       await updateDoc(taskRef, {
-        status: 'needs_approval',
+        status: 'completed', // Task is considered complete by technician, pending approvals
         proofOfWorkUrl: uploadState.url,
         updatedAt: serverTimestamp(),
       });
       await updateDoc(orderRef, {
-          status: 'awaiting_quality_check',
+          status: 'awaiting_customer_approval',
           deliveryHistory: arrayUnion(historyEntry),
           updatedAt: serverTimestamp(),
       });
@@ -511,7 +510,7 @@ export default function TasksPage() {
                 </div>)}
                 {selectedTask && role === 'ServiceManager' && selectedTask.status === 'needs_approval' && (<>
                     <Button size="sm" variant="destructive" onClick={() => setIsRejectionModalOpen(true)} disabled={isUpdating}><XCircle className="mr-2 h-4 w-4"/> Reject</Button>
-                    <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'completed', 'awaiting_assignment')} disabled={isUpdating}><CheckCircle className="mr-2 h-4 w-4"/> Approve</Button>
+                    <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'completed')} disabled={isUpdating}><CheckCircle className="mr-2 h-4 w-4"/> Approve</Button>
                 </>)}
              </div>
           </DialogFooter>

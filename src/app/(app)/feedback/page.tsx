@@ -41,6 +41,7 @@ const getStatusVariant = (status: FeedbackThread['status']): BadgeProps['variant
   }
 };
 
+const managerRoles: UserRole[] = ['Admin', 'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'];
 
 export default function MessagesPage() {
   const { user, role, loading } = useAuth();
@@ -83,10 +84,9 @@ export default function MessagesPage() {
     setIsSubmitting(true);
     
     const recipientId = values.targetRole;
-    const isBroadcast = recipientId === "Customer Broadcast";
-    const recipient = !isBroadcast ? recipients.find(e => e.uid === recipientId) : null;
-    const recipientRole = isBroadcast ? "Customer Broadcast" : recipient?.role;
-    const recipientName = isBroadcast ? "All Customers" : recipient?.displayName;
+    const recipient = recipients.find(e => e.uid === recipientId);
+    const recipientRole = recipient?.role;
+    const recipientName = recipient?.displayName;
 
     if (!recipientRole) {
         toast({ title: "Error", description: "Could not find the recipient's role.", variant: "destructive" });
@@ -106,7 +106,7 @@ export default function MessagesPage() {
           senderName: user.displayName || "N/A",
           senderEmail: user.email || "N/A",
           targetRole: recipientRole, 
-          targetUserId: isBroadcast ? null : recipientId,
+          targetUserId: recipientId,
           targetUserName: recipientName || null,
           status: 'open',
           lastMessageSnippet: values.message.substring(0, 50),
@@ -139,13 +139,11 @@ export default function MessagesPage() {
     if (!db || !user) return;
     setIsLoadingRecipients(true);
     
-    const managerRoles: UserRole[] = ['Admin', 'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'];
-    
     const usersRef = collection(db, 'users');
     const q = query(
         usersRef, 
         where('role', 'in', managerRoles),
-        where('disabled', '!=', true), 
+        where('disabled', '!=', true),
         orderBy('displayName', 'asc')
     );
 
@@ -156,9 +154,10 @@ export default function MessagesPage() {
         const filteredRecipients = managerUsers.filter(u => u.uid !== user.uid);
         
         setRecipients(filteredRecipients);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error fetching recipients:", error);
-        toast({ title: "Error", description: "Could not fetch recipient list.", variant: "destructive" });
+        toast({ title: "Error Fetching Recipients", description: "Could not fetch the recipient list. An index might be required in Firestore.", variant: "destructive" });
+        console.info("Firestore index creation required. An error log in your Firebase backend should contain a direct link to create it.");
     } finally {
         setIsLoadingRecipients(false);
     }
@@ -258,7 +257,7 @@ export default function MessagesPage() {
                               >
                                 {isLoadingRecipients ? "Loading..." : (
                                   field.value
-                                    ? (field.value === "Customer Broadcast" ? "All Customers (Broadcast)" : recipients.find(e => e.uid === field.value)?.displayName)
+                                    ? (recipients.find(e => e.uid === field.value)?.displayName)
                                     : "Select a recipient..."
                                 )}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -271,18 +270,6 @@ export default function MessagesPage() {
                               <CommandList>
                                 <CommandEmpty>No recipient found.</CommandEmpty>
                                 <CommandGroup>
-                                  {role !== 'Customer' && (
-                                     <CommandItem
-                                      value="All Customers (Broadcast)"
-                                      onSelect={() => {
-                                        form.setValue("targetRole", "Customer Broadcast");
-                                        setIsPopoverOpen(false);
-                                      }}
-                                    >
-                                      <Check className={cn("mr-2 h-4 w-4", field.value === "Customer Broadcast" ? "opacity-100" : "opacity-0")}/>
-                                      All Customers (Broadcast)
-                                    </CommandItem>
-                                  )}
                                   {recipients.map(e => (
                                     <CommandItem
                                       value={`${e.displayName || e.email} - ${e.role}`}

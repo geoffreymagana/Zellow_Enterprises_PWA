@@ -132,7 +132,7 @@ export function FeedbackThreadModal({ isOpen, onOpenChange, threadId, currentUse
   const canCloseThread = thread && thread.status !== 'closed' && (thread.targetRole !== 'Customer Broadcast' || currentUserRole === 'Admin');
 
   const recipientDisplay = thread?.targetUserName 
-    ? `${thread.targetUserName} (${thread.targetRole})`
+    ? `${thread.targetUserName}`
     : typeof thread?.targetRole === 'string' ? thread.targetRole.replace('Manager', ' Manager').replace('Customer Broadcast', 'All Customers') : 'N/A';
 
 

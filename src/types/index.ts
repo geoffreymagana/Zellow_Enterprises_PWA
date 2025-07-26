@@ -112,6 +112,7 @@ export type OrderStatus =
   | 'delivery_attempted'
   | 'cancelled'
   | 'awaiting_customer_confirmation'
+  | 'awaiting_customer_approval' // New status for proof of work
   | 'rejected_by_customer'
   | 'completed';
 

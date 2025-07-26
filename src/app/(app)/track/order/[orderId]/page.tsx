@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase';
 import type { Order, DeliveryHistoryEntry, OrderStatus, PaymentStatus } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertTriangle, Package, ShoppingBag, Truck, CheckCircle, MapPin, Clock, Star, MessageSquare, Home, Download, ThumbsUp, ThumbsDown, XCircle } from 'lucide-react';
+import { Loader2, AlertTriangle, Package, ShoppingBag, Truck, CheckCircle, MapPin, Clock, Star, MessageSquare, Home, Download, ThumbsUp, ThumbsDown, XCircle, Gift, Image as ImageIcon, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
@@ -37,7 +37,12 @@ const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] 
     case 'pending_finance_approval':
        return 'statusYellow';
     case 'processing': return 'statusAmber';
+    case 'in_production':
+    case 'awaiting_quality_check':
+    case 'production_complete':
+      return 'statusPurple';
     case 'awaiting_assignment': return 'statusOrange';
+    case 'awaiting_customer_approval': return 'statusOrange';
     case 'out_for_delivery': return 'statusBlue';
     case 'shipped': return 'statusIndigo';
     case 'delivered': return 'statusGreen';
@@ -179,7 +184,7 @@ export default function TrackOrderPage() {
       ? "Order cancelled by customer. Payment was made, refund requested."
       : "Order cancelled by customer before payment.";
     handleUpdateStatus('cancelled', notes, newPaymentStatus);
-  }
+  };
 
   const handleFeedbackSubmit = async () => {
     if (!orderId || !db || !user || (order && order.customerId !== user.uid) || selectedRating === 0) {
@@ -205,6 +210,16 @@ export default function TrackOrderPage() {
     } finally {
       setIsSubmittingFeedback(false);
     }
+  };
+  
+  const handleProofOfWorkApproval = async (approved: boolean, rejectionNotes?: string) => {
+    if (!order || !user) return;
+    const newStatus: OrderStatus = approved ? 'in_production' : 'processing';
+    const notes = approved 
+        ? 'Customer approved the proof of work.'
+        : `Customer rejected proof of work. Reason: ${rejectionNotes}`;
+
+    handleUpdateStatus(newStatus, notes);
   };
 
   const pageContent = (
@@ -247,7 +262,7 @@ export default function TrackOrderPage() {
     const canDownloadReceipt = !isGiftRecipientView && user && order.customerId === user.uid && order.paymentStatus === 'paid';
     const isOrderMutable = !['delivered', 'completed', 'cancelled', 'rejected_by_customer'].includes(order.status);
     const canConfirmDelivery = !isGiftRecipientView && user && order.customerId === user.uid && order.status === 'delivered';
-
+    const canApproveProof = !isGiftRecipientView && user && order.customerId === user.uid && order.status === 'awaiting_customer_approval';
 
     if (isGiftRecipientView && order.status === 'completed') {
        return (
@@ -259,7 +274,7 @@ export default function TrackOrderPage() {
                 <CardDescription>Order ID: {order.id.substring(0,12)}...</CardDescription>
             </CardHeader>
             <CardContent>
-                <p className="text-muted-foreground">We hope you enjoy your special gift from {order.giftDetails?.recipientName || "your sender"}!</p>
+                <p className="text-muted-foreground">We hope you enjoy your special gift from {order.senderName || "your sender"}!</p>
                 {order.actualDeliveryTime && (
                     <p className="text-xs text-muted-foreground mt-2">Delivered on: {formatDate(order.actualDeliveryTime)}</p>
                 )}
@@ -300,6 +315,26 @@ export default function TrackOrderPage() {
             {currentStatusEntry.notes && <p className="text-xs text-muted-foreground mt-1">Note: {currentStatusEntry.notes}</p>}
           </div>
 
+          {canApproveProof && (
+             <Card className="bg-amber-50 border-amber-200">
+                <CardHeader>
+                    <CardTitle className="text-lg">Proof of Work Approval</CardTitle>
+                    <CardDescription>Please review the proof of work for your customized item. Approve to continue or reject with feedback.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {/* Placeholder for actual proof image */}
+                    <div className="relative w-full aspect-video bg-muted-foreground/10 rounded-md overflow-hidden flex items-center justify-center">
+                       <ImageIcon className="h-12 w-12 text-muted-foreground/50"/>
+                       <p className="absolute bottom-2 text-xs text-muted-foreground">Proof image will be shown here</p>
+                    </div>
+                </CardContent>
+                <CardFooter className="flex-col sm:flex-row gap-2">
+                    <Button onClick={() => handleProofOfWorkApproval(true)} disabled={isUpdating} className="w-full sm:w-auto"><ThumbsUp className="mr-2 h-4 w-4"/> Approve Proof</Button>
+                    <Button onClick={() => setIsRejectModalOpen(true)} variant="destructive" disabled={isUpdating} className="w-full sm:w-auto"><ThumbsDown className="mr-2 h-4 w-4"/> Reject Proof</Button>
+                </CardFooter>
+            </Card>
+          )}
+
           {canConfirmDelivery && (
              <Card className="bg-amber-50 border-amber-200">
                 <CardHeader>
@@ -334,6 +369,14 @@ export default function TrackOrderPage() {
                 </ul>
             </div>
           )}
+          
+           {!isGiftRecipientView && order.isGift && order.giftDetails && (
+             <div>
+                <h4 className="font-semibold mb-1 flex items-center"><Gift className="h-4 w-4 mr-2 text-primary"/>Gift Recipient Details:</h4>
+                <p className="text-sm">Name: {order.giftDetails.recipientName}</p>
+                {order.giftDetails.notifyRecipient && <p className="text-sm">Contact: {order.giftDetails.recipientContactValue} ({order.giftDetails.recipientContactMethod})</p>}
+             </div>
+           )}
 
           {order.shippingAddress && (
             <div>
