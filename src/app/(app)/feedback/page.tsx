@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -41,12 +42,14 @@ const getStatusVariant = (status: FeedbackThread['status']): BadgeProps['variant
   }
 };
 
+const technicianRoles: UserRole[] = ['Engraving', 'Printing', 'Assembly', 'Quality Check', 'Packaging'];
 const managerRoles: UserRole[] = ['Admin', 'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'];
+const allStaffRoles = [...managerRoles, ...technicianRoles];
 
 export default function MessagesPage() {
   const { user, role, loading } = useAuth();
   const router = useRouter();
-  const { toast } = useToast();
+  const { toast } from useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
 
@@ -141,16 +144,17 @@ export default function MessagesPage() {
     const usersRef = collection(db, 'users');
     const q = query(
         usersRef, 
-        where('role', 'in', managerRoles),
+        where('role', 'in', allStaffRoles),
+        orderBy('role', 'asc'),
         orderBy('displayName', 'asc')
     );
 
     try {
         const snapshot = await getDocs(q);
-        const managerUsers = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
+        const staffUsers = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser));
         
         // Filter out disabled users and the current user client-side
-        const filteredRecipients = managerUsers.filter(u => u.uid !== user.uid && !u.disabled);
+        const filteredRecipients = staffUsers.filter(u => u.uid !== user.uid && !u.disabled);
         
         setRecipients(filteredRecipients);
     } catch (error: any) {
