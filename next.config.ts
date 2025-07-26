@@ -7,9 +7,13 @@ const withPWA = withPWAInit({
   disable: process.env.NODE_ENV === "development",
   register: true,
   skipWaiting: true,
-  sw: 'sw.js', // Ensure it points to our custom service worker
+  sw: 'sw.js', 
   fallbacks: {
-    document: '/offline', 
+    document: "/offline",
+    // Add fallbacks for other content types as needed.
+    // data: "/offline.json", // Example for data fallbacks
+    // image: "/static/images/fallback.png",
+    // font: "/static/fonts/fallback.woff2",
   },
 });
 
