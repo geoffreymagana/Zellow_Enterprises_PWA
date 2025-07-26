@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -44,12 +43,12 @@ const getStatusVariant = (status: FeedbackThread['status']): BadgeProps['variant
 
 const technicianRoles: UserRole[] = ['Engraving', 'Printing', 'Assembly', 'Quality Check', 'Packaging'];
 const managerRoles: UserRole[] = ['Admin', 'FinanceManager', 'ServiceManager', 'InventoryManager', 'DispatchManager'];
-const allStaffRoles = [...managerRoles, ...technicianRoles];
+const allStaffRoles: UserRole[] = [...managerRoles, ...technicianRoles];
 
 export default function MessagesPage() {
   const { user, role, loading } = useAuth();
   const router = useRouter();
-  const { toast } from useToast();
+  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
 
