@@ -38,7 +38,9 @@ const formatPrice = (price: number): string => {
 
 const formatDate = (timestamp: any) => {
   if (!timestamp) return 'N/A';
-  return timestamp.toDate ? format(timestamp.toDate(), 'PPp') : 'Invalid Date';
+  const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+  if (isNaN(date.getTime())) return 'Invalid Date';
+  return format(date, 'PPp');
 };
 
 const getPaymentStatusBadgeVariant = (status: PaymentStatus): BadgeProps['variant'] => {
@@ -51,6 +53,25 @@ const getPaymentStatusBadgeVariant = (status: PaymentStatus): BadgeProps['varian
     default: return 'outline';
   }
 };
+
+// Helper to convert Firestore Timestamps to JS Dates for serialization
+const convertTimestampsToDates = (obj: any): any => {
+    if (obj === null || typeof obj !== 'object') {
+        return obj;
+    }
+    if (obj instanceof Timestamp) {
+        return obj.toDate();
+    }
+    if (Array.isArray(obj)) {
+        return obj.map(convertTimestampsToDates);
+    }
+    const newObj: { [key: string]: any } = {};
+    for (const key in obj) {
+        newObj[key] = convertTimestampsToDates(obj[key]);
+    }
+    return newObj;
+};
+
 
 export default function AdminPaymentsPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -228,10 +249,10 @@ export default function AdminPaymentsPage() {
     try {
       await updateDoc(orderRef, updatePayload);
       
-      // Send receipt for paid or refunded orders
       if (newPaymentStatus === 'paid' || newPaymentStatus === 'refunded') {
-        const updatedOrderData = { ...actionableOrder, ...updatePayload };
-        await sendOrderReceipt({ order: updatedOrderData });
+        const fullOrderData = { ...actionableOrder, ...updatePayload, deliveryHistory: [...(actionableOrder.deliveryHistory || []), newHistoryEntry] };
+        const serializableOrder = convertTimestampsToDates(fullOrderData);
+        await sendOrderReceipt({ order: serializableOrder });
       }
 
       toast({ title: `Action Successful`, description: `Order payment has been ${newPaymentStatus || 'updated'}.` });
@@ -248,7 +269,8 @@ export default function AdminPaymentsPage() {
   const handleGenerateReceipt = async (order: Order) => {
     setIsSendingReceipt(true);
     try {
-        const result = await sendOrderReceipt({ order, emailSubject: `Receipt for your Zellow Order #${order.id.substring(0,8)}` });
+        const serializableOrder = convertTimestampsToDates(order);
+        const result = await sendOrderReceipt({ order: serializableOrder, emailSubject: `Receipt for your Zellow Order #${order.id.substring(0,8)}` });
         if (result.success) {
             toast({ title: "Receipt Sent", description: `An updated receipt has been sent to ${order.customerEmail}.` });
         } else {
@@ -429,7 +451,7 @@ export default function AdminPaymentsPage() {
                            {isRevenue && paymentStatus === 'refund_requested' && (
                             <Button size="sm" variant="destructive" onClick={() => handleOpenActionModal(order!, 'refund')} disabled={isSubmittingAction}><Undo2 className="h-4 w-4 mr-1"/> Process Refund</Button>
                           )}
-                          {isRevenue && ['paid', 'refunded', 'cancelled'].includes(paymentStatus) && (
+                          {isRevenue && ['paid', 'refunded', 'cancelled'].includes(paymentStatus as string) && (
                             <Button size="sm" variant="outline" onClick={() => handleGenerateReceipt(order!)} disabled={isSendingReceipt || isSubmittingAction}>
                                 {isSendingReceipt ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4"/>}
                             </Button>
@@ -525,7 +547,7 @@ export default function AdminPaymentsPage() {
                 variant={actionType === 'reject' || actionType === 'refund' ? 'destructive' : 'default'}
             >
                 {isSubmittingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                Confirm {actionType}
+                Confirm
             </Button>
           </DialogFooter>
         </DialogContent>
