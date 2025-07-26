@@ -100,18 +100,21 @@ export interface Product {
 export type OrderStatus =
   | 'pending'
   | 'pending_finance_approval'
-  | 'processing' // Order approved, ready for production tasks to be created
-  | 'in_production' // A task has been started by a technician
-  | 'awaiting_quality_check' // A technician has submitted work for approval
-  | 'production_complete' // All tasks are done, ready for dispatch assignment
-  | 'awaiting_assignment' // Alias for production_complete, for dispatch view
+  | 'processing'
+  | 'in_production' 
+  | 'awaiting_quality_check' 
+  | 'production_complete' 
+  | 'awaiting_assignment'
   | 'assigned'
   | 'out_for_delivery'
+  | 'shipped'
   | 'delivered'
   | 'delivery_attempted'
   | 'cancelled'
-  | 'shipped'
-  | 'awaiting_customer_confirmation';
+  | 'awaiting_customer_confirmation'
+  | 'rejected_by_customer'
+  | 'completed';
+
 
 export interface DeliveryHistoryEntry {
   status: OrderStatus | string;
@@ -152,7 +155,7 @@ export interface GiftDetails {
   recipientCanViewAndTrack: boolean;
 }
 
-export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'refund_requested';
 
 export interface OrderRating {
   value: number;

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useAuth } from '@/hooks/useAuth';
@@ -27,7 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 type UnifiedTransaction = (Order | Invoice) & { transactionType: 'revenue' | 'expense' };
 type PaymentAction = 'confirm' | 'reject' | 'refund';
 
-const paymentStatuses: (PaymentStatus | "all")[] = ['all', 'pending', 'paid', 'failed', 'refunded'];
+const paymentStatuses: (PaymentStatus | "all")[] = ['all', 'pending', 'paid', 'failed', 'refunded', 'refund_requested'];
 const ALL_STATUSES_SENTINEL = "all";
 
 const formatPrice = (price: number): string => {
@@ -44,6 +45,7 @@ const getPaymentStatusBadgeVariant = (status: PaymentStatus): BadgeProps['varian
     case 'pending': return 'statusAmber';
     case 'paid': return 'statusGreen';
     case 'failed': return 'statusRed';
+    case 'refund_requested': return 'statusOrange';
     case 'refunded': return 'statusGrey';
     default: return 'outline';
   }
@@ -204,10 +206,14 @@ export default function AdminPaymentsPage() {
         break;
       case 'refund':
         newPaymentStatus = 'refunded';
-        newOrderStatus = 'cancelled'; // A refunded order is also cancelled from a fulfillment POV
-        historyNotes = `Payment refunded by ${user.displayName || user.email}. Reason: ${actionReason}`;
+        historyNotes = `Refund processed by ${user.displayName || user.email}. Reason: ${actionReason}`;
         updatePayload.paymentStatus = newPaymentStatus;
-        updatePayload.status = newOrderStatus;
+        // The order status might already be 'cancelled' if refund was requested.
+        // We'll keep it as cancelled or update it if it wasn't.
+        if (actionableOrder.status !== 'cancelled') {
+            newOrderStatus = 'cancelled';
+            updatePayload.status = newOrderStatus;
+        }
         break;
     }
 
@@ -400,6 +406,9 @@ export default function AdminPaymentsPage() {
                            {isRevenue && paymentStatus === 'paid' && (
                             <Button size="sm" variant="outline" onClick={() => handleOpenActionModal(order!, 'refund')} disabled={isSubmittingAction}><Undo2 className="h-4 w-4"/></Button>
                           )}
+                          {isRevenue && paymentStatus === 'refund_requested' && (
+                            <Button size="sm" variant="destructive" onClick={() => handleOpenActionModal(order!, 'refund')} disabled={isSubmittingAction}><Undo2 className="h-4 w-4 mr-1"/> Process Refund</Button>
+                          )}
                           <Button variant="ghost" size="icon" aria-label="View Details" onClick={() => setViewingTransaction(tx)}>
                             <Eye className="h-4 w-4"/>
                           </Button>
@@ -491,7 +500,7 @@ export default function AdminPaymentsPage() {
                 variant={actionType === 'reject' || actionType === 'refund' ? 'destructive' : 'default'}
             >
                 {isSubmittingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                Confirm {actionType}
+                Confirm
             </Button>
           </DialogFooter>
         </DialogContent>
