@@ -50,7 +50,7 @@ const allOrderStatuses: OrderStatus[] = [
     'pending', 'pending_finance_approval', 'processing',
     'in_production', 'awaiting_quality_check', 'production_complete', 
     'awaiting_assignment', 'assigned', 'out_for_delivery', 'shipped', 
-    'delivered', 'delivery_attempted', 'cancelled'
+    'delivered', 'delivery_attempted', 'cancelled', 'completed', 'rejected_by_customer'
 ];
 
 const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] => {
@@ -67,8 +67,11 @@ const getOrderStatusBadgeVariant = (status: OrderStatus): BadgeProps['variant'] 
     case 'out_for_delivery': return 'statusBlue';
     case 'shipped': return 'statusIndigo';
     case 'delivered': return 'statusGreen';
+    case 'completed': return 'statusGreen';
     case 'delivery_attempted': return 'statusPurple';
-    case 'cancelled': return 'statusRed';
+    case 'cancelled':
+    case 'rejected_by_customer':
+       return 'statusRed';
     default: return 'outline';
   }
 };
@@ -79,6 +82,7 @@ const getPaymentStatusBadgeVariant = (status: PaymentStatus): BadgeProps['varian
     case 'paid': return 'statusGreen';
     case 'failed': return 'statusRed';
     case 'refunded': return 'statusGrey';
+    case 'refund_requested': return 'statusOrange';
     default: return 'outline';
   }
 };
@@ -266,7 +270,7 @@ export default function AdminOrderDetailPage() {
       const newHistoryEntry: DeliveryHistoryEntry = {
         status: data.status as OrderStatus,
         timestamp: Timestamp.now(), 
-        notes: `Status updated to ${data.status} by ${user.displayName || user.email}`,
+        notes: `Status updated to ${data.status.replace(/_/g, ' ')} by ${user.displayName || user.email}`,
         actorId: user.uid,
       };
       await updateDoc(orderRef, { 
@@ -308,7 +312,7 @@ export default function AdminOrderDetailPage() {
           deliveryHistory: [...(prev.deliveryHistory || []), {...newHistoryEntry, timestamp: new Date() }] 
       } : null);
       statusForm.reset({ status: data.status as OrderStatus }); 
-      toast({ title: "Order Status Updated", description: `Order marked as ${data.status}.` });
+      toast({ title: "Order Status Updated", description: `Order marked as ${data.status.replace(/_/g, ' ')}.` });
     } catch (error) {
       console.error("Error updating order status:", error);
       toast({ title: "Error", description: "Failed to update order status.", variant: "destructive" });
@@ -416,7 +420,7 @@ export default function AdminOrderDetailPage() {
     return <div className="flex items-center justify-center min-h-screen"><AlertTriangle className="h-10 w-10 text-destructive mr-2" /> Order not found.</div>;
   }
 
-  const isOrderDelivered = order.status === 'delivered';
+  const isOrderFinalized = ['delivered', 'completed', 'cancelled', 'rejected_by_customer'].includes(order.status);
 
   return (
     <div className="space-y-6">
@@ -446,7 +450,7 @@ export default function AdminOrderDetailPage() {
                         name="status"
                         control={statusForm.control}
                         render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value} disabled={isOrderDelivered}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isOrderFinalized}>
                             <SelectTrigger id="orderStatus"><SelectValue placeholder="Select new status" /></SelectTrigger>
                             <SelectContent>
                             {allOrderStatuses.map(s => <SelectItem key={s} value={s} className="capitalize">{s.replace(/_/g, ' ')}</SelectItem>)}
@@ -456,7 +460,7 @@ export default function AdminOrderDetailPage() {
                     />
                     {statusForm.formState.errors.status && <p className="text-xs text-destructive mt-1">{statusForm.formState.errors.status.message}</p>}
                     </div>
-                    <Button type="submit" disabled={isUpdatingStatus || isOrderDelivered}>
+                    <Button type="submit" disabled={isUpdatingStatus || isOrderFinalized}>
                         {isUpdatingStatus ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />} Save Status
                     </Button>
                 </form>
