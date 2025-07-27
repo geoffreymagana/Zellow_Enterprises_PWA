@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   LayoutDashboard, Users, Package, ShoppingCart, Layers, DollarSign,
   Truck, Settings as SettingsIcon, UserCircle, LogOutIcon, Menu, Bell,
@@ -34,10 +34,62 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { FeedbackThread, UserRole } from '@/types';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { HeaderSearch } from '@/components/layout/HeaderSearch';
+import { Input } from '@/components/ui/input';
+import { Search as SearchIconLucide } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
+}
+
+// A local, simplified search component for the NonAdminLayout header.
+function NonAdminHeaderSearch({ placeholder }: { placeholder: string }) {
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
+    const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const newSearchTerm = event.target.value;
+        setSearchTerm(newSearchTerm);
+
+        if (debounceTimeoutRef.current) {
+            clearTimeout(debounceTimeoutRef.current);
+        }
+
+        debounceTimeoutRef.current = setTimeout(() => {
+            const params = new URLSearchParams(searchParams.toString());
+            if (newSearchTerm) {
+                params.set('q', newSearchTerm);
+            } else {
+                params.delete('q');
+            }
+            
+            const targetPath = (pathname === '/products' || pathname === '/gift-boxes') ? pathname : '/products';
+            router.push(`${targetPath}?${params.toString()}`);
+        }, 500);
+    };
+    
+    useEffect(() => {
+        const urlSearchTerm = searchParams.get('q') || '';
+        if (urlSearchTerm !== searchTerm) {
+            setSearchTerm(urlSearchTerm);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
+
+    return (
+        <div className="relative flex-1 max-w-md sm:max-w-lg md:max-w-xl">
+            <SearchIconLucide className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder={placeholder}
+              className="h-9 w-full pl-10"
+              value={searchTerm}
+              onChange={handleSearchChange}
+            />
+        </div>
+    );
 }
 
 const technicianRoles: UserRole[] = ['Engraving', 'Printing', 'Assembly', 'Quality Check', 'Packaging'];
@@ -50,7 +102,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
 
   const [pendingPaymentsCount, setPendingPaymentsCount] = useState(0);
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
-  const [accountApprovalsCount, setAccountApprovalsCount] = useState(0);
+  const [generalApprovalsCount, setGeneralApprovalsCount] = useState(0);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [qaCount, setQaCount] = useState(0);
 
@@ -63,30 +115,33 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
       const paymentsQuery = query(collection(db, 'orders'), where('status', '==', 'pending_finance_approval'));
       unsubscribers.push(onSnapshot(paymentsQuery, (snapshot) => setPendingPaymentsCount(snapshot.size)));
     }
+    
     if (role === 'Admin' || role === 'ServiceManager') {
       const ordersQuery = query(collection(db, 'orders'), where('status', '==', 'pending_finance_approval'));
-       unsubscribers.push(onSnapshot(ordersQuery, (snapshot) => setPendingOrdersCount(snapshot.size)));
+      unsubscribers.push(onSnapshot(ordersQuery, (snapshot) => setPendingOrdersCount(snapshot.size)));
     }
+    
     if (role === 'Admin') {
       const approvalsQuery = query(collection(db, 'approvalRequests'), where('status', '==', 'pending'));
-      unsubscribers.push(onSnapshot(approvalsQuery, (snapshot) => setAccountApprovalsCount(snapshot.size)));
+      unsubscribers.push(onSnapshot(approvalsQuery, (snapshot) => setGeneralApprovalsCount(snapshot.size)));
     }
-     if (role === 'Admin' || role === 'Quality Check') {
-        const qaQuery = query(collection(db, 'orders'), where('status', '==', 'awaiting_quality_check'));
-        unsubscribers.push(onSnapshot(qaQuery, (snapshot) => setQaCount(snapshot.size)));
+    
+    if (role === 'Admin' || role === 'Quality Check') {
+      const qaQuery = query(collection(db, 'orders'), where('status', '==', 'awaiting_quality_check'));
+      unsubscribers.push(onSnapshot(qaQuery, (snapshot) => setQaCount(snapshot.size)));
     }
+    
     const threadsQuery = query(collection(db, 'feedbackThreads'), where('targetUserId', '==', user.uid));
     unsubscribers.push(onSnapshot(threadsQuery, (snapshot) => {
       const unread = snapshot.docs.filter(doc => {
-          const threadData = doc.data() as FeedbackThread;
-          return threadData.lastReplierRole !== role && threadData.status !== 'closed';
+        const threadData = doc.data() as FeedbackThread;
+        return threadData.lastReplierRole !== role && threadData.status !== 'closed';
       }).length;
       setUnreadMessagesCount(unread);
     }));
 
     return () => unsubscribers.forEach(unsub => unsub());
   }, [db, role, user]);
-
 
   if (!sidebarContext) {
     return <div className="flex items-center justify-center min-h-screen">Error: Sidebar context not found.</div>;
@@ -106,8 +161,8 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/customizations', label: 'Customizations', icon: Layers, roles: ['Admin', 'ServiceManager'] },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'], count: pendingPaymentsCount },
     { href: '/admin/shipping', label: 'Shipping', icon: Ship, roles: ['Admin', 'DispatchManager'] },
-    { href: '/admin/approvals', label: 'Account Approvals', icon: ClipboardCheck, roles: ['Admin'], count: accountApprovalsCount },
-    { href: '/finance/approvals', label: 'Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] },
+    { href: '/admin/approvals', label: 'Account Approvals', icon: ClipboardCheck, roles: ['Admin'], count: generalApprovalsCount },
+    { href: '/finance/approvals', label: 'Stock Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] },
     { href: '/finance/financials', label: 'Financials', icon: BarChart2, roles: ['Admin', 'FinanceManager'] },
     { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['Admin', 'FinanceManager'] },
     { href: '/admin/notifications', label: 'Notifications', icon: Bell, roles: ['Admin'], count: unreadMessagesCount },
@@ -127,7 +182,6 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     .filter(item => role && item.roles.includes(role))
     .filter(item => !searchTerm || item.label.toLowerCase().includes(searchTerm.toLowerCase()));
 
-
   return (
     <div className="flex flex-col w-full min-h-screen bg-background">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-[var(--header-height)]">
@@ -142,18 +196,18 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
               </SheetTrigger>
               <SheetContent side="left" className="w-[var(--sidebar-width-mobile,280px)] p-0 bg-sidebar text-sidebar-foreground flex flex-col">
                 <SheetHeader className="p-4 border-b border-sidebar h-[var(--header-height)] flex items-center">
-                   <SheetTitle className="text-lg font-semibold">Admin Menu</SheetTitle>
+                  <SheetTitle className="text-lg font-semibold">Admin Menu</SheetTitle>
                 </SheetHeader>
                 <ScrollArea className="flex-1">
                   <SidebarMenu className="p-2">
                     {mainAdminNavItems.map((item) => { 
-                       const isActive = (() => {
+                      const isActive = (() => {
                         if (item.href === '/inventory' && pathname.startsWith('/inventory/receivership')) return false;
                         if (item.href === '/inventory' && pathname.startsWith('/admin/products/edit')) return false;
                         return item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
                       })();
                       return (
-                      <SidebarMenuItem key={item.label}>
+                      <SidebarMenuItem key={item.label + item.href}>
                         <Link href={item.href!}>
                           <SidebarMenuButton
                             className="w-full justify-start"
@@ -205,11 +259,16 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
             </Link>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            <HeaderSearch 
-              initialSearchTerm={searchTerm} 
-              onSearchChange={setSearchTerm} 
-              placeholder="Search sections..." 
-            />
+             <div className="relative w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96">
+                <SearchIconLucide className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                    type="search"
+                    placeholder="Search sections..."
+                    className="h-9 w-full pl-8"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
             <div className="hidden md:block">
               <ThemeToggle />
             </div>
@@ -312,13 +371,26 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   useEffect(() => {
     if (!db || !user || !role) return;
 
-    const threadsQuery = query(collection(db, 'feedbackThreads'), where('targetUserId', '==', user.uid));
-    const unsubscribe = onSnapshot(threadsQuery, (snapshot) => {
-      const unread = snapshot.docs.filter(doc => {
-          const threadData = doc.data() as FeedbackThread;
-          return threadData.lastReplierRole !== role && threadData.status !== 'closed';
-      }).length;
-      setUnreadCount(unread);
+    let q;
+    if (role === 'Customer') {
+      q = query(collection(db, 'feedbackThreads'), 
+        where('senderId', '==', user.uid)
+      );
+    } else { 
+      q = query(collection(db, 'feedbackThreads'), 
+        where('targetUserId', '==', user.uid)
+      );
+    }
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      let count = 0;
+      snapshot.forEach((doc) => {
+        const thread = doc.data() as FeedbackThread;
+        if (thread.lastReplierRole !== role && thread.status !== 'closed') {
+          count++;
+        }
+      });
+      setUnreadCount(count);
     });
 
     return () => unsubscribe();
@@ -328,7 +400,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
     <div className="flex flex-col min-h-screen bg-background">
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-[var(--header-height)]">
         <div className="container mx-auto h-full flex items-center justify-between px-4 gap-4">
-           <HeaderSearch 
+           <NonAdminHeaderSearch 
              placeholder={role === 'Customer' ? "Search products, gift boxes..." : (role === 'InventoryManager' ? "Search inventory..." : "Search...")} 
            />
 
@@ -420,7 +492,7 @@ function AppLayoutContent({ children }: LayoutProps) {
         router.replace('/login');
       }
       if (user && isAuthPage) {
-          router.replace('/dashboard');
+        router.replace('/dashboard');
       }
     }
   }, [user, loading, pathname, router]);
@@ -459,5 +531,3 @@ export function AppLayoutClientBoundary({ children }: LayoutProps) {
     </Suspense>
   );
 }
-
-    
