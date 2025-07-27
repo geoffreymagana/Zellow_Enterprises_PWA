@@ -6,20 +6,20 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
-import { Loader2, DollarSign, ShoppingCart, TrendingUp, Coins, PackageIcon, PieChartIcon, CalendarIcon, FilterX } from 'lucide-react';
-import Image from 'next/image';
+import { Loader2, DollarSign, ShoppingCart, TrendingUp, Coins, Package, PieChart, CalendarIcon, FilterX } from 'lucide-react';
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order, Invoice, Product, OrderItem as FirestoreOrderItem, StockRequest } from '@/types';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isBefore, isAfter, isValid, parseISO, subMonths, addDays } from 'date-fns';
+import type { Order, Invoice, Product, OrderItem as FirestoreOrderItem, StockRequest, ShippingAddress } from '@/types';
+import { useToast } from '@/hooks/use-toast';
+import { format, isSameMonth, isBefore, isAfter, isValid, addDays } from 'date-fns';
+import { DateRange } from "react-day-picker";
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 import { MonthlyRevenueExpensesChart, type DailyDataPoint } from '@/components/charts/MonthlyRevenueExpensesChart';
 import { TopSellingProductsChart, type ProductSalesData } from '@/components/charts/TopSellingProductsChart';
 import { RevenueBreakdownChart, type RevenueSourceData } from '@/components/charts/RevenueBreakdownChart';
 import { ExpenseBreakdownChart, type ExpenseSourceData } from '@/components/charts/ExpenseBreakdownChart';
-import { Coins as CoinsIcon } from 'lucide-react';
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { cn } from '@/lib/utils';
 
 const formatPrice = (price: number): string => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(price);
@@ -33,7 +33,7 @@ export default function FinancialsPage() {
   const [latestMonthLabel, setLatestMonthLabel] = useState<string>("");
   const [overallCumulativeNetProfit, setOverallCumulativeNetProfit] = useState<number>(0);
   const [latestMonthNetChange, setLatestMonthNetChange] = useState<number>(0);
-  const [targetMonthDateForChart, setTargetMonthDateForChart] = useState<Date>(new Date());
+  const [targetMonthDateForChart, setTargetMonthDateForDailyChart] = useState<Date>(new Date());
 
   const [topProductsData, setTopProductsData] = useState<ProductSalesData[]>([]);
   const [revenueBreakdownData, setRevenueBreakdownData] = useState<RevenueSourceData[]>([]);
@@ -171,9 +171,11 @@ export default function FinancialsPage() {
       );
 
       let targetMonthForDailyChart = filterRange?.end ? filterRange.end : (isValid(lastTransactionDate) && lastTransactionDate.getFullYear() !== 1970 ? lastTransactionDate : new Date());
-      setTargetMonthDateForChart(targetMonthForDailyChart);
+      setTargetMonthDateForDailyChart(targetMonthForDailyChart);
       setLatestMonthLabel(format(targetMonthForDailyChart, 'MMMM yyyy'));
       
+      const { eachDayOfInterval, startOfMonth, endOfMonth, isSameDay } = await import('date-fns');
+
       const daysInTargetMonth = eachDayOfInterval({
         start: startOfMonth(targetMonthForDailyChart),
         end: (isSameMonth(targetMonthForDailyChart, new Date()) && (!filterRange || !filterRange.end || isSameMonth(filterRange.end, new Date()))) ? new Date() : endOfMonth(targetMonthForDailyChart)
@@ -245,10 +247,6 @@ export default function FinancialsPage() {
     }
   }, [user, role, authLoading, router, fetchFinancialData, startDate, endDate]);
   
-  const handleDateFilterApply = () => {
-     fetchFinancialData({ start: startDate, end: endDate });
-  };
-
   const handleClearFilter = () => {
     setStartDate(undefined);
     setEndDate(undefined);
@@ -410,7 +408,7 @@ export default function FinancialsPage() {
                 <RevenueBreakdownChart data={revenueBreakdownData} />
              ) : (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 text-center">
-                    <PieChartIcon className="h-10 w-10 mb-2 text-muted-foreground/70" />
+                    <PieChart className="h-10 w-10 mb-2 text-muted-foreground/70" />
                     No revenue breakdown data available {filterActive && "for this range"}.
                 </div>
              )}
@@ -426,7 +424,7 @@ export default function FinancialsPage() {
                 <TopSellingProductsChart data={topProductsData} />
              ) : (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 text-center">
-                    <PackageIcon className="h-10 w-10 mb-2 text-muted-foreground/70"/>
+                    <Package className="h-10 w-10 mb-2 text-muted-foreground/70"/>
                     No sales data available for top products {filterActive && "in this range"}.
                 </div>
              )}
@@ -444,7 +442,7 @@ export default function FinancialsPage() {
                 <ExpenseBreakdownChart data={expenseBreakdownData} />
              ) : (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 text-center">
-                    <CoinsIcon className="h-10 w-10 mb-2 text-muted-foreground/70"/>
+                    <Coins className="h-10 w-10 mb-2 text-muted-foreground/70"/>
                     No expense data available {filterActive && "in this range"}.
                 </div>
              )}

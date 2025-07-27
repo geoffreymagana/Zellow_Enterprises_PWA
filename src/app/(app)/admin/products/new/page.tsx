@@ -61,7 +61,7 @@ export default function CreateProductPage() {
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
-      name: "", description: "", price: "", stock: "", categories: [], imageUrl: "", supplier: "", customizationGroupId: null, published: true
+      name: "", description: "", price: 0, stock: 0, categories: [], imageUrl: "", supplier: "", customizationGroupId: null, published: true
     },
   });
 

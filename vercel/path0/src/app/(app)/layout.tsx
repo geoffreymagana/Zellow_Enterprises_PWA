@@ -33,9 +33,7 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { FeedbackThread, UserRole } from '@/types';
 import { useIsMobile } from '@/hooks/use-mobile';
-// import { HeaderSearch } from './HeaderSearch'; // Commented out for Vercel compatibility
-import { Input } from '@/components/ui/input';
-import { Search as SearchIconLucide } from 'lucide-react';
+import { HeaderSearch } from '@/components/layout/HeaderSearch';
 
 interface LayoutProps {
   children: ReactNode;
@@ -49,55 +47,45 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   const pathname = usePathname();
   const isMobile = useIsMobile();
 
-  // Notification counts state
   const [pendingPaymentsCount, setPendingPaymentsCount] = useState(0);
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
-  const [generalApprovalsCount, setGeneralApprovalsCount] = useState(0);
+  const [accountApprovalsCount, setAccountApprovalsCount] = useState(0);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [qaCount, setQaCount] = useState(0);
 
-  // Set up real-time listeners for notification counts
   useEffect(() => {
     if (!db || !role || !user) return;
 
     const unsubscribers: (() => void)[] = [];
 
-    // Pending Payments (for Finance)
     if (role === 'Admin' || role === 'FinanceManager') {
       const paymentsQuery = query(collection(db, 'orders'), where('status', '==', 'pending_finance_approval'));
       unsubscribers.push(onSnapshot(paymentsQuery, (snapshot) => setPendingPaymentsCount(snapshot.size)));
     }
-    
-    // Pending Orders (for Admin/Service Mgr)
     if (role === 'Admin' || role === 'ServiceManager') {
       const ordersQuery = query(collection(db, 'orders'), where('status', '==', 'pending_finance_approval'));
-      unsubscribers.push(onSnapshot(ordersQuery, (snapshot) => setPendingOrdersCount(snapshot.size)));
+       unsubscribers.push(onSnapshot(ordersQuery, (snapshot) => setPendingOrdersCount(snapshot.size)));
     }
-    
-    // General Approvals (for Admin)
     if (role === 'Admin') {
       const approvalsQuery = query(collection(db, 'approvalRequests'), where('status', '==', 'pending'));
-      unsubscribers.push(onSnapshot(approvalsQuery, (snapshot) => setGeneralApprovalsCount(snapshot.size)));
+      unsubscribers.push(onSnapshot(approvalsQuery, (snapshot) => setAccountApprovalsCount(snapshot.size)));
     }
-    
-    // QA Count
-    if (role === 'Admin' || role === 'Quality Check') {
-      const qaQuery = query(collection(db, 'orders'), where('status', '==', 'awaiting_quality_check'));
-      unsubscribers.push(onSnapshot(qaQuery, (snapshot) => setQaCount(snapshot.size)));
+     if (role === 'Admin' || role === 'Quality Check') {
+        const qaQuery = query(collection(db, 'orders'), where('status', '==', 'awaiting_quality_check'));
+        unsubscribers.push(onSnapshot(qaQuery, (snapshot) => setQaCount(snapshot.size)));
     }
-    
-    // Unread Messages for all staff roles
     const threadsQuery = query(collection(db, 'feedbackThreads'), where('targetUserId', '==', user.uid));
     unsubscribers.push(onSnapshot(threadsQuery, (snapshot) => {
       const unread = snapshot.docs.filter(doc => {
-        const threadData = doc.data() as FeedbackThread;
-        return threadData.lastReplierRole !== role && threadData.status !== 'closed';
+          const threadData = doc.data() as FeedbackThread;
+          return threadData.lastReplierRole !== role && threadData.status !== 'closed';
       }).length;
       setUnreadMessagesCount(unread);
     }));
 
     return () => unsubscribers.forEach(unsub => unsub());
   }, [db, role, user]);
+
 
   if (!sidebarContext) {
     return <div className="flex items-center justify-center min-h-screen">Error: Sidebar context not found.</div>;
@@ -118,7 +106,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/customizations', label: 'Customizations', icon: Layers, roles: ['Admin', 'ServiceManager'] },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'], count: pendingPaymentsCount },
     { href: '/admin/shipping', label: 'Shipping', icon: Ship, roles: ['Admin', 'DispatchManager'] },
-    { href: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck, roles: ['Admin'], count: generalApprovalsCount },
+    { href: '/admin/approvals', label: 'Account Approvals', icon: ClipboardCheck, roles: ['Admin'], count: accountApprovalsCount },
     { href: '/finance/approvals', label: 'Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] },
     { href: '/finance/financials', label: 'Financials', icon: BarChart2, roles: ['Admin', 'FinanceManager'] },
     { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['Admin', 'FinanceManager'] },
@@ -131,7 +119,6 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/settings', label: 'Settings', icon: SettingsIcon, roles: ['Admin'] },
   ];
 
-  // Filter navigation items by role and search term
   const mainAdminNavItems = baseAdminNavItems
     .filter(item => role && item.roles.includes(role))
     .filter(item => !searchTerm || item.label.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -139,6 +126,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   const filteredFooterAdminNavItems = footerAdminNavItems
     .filter(item => role && item.roles.includes(role))
     .filter(item => !searchTerm || item.label.toLowerCase().includes(searchTerm.toLowerCase()));
+
 
   return (
     <div className="flex flex-col w-full min-h-screen bg-background">
@@ -159,31 +147,27 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                 <ScrollArea className="flex-1">
                   <SidebarMenu className="p-2">
                     {mainAdminNavItems.map((item) => { 
-                      const isActive = (() => {
-                        if (item.href === '/inventory' && pathname.startsWith('/inventory/receivership')) {
-                          return false; 
-                        }
-                        if (item.href === '/inventory' && pathname.startsWith('/admin/products/edit')) {
-                          return false; 
-                        }
+                       const isActive = (() => {
+                        if (item.href === '/inventory' && pathname.startsWith('/inventory/receivership')) return false;
+                        if (item.href === '/inventory' && pathname.startsWith('/admin/products/edit')) return false;
                         return item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
                       })();
                       return (
-                        <SidebarMenuItem key={item.label + item.href}>
-                          <Link href={item.href!}>
-                            <SidebarMenuButton
-                              className="w-full justify-start"
-                              onClick={() => setOpenMobile(false)}
-                              isActive={isActive}
-                            >
-                              <item.icon className="mr-2 h-4 w-4" />
-                              <span>{item.label}</span>
-                              {item.count && item.count > 0 && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
-                            </SidebarMenuButton>
-                          </Link>
-                        </SidebarMenuItem>
-                      )
-                    })}
+                      <SidebarMenuItem key={item.label}>
+                        <Link href={item.href!}>
+                          <SidebarMenuButton
+                            className="w-full justify-start"
+                            variant="ghost"
+                            onClick={() => setOpenMobile(false)}
+                            isActive={isActive}
+                           >
+                            <item.icon className="mr-2 h-4 w-4" />
+                            <span>{item.label}</span>
+                            {item.count && item.count > 0 && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                          </SidebarMenuButton>
+                        </Link>
+                      </SidebarMenuItem>
+                    )})}
                   </SidebarMenu>
                 </ScrollArea>
                 <SidebarFooter className="p-2 border-t border-sidebar">
@@ -221,16 +205,11 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
             </Link>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            <div className="relative w-full max-w-xs sm:max-w-sm md:w-64 lg:w-96">
-              <SearchIconLucide className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search sections..."
-                className="h-9 w-full pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+            <HeaderSearch 
+              initialSearchTerm={searchTerm} 
+              onSearchChange={setSearchTerm} 
+              placeholder="Search sections..." 
+            />
             <div className="hidden md:block">
               <ThemeToggle />
             </div>
@@ -251,28 +230,25 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                 <SidebarMenu className="p-2">
                   {mainAdminNavItems.map((item) => { 
                     const isActive = (() => {
-                      if (item.href === '/inventory' && pathname.startsWith('/inventory/receivership')) {
-                        return false; 
-                      }
-                      if (item.href === '/inventory' && pathname.startsWith('/admin/products/edit')) {
-                        return false;
-                      }
+                      if (item.href === '/inventory' && pathname.startsWith('/inventory/receivership')) return false;
+                      if (item.href === '/inventory' && pathname.startsWith('/admin/products/edit')) return false;
                       return item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
                     })();
                     return (
-                      <SidebarMenuItem key={item.label + item.href}>
-                        <Link href={item.href!}>
-                          <SidebarMenuButton
-                            tooltip={item.label}
-                            className="w-full justify-start"
-                            isActive={isActive}
-                          >
-                            <item.icon className="mr-2 h-4 w-4" />
-                            <span>{item.label}</span>
-                            {item.count && item.count > 0 && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
-                          </SidebarMenuButton>
-                        </Link>
-                      </SidebarMenuItem>
+                    <SidebarMenuItem key={item.label}>
+                      <Link href={item.href!}>
+                        <SidebarMenuButton
+                          tooltip={item.label}
+                          className="w-full justify-start"
+                          variant="ghost"
+                          isActive={isActive}
+                        >
+                          <item.icon className="mr-2 h-4 w-4" />
+                          <span>{item.label}</span>
+                          {item.count && item.count > 0 && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                        </SidebarMenuButton>
+                      </Link>
+                    </SidebarMenuItem>
                     )
                   })}
                 </SidebarMenu>
@@ -336,26 +312,13 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
   useEffect(() => {
     if (!db || !user || !role) return;
 
-    let q;
-    if (role === 'Customer') {
-      q = query(collection(db, 'feedbackThreads'), 
-        where('senderId', '==', user.uid)
-      );
-    } else { 
-      q = query(collection(db, 'feedbackThreads'), 
-        where('targetUserId', '==', user.uid)
-      );
-    }
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      let count = 0;
-      snapshot.forEach((doc) => {
-        const thread = doc.data() as FeedbackThread;
-        if (thread.lastReplierRole !== role && thread.status !== 'closed') {
-          count++;
-        }
-      });
-      setUnreadCount(count);
+    const threadsQuery = query(collection(db, 'feedbackThreads'), where('targetUserId', '==', user.uid));
+    const unsubscribe = onSnapshot(threadsQuery, (snapshot) => {
+      const unread = snapshot.docs.filter(doc => {
+          const threadData = doc.data() as FeedbackThread;
+          return threadData.lastReplierRole !== role && threadData.status !== 'closed';
+      }).length;
+      setUnreadCount(unread);
     });
 
     return () => unsubscribe();
@@ -365,16 +328,9 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
     <div className="flex flex-col min-h-screen bg-background">
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-[var(--header-height)]">
         <div className="container mx-auto h-full flex items-center justify-between px-4 gap-4">
-          <div className="relative flex-1 max-w-md sm:max-w-lg md:max-w-xl">
-            <SearchIconLucide className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder={role === 'Customer' ? "Search products, gift boxes..." : (role === 'InventoryManager' ? "Search inventory..." : "Search...")}
-              className="h-9 w-full pl-10"
-              value={searchTerm || ''}
-              onChange={(e) => setSearchTerm && setSearchTerm(e.target.value)}
-            />
-          </div>
+           <HeaderSearch 
+             placeholder={role === 'Customer' ? "Search products, gift boxes..." : (role === 'InventoryManager' ? "Search inventory..." : "Search...")} 
+           />
 
           <div className="flex items-center gap-2">
             <Link href="/feedback" passHref>
@@ -503,3 +459,5 @@ export function AppLayoutClientBoundary({ children }: LayoutProps) {
     </Suspense>
   );
 }
+
+    
