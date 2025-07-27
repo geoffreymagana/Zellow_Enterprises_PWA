@@ -25,6 +25,23 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  webpack: (config, { isServer }) => {
+    // Ignore handlebars require.extensions warning for genkit
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      path: false,
+      os: false,
+    };
+    
+    // Suppress specific warnings
+    config.ignoreWarnings = [
+      /require\.extensions/,
+      /handlebars/,
+    ];
+    
+    return config;
+  },
   images: {
     remotePatterns: [
       {
