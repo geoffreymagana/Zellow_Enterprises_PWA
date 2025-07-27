@@ -2,7 +2,7 @@
 "use client";
 
 import type { User, UserRole, UserStatus } from '@/types';
-import React, from 'react';
+import React from 'react';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { 
   onAuthStateChanged, 
