@@ -177,11 +177,15 @@ export default function TasksPage() {
             await updateDoc(orderRef, orderUpdatePayload);
         }
 
-        // Local state update
-        setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null);
         toast({ title: "Task Updated", description: `Task status changed to ${newStatus.replace(/_/g, ' ')}.` });
+
+        // Update local state immediately after successful db write
+        setTasks(prevTasks => prevTasks.map(task => 
+            task.id === taskId ? { ...task, status: newStatus } : task
+        ));
+        setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null);
         
-        // This was causing the modal to stay open if it was a final step
+        // Close modal if it's a terminal state for the modal's primary action
         if (newStatus !== 'in-progress') {
           setIsModalOpen(false);
         }
@@ -487,7 +491,7 @@ export default function TasksPage() {
                 </div>)}
                 {selectedTask && (role === 'ServiceManager' || role === 'Admin') && selectedTask.status === 'needs_approval' && (<>
                     <Button size="sm" variant="destructive" onClick={() => setIsRejectionModalOpen(true)} disabled={isUpdating}><XCircle className="mr-2 h-4 w-4"/> Reject</Button>
-                    <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'completed', 'awaiting_quality_check')} disabled={isUpdating}><CheckCircle className="mr-2 h-4 w-4"/> Approve</Button>
+                    <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'completed', 'awaiting_quality_check')} disabled={isUpdating}>Approve</Button>
                 </>)}
              </div>
           </DialogFooter>

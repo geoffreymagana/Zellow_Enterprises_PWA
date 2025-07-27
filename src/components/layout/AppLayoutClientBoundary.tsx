@@ -113,7 +113,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'], count: pendingPaymentsCount },
     { href: '/admin/shipping', label: 'Shipping', icon: Ship, roles: ['Admin', 'DispatchManager'] },
     { href: '/admin/approvals', label: 'Account Approvals', icon: ClipboardCheck, roles: ['Admin'], count: generalApprovalsCount },
-    { href: '/finance/approvals', label: 'Stock Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] },
+    { href: '/finance/approvals', label: 'Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] },
     { href: '/finance/financials', label: 'Financials', icon: BarChart2, roles: ['Admin', 'FinanceManager'] },
     { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['Admin', 'FinanceManager'] },
     { href: '/admin/notifications', label: 'Notifications', icon: Bell, roles: ['Admin'], count: unreadMessagesCount },

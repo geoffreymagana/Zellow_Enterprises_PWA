@@ -143,7 +143,7 @@ export default function FinanceApprovalsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-headline font-semibold flex items-center gap-2"><Coins className="h-7 w-7 text-primary"/>Approvals</h1>
+        <h1 className="text-3xl font-headline font-semibold flex items-center gap-2"><Coins className="h-7 w-7 text-primary"/>Stock Approvals</h1>
         <Button onClick={() => fetchAllData().then(unsub => unsub && unsub())} variant="outline" size="sm" disabled={isLoading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
