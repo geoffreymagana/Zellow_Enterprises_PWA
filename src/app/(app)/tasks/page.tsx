@@ -159,57 +159,33 @@ export default function TasksPage() {
         const taskRef = doc(db, 'tasks', taskId);
         const orderRef = doc(db, 'orders', selectedTask.orderId!);
 
-        let historyNote: string | null = null;
-        if (newOrderStatus) {
-            historyNote = `Order status updated to ${newOrderStatus.replace(/_/g, ' ')} as task '${selectedTask.taskType}' moved to '${newStatus}'.`;
-        }
-
         const taskUpdatePayload: any = { status: newStatus, updatedAt: serverTimestamp() };
         await updateDoc(taskRef, taskUpdatePayload);
         
-        const orderUpdatePayload: any = {};
+        let orderUpdatePayload: any = {};
         if (newOrderStatus) {
             orderUpdatePayload.status = newOrderStatus;
-        }
-
-        if (historyNote) {
+            const historyNote = `Order status updated to ${newOrderStatus.replace(/_/g, ' ')} as task '${selectedTask.taskType}' moved to '${newStatus}'.`;
             const newHistoryEntry: DeliveryHistoryEntry = {
-                status: newOrderStatus || selectedTask.status as OrderStatus,
+                status: newOrderStatus,
                 timestamp: serverTimestamp(),
                 notes: historyNote,
                 actorId: user.uid,
             };
             orderUpdatePayload.deliveryHistory = arrayUnion(newHistoryEntry);
-        }
-
-        if (Object.keys(orderUpdatePayload).length > 0) {
             orderUpdatePayload.updatedAt = serverTimestamp();
             await updateDoc(orderRef, orderUpdatePayload);
         }
 
-        if (newStatus === 'completed' && (role === 'ServiceManager' || role === 'Admin')) {
-            const allTasksForOrderQuery = query(collection(db, 'tasks'), where('orderId', '==', selectedTask.orderId));
-            const allTasksSnapshot = await getDocs(allTasksForOrderQuery);
-            const allTasks = allTasksSnapshot.docs.map(d => ({id: d.id, ...d.data()} as Task));
-            
-            const allTasksCompleted = allTasks.every(t => t.id === taskId ? newStatus === 'completed' : t.status === 'completed');
-            
-            if (allTasksCompleted) {
-                const finalHistoryEntry: DeliveryHistoryEntry = {
-                    status: 'awaiting_assignment',
-                    timestamp: serverTimestamp(),
-                    notes: `All production tasks completed. Order is ready for dispatch assignment.`,
-                    actorId: "System",
-                };
-                await updateDoc(orderRef, {
-                    status: 'awaiting_assignment',
-                    deliveryHistory: arrayUnion(finalHistoryEntry),
-                    updatedAt: serverTimestamp()
-                });
-            }
+        // Local state update
+        setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null);
+        toast({ title: "Task Updated", description: `Task status changed to ${newStatus.replace(/_/g, ' ')}.` });
+        
+        // This was causing the modal to stay open if it was a final step
+        if (newStatus !== 'in-progress') {
+          setIsModalOpen(false);
         }
         
-        setIsModalOpen(false);
     } catch (error) {
         console.error("Error updating task status: ", error);
         toast({ title: "Error", description: "Could not update task status.", variant: "destructive" });
@@ -240,6 +216,7 @@ export default function TasksPage() {
         if (selectedTask) {
             setSelectedTask(prev => prev ? { ...prev, assigneeId: technicianToAssign.uid, assigneeName: technicianToAssign.displayName || technicianToAssign.email } : null);
         }
+        toast({ title: "Assignee Updated", description: "Task has been reassigned." });
     } catch (error) {
         console.error("Error updating assignee:", error);
     } finally {
@@ -330,31 +307,26 @@ export default function TasksPage() {
     setIsUpdating(true);
     try {
       const taskRef = doc(db, 'tasks', selectedTask.id);
-      
-      const newStatus: Task['status'] = (role === 'Admin' || role === 'ServiceManager') ? 'completed' : 'needs_approval';
-      const orderNewStatus: OrderStatus = 'awaiting_quality_check';
-
       await updateDoc(taskRef, {
-        status: newStatus,
+        status: 'needs_approval',
         proofOfWorkUrl: uploadState.url,
         updatedAt: serverTimestamp(),
       });
+      
+      const orderRef = doc(db, 'orders', selectedTask.orderId!);
+      const historyEntry: DeliveryHistoryEntry = {
+          status: 'awaiting_customer_approval',
+          timestamp: serverTimestamp(),
+          notes: `Proof of work for task '${selectedTask.taskType}' submitted by technician. Awaiting customer review.`,
+          actorId: user.uid
+      };
+      await updateDoc(orderRef, {
+          status: 'awaiting_customer_approval',
+          deliveryHistory: arrayUnion(historyEntry),
+          updatedAt: serverTimestamp(),
+      });
 
-      if (newStatus === 'completed') {
-          const orderRef = doc(db, 'orders', selectedTask.orderId!);
-           const historyEntry: DeliveryHistoryEntry = {
-            status: orderNewStatus,
-            timestamp: serverTimestamp(),
-            notes: `Task '${selectedTask.taskType}' approved by ${role}. Order is now awaiting QA.`,
-            actorId: user.uid
-          };
-           await updateDoc(orderRef, {
-              status: orderNewStatus,
-              deliveryHistory: arrayUnion(historyEntry),
-              updatedAt: serverTimestamp(),
-          });
-      }
-
+      toast({ title: "Submitted for Review", description: "Your work has been submitted for customer and manager approval." });
       setIsModalOpen(false);
     } catch (error) {
       console.error("Error submitting for approval:", error);
@@ -364,7 +336,7 @@ export default function TasksPage() {
   };
 
   const handleRejectionSubmit = async () => {
-    if (!db || !selectedTask || !rejectionReason.trim()) {
+    if (!db || !selectedTask || !rejectionReason.trim() || !user) {
       return;
     }
     setIsUpdating(true);
@@ -372,11 +344,12 @@ export default function TasksPage() {
       const taskRef = doc(db, 'tasks', selectedTask.id);
       await updateDoc(taskRef, {
         status: 'rejected',
-        serviceManagerNotes: rejectionReason,
+        serviceManagerNotes: `Rejected by ${user.displayName}: ${rejectionReason}`,
         updatedAt: serverTimestamp(),
       });
       setIsRejectionModalOpen(false);
       setIsModalOpen(false);
+      toast({title: "Task Rejected", description: "The task has been marked as rejected."});
     } catch (error) {
       console.error("Error rejecting task:", error);
     } finally {
@@ -514,7 +487,7 @@ export default function TasksPage() {
                 </div>)}
                 {selectedTask && (role === 'ServiceManager' || role === 'Admin') && selectedTask.status === 'needs_approval' && (<>
                     <Button size="sm" variant="destructive" onClick={() => setIsRejectionModalOpen(true)} disabled={isUpdating}><XCircle className="mr-2 h-4 w-4"/> Reject</Button>
-                    <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'completed', 'awaiting_quality_check')} disabled={isUpdating}><CheckCircle className="mr-2 h-4 w-4"/> Approve & Send to QA</Button>
+                    <Button size="sm" onClick={() => handleStatusChange(selectedTask.id, 'completed', 'awaiting_quality_check')} disabled={isUpdating}><CheckCircle className="mr-2 h-4 w-4"/> Approve</Button>
                 </>)}
              </div>
           </DialogFooter>

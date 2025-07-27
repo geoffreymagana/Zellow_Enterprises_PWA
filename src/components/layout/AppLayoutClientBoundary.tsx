@@ -100,7 +100,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   const { searchTerm, setSearchTerm, setOpenMobile } = sidebarContext;
 
   const baseAdminNavItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager', 'Quality Check'] },
+    { href: '/dashboard', label: 'Dashboard', roles: ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager', 'Quality Check'] },
     { href: '/admin/users', label: 'Users', icon: Users, roles: ['Admin'] },
     { href: '/admin/products', label: 'Products', icon: Package, roles: ['Admin'] },
     { href: '/inventory', label: 'Inventory Mgt', icon: Warehouse, roles: ['Admin', 'InventoryManager'] },
@@ -128,19 +128,18 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   let mainAdminNavItemsFilteredByRole = baseAdminNavItems.filter(item => role && item.roles.includes(role));
 
   if (role === 'Admin') {
-    const hiddenForAdminHrefs = [
+    const hiddenForAdminHrefs = new Set([
       '/inventory',
       '/inventory/receivership',
       '/tasks',
       '/finance/approvals',
       '/finance/financials',
       '/invoices'
-    ];
-    mainAdminNavItemsFilteredByRole = mainAdminNavItemsFilteredByRole.filter(item => !hiddenForAdminHrefs.includes(item.href));
-  }
-  
-  if (role === 'ServiceManager') {
-      mainAdminNavItemsFilteredByRole = mainAdminNavItemsFilteredByRole.filter(item => item.href !== '/admin/orders');
+    ]);
+    mainAdminNavItemsFilteredByRole = mainAdminNavItemsFilteredByRole.filter(item => !hiddenForAdminHrefs.has(item.href));
+  } else if (role === 'ServiceManager') {
+    const hiddenForServiceManagerHrefs = new Set(['/admin/orders']);
+    mainAdminNavItemsFilteredByRole = mainAdminNavItemsFilteredByRole.filter(item => !hiddenForServiceManagerHrefs.has(item.href));
   }
 
 

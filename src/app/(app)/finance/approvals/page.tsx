@@ -47,19 +47,11 @@ export default function FinanceApprovalsPage() {
   const { toast } = useToast();
 
   const [stockRequests, setStockRequests] = useState<StockRequest[]>([]);
-  const [orderRequests, setOrderRequests] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   const [viewingRequest, setViewingRequest] = useState<StockRequest | null>(null);
   const [isSubmittingAward, setIsSubmittingAward] = useState(false);
-
-  const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
-  const [isOrderActionModalOpen, setIsOrderActionModalOpen] = useState(false);
-  const [orderActionType, setOrderActionType] = useState<"approve" | "reject" | null>(null);
-  const [orderRejectionReason, setOrderRejectionReason] = useState("");
-  const [isSubmittingOrderAction, setIsSubmittingOrderAction] = useState(false);
-
 
   const formatDate = (timestamp: any): string => {
     if (!timestamp) return 'N/A';
@@ -79,30 +71,18 @@ export default function FinanceApprovalsPage() {
       const productsSnapshot = await getDocs(collection(db, 'products'));
       setProducts(productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
 
-      const unsubscribers: (() => void)[] = [];
-
-      // Fetch stock requests needing bid awards
       const stockRequestsQuery = query(
         collection(db, 'stockRequests'), 
         where("status", "in", ["pending_award", "pending_bids"]), 
         orderBy("createdAt", "desc")
       );
-      unsubscribers.push(onSnapshot(stockRequestsQuery, (snapshot) => {
+      
+      const unsubscribe = onSnapshot(stockRequestsQuery, (snapshot) => {
         setStockRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StockRequest)));
-      }));
+        setIsLoading(false);
+      });
 
-      // Fetch orders needing finance approval
-      const orderRequestsQuery = query(
-        collection(db, 'orders'),
-        where("status", "==", "pending_finance_approval"),
-        orderBy("createdAt", "desc")
-      );
-      unsubscribers.push(onSnapshot(orderRequestsQuery, (snapshot) => {
-        setOrderRequests(snapshot.docs.map(d => ({id: d.id, ...d.data()} as Order)));
-      }));
-
-      setIsLoading(false);
-      return () => unsubscribers.forEach(unsub => unsub());
+      return () => unsubscribe();
 
     } catch (error) {
        console.error("Error fetching initial data:", error);
@@ -152,71 +132,6 @@ export default function FinanceApprovalsPage() {
       setIsSubmittingAward(false);
     }
   };
-
-  const handleOpenOrderActionModal = (order: Order, type: 'approve' | 'reject') => {
-    setViewingOrder(order);
-    setOrderActionType(type);
-    setOrderRejectionReason("");
-    setIsOrderActionModalOpen(true);
-  };
-  
-  const handleConfirmOrderAction = async () => {
-    if (!db || !user || !viewingOrder || !orderActionType) return;
-    if (orderActionType === 'reject' && !orderRejectionReason.trim()) {
-      toast({ title: "Reason Required", description: "Please provide a reason for rejection.", variant: "destructive" });
-      return;
-    }
-    setIsSubmittingOrderAction(true);
-    
-    const isApproval = orderActionType === 'approve';
-    const newStatus: OrderStatus = isApproval ? 'processing' : 'cancelled';
-    const newPaymentStatus: Order['paymentStatus'] = isApproval ? 'paid' : 'failed';
-    const notes = isApproval 
-        ? `Order approved by ${user.displayName || user.email}.`
-        : `Order rejected by ${user.displayName || user.email}. Reason: ${orderRejectionReason}`;
-
-    const newHistoryEntry: DeliveryHistoryEntry = {
-        status: newStatus,
-        timestamp: Timestamp.now(),
-        notes: notes,
-        actorId: user.uid,
-    };
-
-    try {
-        const orderRef = doc(db, 'orders', viewingOrder.id);
-        await updateDoc(orderRef, {
-            status: newStatus,
-            paymentStatus: newPaymentStatus,
-            deliveryHistory: arrayUnion(newHistoryEntry),
-            updatedAt: serverTimestamp(),
-        });
-        
-        if (isApproval) {
-            try {
-                await fetch('/api/push/send-notification', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        userId: viewingOrder.customerId,
-                        title: "Your Order is Confirmed!",
-                        body: `Your order #${viewingOrder.id.substring(0,8)} has been approved and is now being processed.`,
-                        data: { url: `/track/order/${viewingOrder.id}` }
-                    }),
-                });
-            } catch (notificationError) {
-                console.error("Failed to send push notification:", notificationError);
-            }
-        }
-
-        toast({ title: `Order ${isApproval ? 'Approved' : 'Rejected'}`, description: `Order ${viewingOrder.id.substring(0,8)}... has been updated.` });
-        setIsOrderActionModalOpen(false);
-        setViewingOrder(null);
-    } catch (e: any) {
-        toast({ title: "Action Failed", description: `Could not ${orderActionType} order.`, variant: "destructive" });
-    } finally {
-        setIsSubmittingOrderAction(false);
-    }
-  };
   
   const requestsNeedingAward = stockRequests.filter(r => r.status === 'pending_award');
   const productForViewingRequest = viewingRequest ? products.find(p => p.id === viewingRequest.productId) : null;
@@ -228,53 +143,12 @@ export default function FinanceApprovalsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-headline font-semibold flex items-center gap-2"><Coins className="h-7 w-7 text-primary"/>Finance & Stock Approvals</h1>
-        <Button onClick={fetchAllData} variant="outline" size="sm" disabled={isLoading}>
+        <h1 className="text-3xl font-headline font-semibold flex items-center gap-2"><Coins className="h-7 w-7 text-primary"/>Approvals</h1>
+        <Button onClick={() => fetchAllData().then(unsub => unsub && unsub())} variant="outline" size="sm" disabled={isLoading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
       </div>
-      <p className="text-muted-foreground">Review and approve customer orders and supplier bids on stock requests.</p>
-
-      {/* Order Approvals Section */}
-       <Card>
-        <CardHeader>
-          <CardTitle>Customer Order Approvals</CardTitle>
-          <CardDescription>Review new customer orders before they are sent for processing.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading && orderRequests.length === 0 ? (
-            <div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
-          ) : orderRequests.length === 0 ? (
-            <p className="p-6 text-center text-muted-foreground">No customer orders are currently awaiting approval.</p>
-          ) : (
-            <Table>
-              <TableHeader><TableRow><TableHead>Order ID</TableHead><TableHead>Customer</TableHead><TableHead>Amount</TableHead><TableHead>Payment</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {orderRequests.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-medium">{order.id.substring(0,8)}...</TableCell>
-                      <TableCell>{order.customerName}</TableCell>
-                      <TableCell>{formatKsh(order.totalAmount)}</TableCell>
-                      <TableCell><Badge variant={order.paymentStatus === 'paid' ? 'statusGreen' : 'statusAmber'}>{order.paymentStatus}</Badge></TableCell>
-                      <TableCell className="text-xs">{formatDate(order.createdAt)}</TableCell>
-                      <TableCell className="text-right flex justify-end gap-2">
-                        <Button size="sm" variant="destructive" onClick={() => handleOpenOrderActionModal(order, 'reject')}>
-                            <XCircle className="mr-2 h-4 w-4" /> Reject
-                        </Button>
-                        <Button size="sm" onClick={() => handleOpenOrderActionModal(order, 'approve')}>
-                            <CheckCircle className="mr-2 h-4 w-4" /> Approve
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-        {orderRequests.length > 0 && 
-          <CardFooter className="pt-4"><p className="text-xs text-muted-foreground">Showing {orderRequests.length} orders awaiting approval.</p></CardFooter>}
-      </Card>
-
+      <p className="text-muted-foreground">Review and approve supplier bids on stock requests.</p>
 
       {/* Stock Requests Awarding Section */}
       <Card>
@@ -380,26 +254,6 @@ export default function FinanceApprovalsPage() {
           </div>
           <DialogFooter>
             <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Order Action Modal */}
-      <Dialog open={isOrderActionModalOpen} onOpenChange={setIsOrderActionModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader><DialogTitle className="capitalize">{orderActionType} Order</DialogTitle><DialogDescription>You are about to {orderActionType} order: {viewingOrder?.id.substring(0,8)}...</DialogDescription></DialogHeader>
-          {orderActionType === 'reject' && (
-            <div className="py-2 space-y-2">
-              <Label htmlFor="rejection-reason">Reason for Rejection</Label>
-              <Textarea id="rejection-reason" value={orderRejectionReason} onChange={(e) => setOrderRejectionReason(e.target.value)} placeholder="Provide a brief reason for rejection..." />
-            </div>
-          )}
-          <DialogFooter>
-            <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-            <Button type="button" onClick={handleConfirmOrderAction} disabled={isSubmittingOrderAction || (orderActionType === 'reject' && !orderRejectionReason.trim())} variant={orderActionType === 'reject' ? 'destructive' : 'default'}>
-                {isSubmittingOrderAction && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                Confirm {orderActionType}
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
