@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Edit, Filter, PackageOpen, Layers2, PackagePlus } from 'lucide-react';
+import { Loader2, Search, Edit, Filter, PackageOpen, Wrench, PackagePlus } from 'lucide-react';
 import type { Order, OrderStatus } from '@/types';
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import Link from 'next/link';
@@ -223,7 +223,7 @@ export default function AdminOrdersPage() {
                           <div className="flex flex-col gap-1 items-start">
                             {isCustom && (
                                 <Badge variant="outline" className="text-xs">
-                                    <Layers2 className="mr-1 h-3 w-3"/> Custom
+                                    <Wrench className="mr-1 h-3 w-3"/> Custom
                                 </Badge>
                             )}
                             {isBulk && (
@@ -263,4 +263,3 @@ export default function AdminOrdersPage() {
     </div>
   );
 }
-
