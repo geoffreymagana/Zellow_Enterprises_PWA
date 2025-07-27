@@ -14,7 +14,7 @@ import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle, PackageSearch, RefreshCw, Eye, XCircle } from 'lucide-react';
 import type { Order, OrderStatus, DeliveryHistoryEntry, Task } from '@/types';
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion, writeBatch } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, arrayUnion, writeBatch, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
 import Link from 'next/link';
@@ -136,7 +136,7 @@ export default function QualityAssurancePage() {
         // 2. Find all related tasks and revert them to 'pending'
         const tasksQuery = query(collection(db, 'tasks'), where("orderId", "==", rejectionRequest.id));
         const tasksSnapshot = await getDocs(tasksQuery);
-        tasksSnapshot.forEach(taskDoc => {
+        tasksSnapshot.forEach((taskDoc: any) => {
             batch.update(taskDoc.ref, {
                 status: 'pending',
                 serviceManagerNotes: `QA Rejected: ${rejectionReason}`,
