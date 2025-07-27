@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
-import { Loader2, DollarSign, ShoppingCart, TrendingUp, Coins, PackageIcon, PieChartIcon, CalendarIcon, FilterX } from 'lucide-react';
+import { Loader2, DollarSign, ShoppingCart, TrendingUp, Coins, Package, PieChart, CalendarIcon, FilterX } from 'lucide-react';
 import Image from 'next/image';
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -171,7 +171,7 @@ export default function FinancialsPage() {
       );
 
       let targetMonthForDailyChart = filterRange?.end ? filterRange.end : (isValid(lastTransactionDate) && lastTransactionDate.getFullYear() !== 1970 ? lastTransactionDate : new Date());
-      setTargetMonthDateForChart(targetMonthForDailyChart);
+      setTargetMonthDateForDailyChart(targetMonthForDailyChart);
       setLatestMonthLabel(format(targetMonthForDailyChart, 'MMMM yyyy'));
       
       const daysInTargetMonth = eachDayOfInterval({
@@ -410,7 +410,7 @@ export default function FinancialsPage() {
                 <RevenueBreakdownChart data={revenueBreakdownData} />
              ) : (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 text-center">
-                    <PieChartIcon className="h-10 w-10 mb-2 text-muted-foreground/70" />
+                    <PieChart className="h-10 w-10 mb-2 text-muted-foreground/70" />
                     No revenue breakdown data available {filterActive && "for this range"}.
                 </div>
              )}
@@ -426,7 +426,7 @@ export default function FinancialsPage() {
                 <TopSellingProductsChart data={topProductsData} />
              ) : (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 text-center">
-                    <PackageIcon className="h-10 w-10 mb-2 text-muted-foreground/70"/>
+                    <Package className="h-10 w-10 mb-2 text-muted-foreground/70"/>
                     No sales data available for top products {filterActive && "in this range"}.
                 </div>
              )}
