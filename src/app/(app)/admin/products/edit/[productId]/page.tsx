@@ -327,6 +327,3 @@ export default function AdminEditProductPage() {
     </div>
   );
 }
-    
-
-    

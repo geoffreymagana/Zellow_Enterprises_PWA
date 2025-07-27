@@ -27,6 +27,7 @@ const getStockRequestStatusVariant = (status?: StockRequestStatus | null): Badge
     case 'pending_award': return 'statusAmber';
     case 'awarded': return 'statusIndigo';
     case 'awaiting_fulfillment': return 'statusLightBlue';
+    case 'awaiting_receipt': return 'statusBlue';
     case 'received': return 'statusGreen';
     case 'fulfilled': return 'statusGreen';
     case 'rejected_finance': return 'statusRed';
