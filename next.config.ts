@@ -6,7 +6,6 @@ const withPWA = withPWAInit({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
   register: true,
-  skipWaiting: true,
   sw: 'sw.js', 
   fallbacks: {
     document: "/offline",
@@ -24,6 +23,11 @@ const nextConfig: NextConfig = {
   },
   eslint: {
     ignoreDuringBuilds: true,
+  },
+  // Disable static generation for problematic routes
+  experimental: {
+    // Force dynamic rendering for routes with client-side auth
+    serverComponentsExternalPackages: ['firebase', 'firebase-admin'],
   },
   webpack: (config, { isServer }) => {
     // Ignore handlebars require.extensions warning for genkit

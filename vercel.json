@@ -1,4 +1,25 @@
 {
+  "buildCommand": "npm run build:vercel",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "functions": {
+    "app/(app)/admin/**/*.tsx": {
+      "maxDuration": 30
+    },
+    "app/(app)/inventory/**/*.tsx": {
+      "maxDuration": 30
+    },
+    "app/(app)/finance/**/*.tsx": {
+      "maxDuration": 30
+    },
+    "app/(app)/supplier/**/*.tsx": {
+      "maxDuration": 30
+    }
+  },
+  "env": {
+    "NEXT_TELEMETRY_DISABLED": "1"
+  },
   "rewrites": [
     {
       "source": "/gift-tracking/:assetPath(.+\\.(?:css|js|svg|png|jpg|jpeg|gif|ico|json|txt|map|webmanifest))$",
