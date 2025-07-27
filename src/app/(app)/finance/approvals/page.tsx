@@ -93,7 +93,7 @@ export default function FinanceApprovalsPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user || !['Admin', 'FinanceManager', 'InventoryManager'].includes(role || '')) {
+    if (!user || !['Admin', 'FinanceManager'].includes(role || '')) {
       router.replace('/dashboard');
       return;
     }

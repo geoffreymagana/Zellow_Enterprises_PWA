@@ -100,20 +100,20 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   const { searchTerm, setSearchTerm, setOpenMobile } = sidebarContext;
 
   const baseAdminNavItems = [
-    { href: '/dashboard', label: 'Dashboard', roles: ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager', 'Quality Check'] },
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager', 'Quality Check'] },
     { href: '/admin/users', label: 'Users', icon: Users, roles: ['Admin'] },
-    { href: '/admin/products', label: 'Products', icon: Package, roles: ['Admin'] },
+    { href: '/admin/products', label: 'Products', icon: Package, roles: ['Admin', 'ServiceManager'] },
     { href: '/inventory', label: 'Inventory Mgt', icon: Warehouse, roles: ['Admin', 'InventoryManager'] },
     { href: '/inventory/receivership', label: 'Receive Stock', icon: PackageSearch, roles: ['Admin', 'InventoryManager'] },
-    { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, roles: ['Admin', 'ServiceManager'], count: pendingOrdersCount },
+    { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, roles: ['Admin'], count: pendingOrdersCount },
     { href: '/admin/bulk-orders', label: 'Bulk Orders', icon: PackagePlus, roles: ['Admin', 'FinanceManager', 'ServiceManager'] },
     { href: '/tasks', label: 'Production Tasks', icon: Wrench, roles: ['Admin', 'ServiceManager'] },
     { href: '/admin/quality-assurance', label: 'Quality Assurance', icon: ClipboardCheck, roles: ['Admin', 'Quality Check'], count: qaCount },
     { href: '/admin/customizations', label: 'Customizations', icon: Layers, roles: ['Admin', 'ServiceManager'] },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'], count: pendingPaymentsCount },
     { href: '/admin/shipping', label: 'Shipping', icon: Ship, roles: ['Admin', 'DispatchManager'] },
-    { href: '/admin/approvals', label: 'General Approvals', icon: ClipboardCheck, roles: ['Admin'], count: generalApprovalsCount },
-    { href: '/finance/approvals', label: 'Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] },
+    { href: '/admin/approvals', label: 'Account Approvals', icon: ClipboardCheck, roles: ['Admin'], count: generalApprovalsCount },
+    { href: '/finance/approvals', label: 'Stock Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] },
     { href: '/finance/financials', label: 'Financials', icon: BarChart2, roles: ['Admin', 'FinanceManager'] },
     { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['Admin', 'FinanceManager'] },
     { href: '/admin/notifications', label: 'Notifications', icon: Bell, roles: ['Admin'], count: unreadMessagesCount },
@@ -125,37 +125,13 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/settings', label: 'Settings', icon: SettingsIcon, roles: ['Admin'] },
   ];
 
-  let mainAdminNavItemsFilteredByRole = baseAdminNavItems.filter(item => role && item.roles.includes(role));
-
-  if (role === 'Admin') {
-    const hiddenForAdminHrefs = new Set([
-      '/inventory',
-      '/inventory/receivership',
-      '/tasks',
-      '/finance/approvals',
-      '/finance/financials',
-      '/invoices'
-    ]);
-    mainAdminNavItemsFilteredByRole = mainAdminNavItemsFilteredByRole.filter(item => !hiddenForAdminHrefs.has(item.href));
-  } else if (role === 'ServiceManager') {
-    const hiddenForServiceManagerHrefs = new Set(['/admin/orders']);
-    mainAdminNavItemsFilteredByRole = mainAdminNavItemsFilteredByRole.filter(item => !hiddenForServiceManagerHrefs.has(item.href));
-  }
-
-
-  const mainAdminNavItems = mainAdminNavItemsFilteredByRole
-    .map(item => {
-      if (!searchTerm) return { ...item, isVisible: true };
-      const labelMatches = item.label.toLowerCase().includes(searchTerm.toLowerCase());
-      return { ...item, isVisible: labelMatches };
-    })
-    .filter(item => item.isVisible);
+  const mainAdminNavItems = baseAdminNavItems
+    .filter(item => role && item.roles.includes(role))
+    .filter(item => !searchTerm || item.label.toLowerCase().includes(searchTerm.toLowerCase()));
 
   const filteredFooterAdminNavItems = footerAdminNavItems
     .filter(item => role && item.roles.includes(role))
-    .filter(item =>
-      !searchTerm || item.label.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    .filter(item => !searchTerm || item.label.toLowerCase().includes(searchTerm.toLowerCase()));
 
 
   return (
@@ -437,7 +413,7 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
                                {role === 'FinanceManager' && (<>
                                 <Link href="/invoices" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/invoices") ? "bg-muted text-primary font-semibold" : ""}`}><FileText className="mr-2 h-4 w-4" />Invoices</Link>
                                 <Link href="/finance/financials" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/finance/financials") ? "bg-muted text-primary font-semibold" : ""}`}><BarChart2 className="mr-2 h-4 w-4" />Financials</Link>
-                                <Link href="/finance/approvals" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/finance/approvals") ? "bg-muted text-primary font-semibold" : ""}`}><Coins className="mr-2 h-4 w-4" />Approvals</Link>
+                                <Link href="/finance/approvals" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/finance/approvals") ? "bg-muted text-primary font-semibold" : ""}`}><Coins className="mr-2 h-4 w-4" />Stock Approvals</Link>
                               </>)}
                               <Link href="/profile" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/profile" ? "bg-muted text-primary font-semibold" : ""}`}><UserCircle className="mr-2 h-4 w-4" />Profile</Link>
                           </nav>
