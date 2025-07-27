@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PlusCircle, Edit, Trash2, Search, FilterIcon, ExternalLink, ImageOff } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Search, Filter, ExternalLink, ImageOff } from 'lucide-react';
 import type { Product as ProductType } from '@/types';
 import { Badge } from "@/components/ui/badge";
 import Image from 'next/image';
