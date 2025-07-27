@@ -48,12 +48,14 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   const pathname = usePathname();
   const isMobile = useIsMobile();
 
+  // Notification counts state
   const [pendingPaymentsCount, setPendingPaymentsCount] = useState(0);
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
   const [generalApprovalsCount, setGeneralApprovalsCount] = useState(0);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [qaCount, setQaCount] = useState(0);
 
+  // Set up real-time listeners for notification counts
   useEffect(() => {
     if (!db || !role || !user) return;
 
@@ -64,41 +66,44 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
       const paymentsQuery = query(collection(db, 'orders'), where('status', '==', 'pending_finance_approval'));
       unsubscribers.push(onSnapshot(paymentsQuery, (snapshot) => setPendingPaymentsCount(snapshot.size)));
     }
+    
     // Pending Orders (for Admin/Service Mgr)
     if (role === 'Admin' || role === 'ServiceManager') {
       const ordersQuery = query(collection(db, 'orders'), where('status', '==', 'pending_finance_approval'));
-       unsubscribers.push(onSnapshot(ordersQuery, (snapshot) => setPendingOrdersCount(snapshot.size)));
+      unsubscribers.push(onSnapshot(ordersQuery, (snapshot) => setPendingOrdersCount(snapshot.size)));
     }
+    
     // General Approvals (for Admin)
     if (role === 'Admin') {
       const approvalsQuery = query(collection(db, 'approvalRequests'), where('status', '==', 'pending'));
       unsubscribers.push(onSnapshot(approvalsQuery, (snapshot) => setGeneralApprovalsCount(snapshot.size)));
     }
-     // QA Count
+    
+    // QA Count
     if (role === 'Admin' || role === 'Quality Check') {
-        const qaQuery = query(collection(db, 'orders'), where('status', '==', 'awaiting_quality_check'));
-        unsubscribers.push(onSnapshot(qaQuery, (snapshot) => setQaCount(snapshot.size)));
+      const qaQuery = query(collection(db, 'orders'), where('status', '==', 'awaiting_quality_check'));
+      unsubscribers.push(onSnapshot(qaQuery, (snapshot) => setQaCount(snapshot.size)));
     }
+    
     // Unread Messages for all staff roles
     const threadsQuery = query(collection(db, 'feedbackThreads'), where('targetUserId', '==', user.uid));
     unsubscribers.push(onSnapshot(threadsQuery, (snapshot) => {
       const unread = snapshot.docs.filter(doc => {
-          const threadData = doc.data() as FeedbackThread;
-          return threadData.lastReplierRole !== role && threadData.status !== 'closed';
+        const threadData = doc.data() as FeedbackThread;
+        return threadData.lastReplierRole !== role && threadData.status !== 'closed';
       }).length;
       setUnreadMessagesCount(unread);
     }));
 
-
     return () => unsubscribers.forEach(unsub => unsub());
   }, [db, role, user]);
-
 
   if (!sidebarContext) {
     return <div className="flex items-center justify-center min-h-screen">Error: Sidebar context not found.</div>;
   }
   const { searchTerm, setSearchTerm, setOpenMobile } = sidebarContext;
 
+  // Complete navigation items with proper roles and counts
   const baseAdminNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Admin', 'FinanceManager', 'DispatchManager', 'ServiceManager', 'InventoryManager', 'Quality Check'] },
     { href: '/admin/users', label: 'Users', icon: Users, roles: ['Admin'] },
@@ -112,7 +117,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/customizations', label: 'Customizations', icon: Layers, roles: ['Admin', 'ServiceManager'] },
     { href: '/admin/payments', label: 'Payments', icon: DollarSign, roles: ['Admin', 'FinanceManager'], count: pendingPaymentsCount },
     { href: '/admin/shipping', label: 'Shipping', icon: Ship, roles: ['Admin', 'DispatchManager'] },
-    { href: '/admin/approvals', label: 'Account Approvals', icon: ClipboardCheck, roles: ['Admin'], count: generalApprovalsCount },
+    { href: '/admin/approvals', label: 'Approvals', icon: ClipboardCheck, roles: ['Admin'], count: generalApprovalsCount },
     { href: '/finance/approvals', label: 'Approvals', icon: Coins, roles: ['Admin', 'FinanceManager'] },
     { href: '/finance/financials', label: 'Financials', icon: BarChart2, roles: ['Admin', 'FinanceManager'] },
     { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['Admin', 'FinanceManager'] },
@@ -125,6 +130,7 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
     { href: '/admin/settings', label: 'Settings', icon: SettingsIcon, roles: ['Admin'] },
   ];
 
+  // Filter navigation items by role and search term
   const mainAdminNavItems = baseAdminNavItems
     .filter(item => role && item.roles.includes(role))
     .filter(item => !searchTerm || item.label.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -132,7 +138,6 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
   const filteredFooterAdminNavItems = footerAdminNavItems
     .filter(item => role && item.roles.includes(role))
     .filter(item => !searchTerm || item.label.toLowerCase().includes(searchTerm.toLowerCase()));
-
 
   return (
     <div className="flex flex-col w-full min-h-screen bg-background">
@@ -148,12 +153,12 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
               </SheetTrigger>
               <SheetContent side="left" className="w-[var(--sidebar-width-mobile,280px)] p-0 bg-sidebar text-sidebar-foreground flex flex-col">
                 <SheetHeader className="p-4 border-b border-sidebar h-[var(--header-height)] flex items-center">
-                   <SheetTitle className="text-lg font-semibold">Admin Menu</SheetTitle>
+                  <SheetTitle className="text-lg font-semibold">Admin Menu</SheetTitle>
                 </SheetHeader>
                 <ScrollArea className="flex-1">
                   <SidebarMenu className="p-2">
                     {mainAdminNavItems.map((item) => { 
-                       const isActive = (() => {
+                      const isActive = (() => {
                         if (item.href === '/inventory' && pathname.startsWith('/inventory/receivership')) {
                           return false; 
                         }
@@ -163,21 +168,22 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                         return item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
                       })();
                       return (
-                      <SidebarMenuItem key={item.label}>
-                        <Link href={item.href!}>
-                          <SidebarMenuButton
-                            className="w-full justify-start"
-                            variant="ghost"
-                            onClick={() => setOpenMobile(false)}
-                            isActive={isActive}
-                           >
-                            <item.icon className="mr-2 h-4 w-4" />
-                            <span>{item.label}</span>
-                            {item.count && item.count > 0 && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
-                          </SidebarMenuButton>
-                        </Link>
-                      </SidebarMenuItem>
-                    )})}
+                        <SidebarMenuItem key={item.label + item.href}>
+                          <Link href={item.href!}>
+                            <SidebarMenuButton
+                              className="w-full justify-start"
+                              variant="ghost"
+                              onClick={() => setOpenMobile(false)}
+                              isActive={isActive}
+                            >
+                              <item.icon className="mr-2 h-4 w-4" />
+                              <span>{item.label}</span>
+                              {item.count && item.count > 0 && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                            </SidebarMenuButton>
+                          </Link>
+                        </SidebarMenuItem>
+                      )
+                    })}
                   </SidebarMenu>
                 </ScrollArea>
                 <SidebarFooter className="p-2 border-t border-sidebar">
@@ -185,20 +191,21 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                     {filteredFooterAdminNavItems.map((item) => {
                       const isActive = item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
                       return (
-                      <SidebarMenuItem key={item.label}>
-                        <Link href={item.href}>
-                          <SidebarMenuButton
-                            className="w-full justify-start"
-                            variant="ghost"
-                            onClick={() => setOpenMobile(false)}
-                            isActive={isActive}
-                          >
-                            <item.icon className="mr-2 h-4 w-4" />
-                            <span>{item.label}</span>
-                          </SidebarMenuButton>
-                        </Link>
-                      </SidebarMenuItem>
-                    )})}
+                        <SidebarMenuItem key={item.label}>
+                          <Link href={item.href}>
+                            <SidebarMenuButton
+                              className="w-full justify-start"
+                              variant="ghost"
+                              onClick={() => setOpenMobile(false)}
+                              isActive={isActive}
+                            >
+                              <item.icon className="mr-2 h-4 w-4" />
+                              <span>{item.label}</span>
+                            </SidebarMenuButton>
+                          </Link>
+                        </SidebarMenuItem>
+                      )
+                    })}
                   </SidebarMenu>
                   <div className="p-2 mt-1"><ThemeToggle /></div>
                   <div className="mt-1 p-2">
@@ -210,15 +217,15 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
               </SheetContent>
             </Sheet>
             <Link href="/dashboard" className="hidden md:flex items-center gap-2" aria-label="Admin Dashboard Home">
-               <Aperture className="h-6 w-6 text-primary" /> 
-               <h1 className="text-xl font-semibold font-headline">Admin Panel</h1>
+              <Aperture className="h-6 w-6 text-primary" /> 
+              <h1 className="text-xl font-semibold font-headline">Admin Panel</h1>
             </Link>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
             <HeaderSearch 
-              initialSearchTerm={searchTerm} 
-              onSearchChange={setSearchTerm} 
               placeholder="Search sections..." 
+              initialSearchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
             />
             <div className="hidden md:block">
               <ThemeToggle />
@@ -249,25 +256,25 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
                       return item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
                     })();
                     return (
-                    <SidebarMenuItem key={item.label}>
-                      <Link href={item.href!}>
-                        <SidebarMenuButton
-                          tooltip={item.label}
-                          className="w-full justify-start"
-                          variant="ghost"
-                          isActive={isActive}
-                        >
-                          <item.icon className="mr-2 h-4 w-4" />
-                          <span>{item.label}</span>
-                          {item.count && item.count > 0 && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
-                        </SidebarMenuButton>
-                      </Link>
-                    </SidebarMenuItem>
+                      <SidebarMenuItem key={item.label + item.href}>
+                        <Link href={item.href!}>
+                          <SidebarMenuButton
+                            tooltip={item.label}
+                            className="w-full justify-start"
+                            variant="ghost"
+                            isActive={isActive}
+                          >
+                            <item.icon className="mr-2 h-4 w-4" />
+                            <span>{item.label}</span>
+                            {item.count && item.count > 0 && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                          </SidebarMenuButton>
+                        </Link>
+                      </SidebarMenuItem>
                     )
                   })}
                 </SidebarMenu>
               ) : null}
-               {searchTerm && mainAdminNavItems.length === 0 && filteredFooterAdminNavItems.length === 0 && (
+              {searchTerm && mainAdminNavItems.length === 0 && filteredFooterAdminNavItems.length === 0 && (
                 <p className="p-4 text-sm text-muted-foreground">No admin sections found for "{searchTerm}".</p>
               )}
             </ScrollArea>
@@ -276,22 +283,23 @@ const AdminLayout: FC<LayoutProps> = ({ children }) => {
             {filteredFooterAdminNavItems.length > 0 && (
               <SidebarMenu className="p-0">
                 {filteredFooterAdminNavItems.map((item) => {
-                 const isActive = item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                  const isActive = item.href === pathname || (item.href !== '/dashboard' && pathname.startsWith(item.href));
                   return (
-                  <SidebarMenuItem key={item.label}>
-                    <Link href={item.href}>
-                      <SidebarMenuButton
-                        tooltip={item.label}
-                        className="w-full justify-start"
-                        variant="ghost"
-                        isActive={isActive}
-                      >
-                        <item.icon className="mr-2 h-4 w-4" />
-                        <span>{item.label}</span>
-                      </SidebarMenuButton>
-                    </Link>
-                  </SidebarMenuItem>
-                )})}
+                    <SidebarMenuItem key={item.label}>
+                      <Link href={item.href}>
+                        <SidebarMenuButton
+                          tooltip={item.label}
+                          className="w-full justify-start"
+                          variant="ghost"
+                          isActive={isActive}
+                        >
+                          <item.icon className="mr-2 h-4 w-4" />
+                          <span>{item.label}</span>
+                        </SidebarMenuButton>
+                      </Link>
+                    </SidebarMenuItem>
+                  )
+                })}
               </SidebarMenu>
             )}
             <div className="mt-1 p-2">
@@ -355,20 +363,20 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
     <div className="flex flex-col min-h-screen bg-background">
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-[var(--header-height)]">
         <div className="container mx-auto h-full flex items-center justify-between px-4 gap-4">
-           <HeaderSearch 
-             placeholder={role === 'Customer' ? "Search products, gift boxes..." : (role === 'InventoryManager' ? "Search inventory..." : "Search...")} 
-           />
+          <HeaderSearch 
+            placeholder={role === 'Customer' ? "Search products, gift boxes..." : (role === 'InventoryManager' ? "Search inventory..." : "Search...")} 
+          />
 
           <div className="flex items-center gap-2">
             <Link href="/feedback" passHref>
-                <Button variant="ghost" size="icon" aria-label="Feedback Notifications" className="relative">
-                    <Bell className="h-5 w-5" />
-                    {unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                            {unreadCount}
-                        </span>
-                    )}
-                </Button>
+              <Button variant="ghost" size="icon" aria-label="Feedback Notifications" className="relative">
+                <Bell className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                    {unreadCount}
+                  </span>
+                )}
+              </Button>
             </Link>
             {role !== 'Customer' && <ThemeToggle />}
             {user && role === 'Customer' && (
@@ -383,46 +391,46 @@ const NonAdminLayout: FC<LayoutProps> = ({ children }) => {
                 </Button>
               </Link>
             )}
-             {user && role && !['Customer', 'Admin'].includes(role) && (
-                 <Button variant="ghost" size="icon" onClick={logout} aria-label="Logout">
-                    <LogOutIcon className="h-5 w-5" />
-                 </Button>
+            {user && role && !['Customer', 'Admin'].includes(role) && (
+              <Button variant="ghost" size="icon" onClick={logout} aria-label="Logout">
+                <LogOutIcon className="h-5 w-5" />
+              </Button>
             )}
             {user && role && !['Customer', 'Admin'].includes(role) && (
-                <Sheet>
-                    <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon" className="md:hidden">
-                            <Menu className="h-5 w-5" /><span className="sr-only">Open menu</span>
-                        </Button>
-                    </SheetTrigger>
-                    <SheetContent side="left" className="w-[280px] p-0 bg-card text-card-foreground flex flex-col">
-                        <SheetHeader className="p-4 border-b h-[var(--header-height)]">
-                            <SheetTitle>Menu</SheetTitle>
-                        </SheetHeader>
-                        <ScrollArea className="flex-1">
-                          <nav className="py-4 px-2">
-                              <Link href="/dashboard" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/dashboard" ? "bg-muted text-primary font-semibold" : ""}`}><Home className="mr-2 h-4 w-4" />Dashboard</Link>
-                              {technicianRoles.includes(role || null) && <Link href="/tasks" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/tasks") ? "bg-muted text-primary font-semibold" : ""}`}><ListChecks className="mr-2 h-4 w-4" />Tasks</Link>}
-                              {role === 'ServiceManager' && <Link href="/tasks" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/tasks") ? "bg-muted text-primary font-semibold" : ""}`}><Wrench className="mr-2 h-4 w-4" />Team Tasks</Link>}
-                              {role === 'Rider' && <Link href="/deliveries" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/deliveries") ? "bg-muted text-primary font-semibold" : ""}`}><Truck className="mr-2 h-4 w-4" />Deliveries</Link>}
-                              {role === 'Supplier' && <Link href="/supplier/stock-requests" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/supplier/stock-requests") ? "bg-muted text-primary font-semibold" : ""}`}><Warehouse className="mr-2 h-4 w-4" />Stock Requests</Link>}
-                              {role === 'InventoryManager' && (<>
-                                <Link href="/inventory" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/inventory" ? "bg-muted text-primary font-semibold" : ""}`}><Package className="mr-2 h-4 w-4" />Inventory</Link>
-                                <Link href="/inventory/receivership" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/inventory/receivership") ? "bg-muted text-primary font-semibold" : ""}`}><PackageSearch className="mr-2 h-4 w-4" />Receive Stock</Link>
-                              </>)}
-                               {role === 'FinanceManager' && (<>
-                                <Link href="/invoices" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/invoices") ? "bg-muted text-primary font-semibold" : ""}`}><FileText className="mr-2 h-4 w-4" />Invoices</Link>
-                                <Link href="/finance/financials" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/finance/financials") ? "bg-muted text-primary font-semibold" : ""}`}><BarChart2 className="mr-2 h-4 w-4" />Financials</Link>
-                                <Link href="/finance/approvals" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/finance/approvals") ? "bg-muted text-primary font-semibold" : ""}`}><Coins className="mr-2 h-4 w-4" />Stock Approvals</Link>
-                              </>)}
-                              <Link href="/profile" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/profile" ? "bg-muted text-primary font-semibold" : ""}`}><UserCircle className="mr-2 h-4 w-4" />Profile</Link>
-                          </nav>
-                        </ScrollArea>
-                        <div className="p-4 border-t">
-                          <Button variant="outline" onClick={logout} className="w-full justify-start"><LogOutIcon className="mr-2 h-4 w-4" />Logout</Button>
-                        </div>
-                    </SheetContent>
-                </Sheet>
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="md:hidden">
+                    <Menu className="h-5 w-5" /><span className="sr-only">Open menu</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-[280px] p-0 bg-card text-card-foreground flex flex-col">
+                  <SheetHeader className="p-4 border-b h-[var(--header-height)]">
+                    <SheetTitle>Menu</SheetTitle>
+                  </SheetHeader>
+                  <ScrollArea className="flex-1">
+                    <nav className="py-4 px-2">
+                      <Link href="/dashboard" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/dashboard" ? "bg-muted text-primary font-semibold" : ""}`}><Home className="mr-2 h-4 w-4" />Dashboard</Link>
+                      {technicianRoles.includes(role || null) && <Link href="/tasks" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/tasks") ? "bg-muted text-primary font-semibold" : ""}`}><ListChecks className="mr-2 h-4 w-4" />Tasks</Link>}
+                      {role === 'ServiceManager' && <Link href="/tasks" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/tasks") ? "bg-muted text-primary font-semibold" : ""}`}><Wrench className="mr-2 h-4 w-4" />Team Tasks</Link>}
+                      {role === 'Rider' && <Link href="/deliveries" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/deliveries") ? "bg-muted text-primary font-semibold" : ""}`}><Truck className="mr-2 h-4 w-4" />Deliveries</Link>}
+                      {role === 'Supplier' && <Link href="/supplier/stock-requests" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/supplier/stock-requests") ? "bg-muted text-primary font-semibold" : ""}`}><Warehouse className="mr-2 h-4 w-4" />Stock Requests</Link>}
+                      {role === 'InventoryManager' && (<>
+                        <Link href="/inventory" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/inventory" ? "bg-muted text-primary font-semibold" : ""}`}><Package className="mr-2 h-4 w-4" />Inventory</Link>
+                        <Link href="/inventory/receivership" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/inventory/receivership") ? "bg-muted text-primary font-semibold" : ""}`}><PackageSearch className="mr-2 h-4 w-4" />Receive Stock</Link>
+                      </>)}
+                      {role === 'FinanceManager' && (<>
+                        <Link href="/invoices" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/invoices") ? "bg-muted text-primary font-semibold" : ""}`}><FileText className="mr-2 h-4 w-4" />Invoices</Link>
+                        <Link href="/finance/financials" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/finance/financials") ? "bg-muted text-primary font-semibold" : ""}`}><BarChart2 className="mr-2 h-4 w-4" />Financials</Link>
+                        <Link href="/finance/approvals" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname.startsWith("/finance/approvals") ? "bg-muted text-primary font-semibold" : ""}`}><Coins className="mr-2 h-4 w-4" />Approvals</Link>
+                      </>)}
+                      <Link href="/profile" className={`flex items-center p-2 rounded-md hover:bg-muted ${pathname === "/profile" ? "bg-muted text-primary font-semibold" : ""}`}><UserCircle className="mr-2 h-4 w-4" />Profile</Link>
+                    </nav>
+                  </ScrollArea>
+                  <div className="p-4 border-t">
+                    <Button variant="outline" onClick={logout} className="w-full justify-start"><LogOutIcon className="mr-2 h-4 w-4" />Logout</Button>
+                  </div>
+                </SheetContent>
+              </Sheet>
             )}
           </div>
         </div>
@@ -447,7 +455,7 @@ function AppLayoutContent({ children }: LayoutProps) {
         router.replace('/login');
       }
       if (user && isAuthPage) {
-          router.replace('/dashboard');
+        router.replace('/dashboard');
       }
     }
   }, [user, loading, pathname, router]);
