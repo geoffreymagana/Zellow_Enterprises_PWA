@@ -24,10 +24,11 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // External packages for server components
+  serverExternalPackages: ['firebase', 'firebase-admin'],
   // Disable static generation for problematic routes
   experimental: {
     // Force dynamic rendering for routes with client-side auth
-    serverComponentsExternalPackages: ['firebase', 'firebase-admin'],
   },
   webpack: (config, { isServer }) => {
     // Ignore handlebars require.extensions warning for genkit
