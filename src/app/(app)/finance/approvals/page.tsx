@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge, BadgeProps } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle, XCircle, Eye, RefreshCw, Coins, Trophy, ArrowRight, FilePlus2, Hourglass, TrendingUp, TrendingDown, Minus, ShoppingCart, Info } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Eye, RefreshCw, Coins, Trophy, ArrowRight, FilePlus2, Hourglass, TrendingUp, TrendingDown, MinusCircle, ShoppingCart, Info } from 'lucide-react';
 import type { StockRequest, StockRequestStatus, Bid, Product, Order, OrderStatus, DeliveryHistoryEntry } from '@/types';
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, writeBatch, getDocs, Timestamp, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -27,6 +27,7 @@ const getStockRequestStatusVariant = (status?: StockRequestStatus | null): Badge
     case 'pending_award': return 'statusAmber';
     case 'awarded': return 'statusIndigo';
     case 'awaiting_fulfillment': return 'statusLightBlue';
+    case 'awaiting_receipt': return 'statusBlue';
     case 'received': return 'statusGreen';
     case 'fulfilled': return 'statusGreen';
     case 'rejected_finance': return 'statusRed';
@@ -143,7 +144,7 @@ export default function FinanceApprovalsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-headline font-semibold flex items-center gap-2"><Coins className="h-7 w-7 text-primary"/>Approvals</h1>
+        <h1 className="text-3xl font-headline font-semibold flex items-center gap-2"><Coins className="h-7 w-7 text-primary"/>Stock Approvals</h1>
         <Button onClick={() => fetchAllData().then(unsub => unsub && unsub())} variant="outline" size="sm" disabled={isLoading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
@@ -210,7 +211,7 @@ export default function FinanceApprovalsPage() {
                   const priceDifference = currentProductPrice !== undefined ? bid.pricePerUnit - currentProductPrice : 0;
                   const isBetterPrice = priceDifference < 0;
                   const isWorsePrice = priceDifference > 0;
-                  const Icon = isBetterPrice ? TrendingDown : isWorsePrice ? TrendingUp : Minus;
+                  const Icon = isBetterPrice ? TrendingDown : isWorsePrice ? TrendingUp : MinusCircle;
                   const iconColor = isBetterPrice ? 'text-green-500' : isWorsePrice ? 'text-red-500' : 'text-muted-foreground';
 
                   return (

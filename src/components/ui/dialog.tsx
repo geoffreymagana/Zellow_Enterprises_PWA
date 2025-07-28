@@ -98,17 +98,14 @@ const DialogTitle = React.forwardRef<
 DialogTitle.displayName = DialogPrimitive.Title.displayName
 
 const DialogDescription = React.forwardRef<
-  HTMLDivElement, // Changed to HTMLDivElement as we are rendering a div
+  React.ElementRef<typeof DialogPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
->(({ className, children, ...props }, ref) => (
+>(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
-    asChild // Use asChild to pass props to our custom div
+    ref={ref}
+    className={cn("text-sm text-muted-foreground", className)}
     {...props}
-  >
-    <div ref={ref} className={cn("text-sm text-muted-foreground", className)}>
-      {children}
-    </div>
-  </DialogPrimitive.Description>
+  />
 ))
 DialogDescription.displayName = DialogPrimitive.Description.displayName
 

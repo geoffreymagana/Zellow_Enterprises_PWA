@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -8,58 +7,52 @@ import { Search as SearchIconLucide } from 'lucide-react';
 
 interface HeaderSearchProps {
   placeholder: string;
-  initialSearchTerm?: string;
+  searchContext: 'admin' | 'non-admin';
   onSearchChange?: (term: string) => void;
 }
 
-export function HeaderSearch({ placeholder, initialSearchTerm, onSearchChange }: HeaderSearchProps) {
+export function HeaderSearch({ placeholder, searchContext, onSearchChange }: HeaderSearchProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [localSearchTerm, setLocalSearchTerm] = useState(initialSearchTerm ?? searchParams.get('q') ?? '');
+  // For non-admin, state is managed locally. For admin, it's passed via props.
+  const [localSearchTerm, setLocalSearchTerm] = useState(searchParams.get('q') || '');
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Sync state if initial search term changes from parent (e.g., admin sidebar search)
-  useEffect(() => {
-    if (initialSearchTerm !== undefined && initialSearchTerm !== localSearchTerm) {
-      setLocalSearchTerm(initialSearchTerm);
-    }
-  }, [initialSearchTerm, localSearchTerm]);
-
-  // Sync state if URL search param changes
+  
+  // This effect ensures that when the URL's search param changes (e.g., from browser back/forward), the input updates.
   useEffect(() => {
     const urlSearchTerm = searchParams.get('q') || '';
-    if (urlSearchTerm !== localSearchTerm) {
+    if (urlSearchTerm !== localSearchTerm && searchContext === 'non-admin') {
       setLocalSearchTerm(urlSearchTerm);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, searchContext]);
+
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newSearchTerm = event.target.value;
-    setLocalSearchTerm(newSearchTerm);
 
-    if (onSearchChange) {
+    if (searchContext === 'admin' && onSearchChange) {
       onSearchChange(newSearchTerm);
-      return; // If parent handler is provided, let it control logic
-    }
-
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-
-    debounceTimeoutRef.current = setTimeout(() => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (newSearchTerm) {
-        params.set('q', newSearchTerm);
-      } else {
-        params.delete('q');
+    } else {
+      setLocalSearchTerm(newSearchTerm);
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
       }
-      
-      const targetPath = (pathname === '/products' || pathname === '/gift-boxes') ? pathname : '/products';
-      router.push(`${targetPath}?${params.toString()}`);
-    }, 500); // 500ms debounce
+      debounceTimeoutRef.current = setTimeout(() => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (newSearchTerm) {
+          params.set('q', newSearchTerm);
+        } else {
+          params.delete('q');
+        }
+        
+        // Non-admin search always redirects to a product discovery page
+        const targetPath = (pathname === '/products' || pathname === '/gift-boxes') ? pathname : '/products';
+        router.push(`${targetPath}?${params.toString()}`);
+      }, 500);
+    }
   };
 
   return (
@@ -69,7 +62,7 @@ export function HeaderSearch({ placeholder, initialSearchTerm, onSearchChange }:
         type="search"
         placeholder={placeholder}
         className="h-9 w-full pl-10"
-        value={localSearchTerm}
+        value={searchContext === 'admin' ? (onSearchChange ? undefined : '') : localSearchTerm} // Admin search is controlled by parent
         onChange={handleSearchChange}
       />
     </div>

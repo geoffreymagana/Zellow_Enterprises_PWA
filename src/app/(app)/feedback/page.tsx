@@ -2,7 +2,8 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { History, MessageSquarePlus, Send, Loader2, ChevronsUpDown, Check } from "lucide-react";
+import { History, MessageSquarePlus, Send, Loader2, Check } from "lucide-react";
+import { ChevronsUpDown } from '@/components/ui/chevrons-up-down';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";

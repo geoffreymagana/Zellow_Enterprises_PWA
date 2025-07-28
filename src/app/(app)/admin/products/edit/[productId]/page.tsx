@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, ArrowLeft, UploadCloud, ExternalLink, ImageOff, Construction } from 'lucide-react';
+import { Loader2, Save, ArrowLeft, UploadCloud, ExternalLink, ImageOff } from 'lucide-react';
 import type { Product as ProductType, CustomizationGroupDefinition } from '@/types';
 import { useForm, Controller, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -327,6 +327,3 @@ export default function AdminEditProductPage() {
     </div>
   );
 }
-    
-
-    
