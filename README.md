@@ -17,7 +17,7 @@ ZellowLive is a comprehensive web application designed to streamline the process
 *   **Generative AI:** Genkit (for features like gift notifications via email)
 *   **PWA:** Enabled for Customer and Staff portals for an app-like experience with Push Notifications.
 ## Dashboard Screenshot
-[![ZellowLive Logo](https://res.cloudinary.com/dwqwwb2fh/image/upload/v1753043502/wgwxd1qjbzmld0o6mdyi.png)](https://zellow-enterprises.vercel.app/)
+[![ZellowLive Dashboard](https://res.cloudinary.com/dwqwwb2fh/image/upload/v1753043502/wgwxd1qjbzmld0o6mdyi.png)](https://zellow-enterprises.vercel.app/)
 
 
 
