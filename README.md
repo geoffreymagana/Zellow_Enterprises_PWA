@@ -32,10 +32,10 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Installation
 
-1.  **Clone the repository (if applicable):**
+1.  **Clone the repository:**
     ```bash
-    # git clone [your-repo-url]
-    # cd zellowlive
+    # git clone https://github.com/geoffreymagana/Zellow_Enterprises_PWA
+    # cd Zellow_Enterprises_PWA
     ```
 
 2.  **Install NPM packages:**
